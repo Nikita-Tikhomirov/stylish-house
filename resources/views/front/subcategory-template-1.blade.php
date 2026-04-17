@@ -135,12 +135,12 @@
 
     <main class="layout">
 
-        <!-- РџРµСЂРІС‹Р№ СЌРєСЂР°РЅ -->
+        <!-- Р СџР ВµРЎР‚Р Р†РЎвЂ№Р в„– РЎРЊР С”РЎР‚Р В°Р Р… -->
         <section class="s-catMain wrapper">
             <div class="s-catMain__img"><img src="{{ Storage::url($subcategory->img) }}" alt="" /></div>
             <div class="breadcrumbs">
                 <ul class="breadcrumbs__list">
-                    <li class=""><a class="breadcrumbs__link" href="{{ route('front.home') }}">Р“Р»Р°РІРЅР°СЏ</a></li>
+                    <li class=""><a class="breadcrumbs__link" href="{{ route('front.home') }}">Р вЂњР В»Р В°Р Р†Р Р…Р В°РЎРЏ</a></li>
 
                     <li class="breadcrumbs__item"><svg class="breadcrumbs__arrow" width="5" height="9"
                             viewBox="0 0 5 9" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -169,10 +169,10 @@
             <div class="s-catMain__text">{{ $subcategory->first_screen_text }}</div>
         </section>
 
-        <!-- Р’С‹РІРѕРґ С‚РѕРІР°СЂРѕРІ РєР°Рє РІРµР·РґРµ -->
+        <!-- Р вЂ™РЎвЂ№Р Р†Р С•Р Т‘ РЎвЂљР С•Р Р†Р В°РЎР‚Р С•Р Р† Р С”Р В°Р С” Р Р†Р ВµР В·Р Т‘Р Вµ -->
 
             <section class="popularsWithFilter wrapper">
-                <h2 class="popularsWithFilter__title title"> <span>РџРѕРїСѓР»СЏСЂРЅС‹Рµ С‚РѕРІР°СЂС‹</span><svg width="114"
+                <h2 class="popularsWithFilter__title title"> <span>Р СџР С•Р С—РЎС“Р В»РЎРЏРЎР‚Р Р…РЎвЂ№Р Вµ РЎвЂљР С•Р Р†Р В°РЎР‚РЎвЂ№</span><svg width="114"
                         height="35" viewBox="0 0 114 35" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M112 23.275C1.84952 -10.6834 -7.36586 1.48086 7.50443 32.9053" stroke="currentColor"
                             stroke-width="4" stroke-miterlimit="3.8637" stroke-linecap="round"></path>
@@ -259,293 +259,310 @@
                 </div>
             </section>
 
-        <!-- Р’РёРґС‹ РјРѕРЅС‚Р°Р¶Р° -->
+        <!-- Р вЂ™Р С‘Р Т‘РЎвЂ№ Р СР С•Р Р…РЎвЂљР В°Р В¶Р В° -->
         @if (!empty($installationTypes) && $installationTypes->isNotEmpty())
             <x-front.section.subcategory-installation-types :installationTypes="$installationTypes" />
         @else
             <x-front.section.rollets-installation />
         @endif
 
-        <!-- РљР°Р»СЊРєСѓР»СЏС‚РѕСЂ -->
+        <!-- Р С™Р В°Р В»РЎРЉР С”РЎС“Р В»РЎРЏРЎвЂљР С•РЎР‚ -->
         @if (!empty($firstProduct))
             @php
                 $product = $firstProduct;
             @endphp
             <section class="prodMain wrapper catCalculator" style="padding-top: 40px;">
-                <h2 class="prodMain__title title"> <span>Р Р°СЃСЃС‡РёС‚Р°С‚СЊ СЃС‚РѕРёРјРѕСЃС‚СЊ СЂРѕР»СЊСЃС‚Р°РІРµРЅ</span><svg width="114" height="35"
+                <h2 class="prodMain__title title"> <span>Р В Р В°РЎРѓРЎРѓРЎвЂЎР С‘РЎвЂљР В°РЎвЂљРЎРЉ РЎРѓРЎвЂљР С•Р С‘Р СР С•РЎРѓРЎвЂљРЎРЉ РЎР‚Р С•Р В»РЎРЉРЎРѓРЎвЂљР В°Р Р†Р ВµР Р…</span><svg width="114" height="35"
                         viewBox="0 0 114 35" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M112 23.275C1.84952 -10.6834 -7.36586 1.48086 7.50443 32.9053" stroke="currentColor"
                             stroke-width="4" stroke-miterlimit="3.8637" stroke-linecap="round"></path>
                     </svg></h2>
 
-                <div class="prodForm">
-                    <div class="prodForm__galleryWrapOuter">
-                        <div class="prodForm__galleryWrap">
-                            <div class="prodForm__imgWrap">
+            <div class="prodForm">
+                <div class="prodForm__galleryWrapOuter">
+                    <div class="prodForm__galleryWrap">
+                        <div class="prodForm__imgWrap">
+                            @php
+                                $productMainImage = $product->image_thumb_path ?: $product->image_path;
+                                $productFabricImage = $product->fabric_thumb_path ?: $product->fabric_photo;
+                            @endphp
+                            @if ($productMainImage)
+                                <img src="{{ asset($productMainImage) }}" alt="{{ $product->h1 }}" />
+                            @endif
+                            @if ($productFabricImage)
+                                <img src="{{ asset($productFabricImage) }}"
+                                    alt="{{ $product->h1 }}" />
+                            @endif
+
+                        </div>
+
+
+
+                        <div class="prodForm__bar">
+                            @foreach ($sameModelProducts as $sameProduct)
                                 @php
-                                    $productMainImage = $product->image_thumb_path ?: $product->image_path;
-                                    $productFabricImage = $product->fabric_thumb_path ?: $product->fabric_photo;
+                                    $sameMainImage = $sameProduct->image_thumb_path ?: $sameProduct->image_path;
+                                    $sameFabricImage = $sameProduct->fabric_thumb_path ?: $sameProduct->fabric_photo;
                                 @endphp
-                                @if ($productMainImage)
-                                    <img src="{{ asset($productMainImage) }}" alt="{{ $product->h1 }}" />
+                                @if ($sameMainImage)
+                                    <img src="{{ asset($sameMainImage) }}"
+                                        alt="{{ $sameProduct->h1 }}" />
+                                @elseif ($sameFabricImage)
+                                    <img src="{{ asset($sameFabricImage) }}"
+                                        alt="{{ $sameProduct->h1 }}" />
                                 @endif
-                                @if ($productFabricImage)
-                                    <img src="{{ asset($productFabricImage) }}" alt="{{ $product->h1 }}" />
-                                @endif
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+
+                <div class="prodForm__calcFormWrap">
+                    <div class="prodForm__formSubtitle">{{ $category->titleh1 }}</div>
+                    <div class="prodForm__formTitle">{{ $product->h1 }}</div>
+                    <div class="prodForm__description">
+                        <p>{{ $product->first_screenn_description }}...</p><span class="more">Подробнее</span>
+                    </div>
+
+                    <input type="hidden" name="modelSelect" class="modelSelect" value="{{ $product->model_title }}">
+
+                    <input type="hidden" name="cloth" class="cloth" value="{{ $product->cloth }}">
+                    <input type="hidden" name="model" class="model" value="{{ $product->model_title }}">
+<input type="hidden" class="discount" value="{{ $product->discount }}">
+
+                    <div class="prodForm__sizeWrap">
+                        <label class="prodForm__label">
+                            <p>Ширина, мм</p>
+                            @if ($product->min_width)
+                                <input class="prodForm__input width-input" type="number" name="width"
+                                    value="{{ $product->min_width }}" required />
+                            @else
+                                <input class="prodForm__input width-input" type="number" name="width" value="500"
+                                    required />
+                            @endif
+
+                        </label>
+                        <label class="prodForm__label">
+                            <p>Высота, мм</p>
+                            @if ($product->min_height)
+                                <input class="prodForm__input height-input" type="number" name="height"
+                                    value="{{ $product->min_height }}" required />
+                            @else
+                                <input class="prodForm__input height-input" type="number" name="height"
+                                    value="500" required />
+                            @endif
+
+                        </label>
+                    </div>
+
+                    <div class="calcWidhType">
+                        <div class="cartForm__optionsList">
+                            <div class="cartForm__listTitle">Тип монтажа</div>
+                            <ul>
+                                <li>
+                                    <label>
+                                        <input class="widthType" type="radio" name="widhType{{ $product->id }}"
+                                            value="Ширина по ткани" checked>
+                                        <span>Короб внутри (скрытый)</span>
+                                    </label>
+                                </li>
+                                <li>
+                                    <label>
+                                        <input class="widthType" type="radio" name="widhType{{ $product->id }}"
+                                            value="Ширина по габариту">
+                                        <span>Короб снаружи</span>
+
+                                    </label>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="calcWidhType">
+                        <div class="cartForm__optionsList">
+                            <div class="cartForm__listTitle">Тип запорного устройства</div>
+                            <ul>
+                                <li>
+                                    <label>
+                                        <input class="widthType" type="radio" name="lock-type" value="sliders" data-price="0" checked>
+                                        <span>Задвижки +0р</span>
+                                    </label>
+                                </li>
+                                <li>
+                                    <label>
+                                        <input class="widthType" type="radio" name="lock-type" value="lock" data-price="1600">
+                                        <span>Замок +1600р</span>
+                                    </label>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Аккордеон с параметрами товара -->
+                    <div class="product-params-accordion" style="margin-top: 30px;">
+                        <div class="cartForm__optionsList">
+                            <div class="cartForm__listTitle">Характеристики товара</div>
+                            
+                            <div class="accordion-item">
+                                <div class="accordion-header">
+                                    <h4>Вид монтажа</h4>
+                                    <span class="accordion-arrow">▼</span>
+                                </div>
+                                <div class="accordion-content">
+                                    <div class="installation-options">
+                                        <label class="option-label">
+                                            <input type="radio" name="installation-type" value="overhead" data-price="{{ $product->overhead_price ?? 0 }}" {{ $product->installation_type == 'overhead' ? 'checked' : '' }}>
+                                            <span class="option-name">Накладной монтаж</span>
+                                            <span class="option-price">+{{ $product->overhead_price ?? 0 }}₽</span>
+                                        </label>
+                                        <div class="option-description">
+                                            При выборе накладного монтажа необходимо к размерам проема добавьте 110мм по ширине и 250мм по высоте.
+                                        </div>
+                                        
+                                        <label class="option-label">
+                                            <input type="radio" name="installation-type" value="built-in" data-price="{{ $product->builtin_price ?? 0 }}" {{ $product->installation_type == 'built-in' ? 'checked' : '' }}>
+                                            <span class="option-name">Встроенный монтаж</span>
+                                            <span class="option-price">+{{ $product->builtin_price ?? 0 }}₽</span>
+                                        </label>
+                                        <div class="option-description">
+                                            При выборе встроенного монтажа рекомендуется от размеров проема отнять по ширине и высоте 5 мм.
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div class="prodForm__bar">
-                                @foreach ($sameModelProducts as $sameProduct)
-                                    @php
-                                        $sameMainImage = $sameProduct->image_thumb_path ?: $sameProduct->image_path;
-                                        $sameFabricImage = $sameProduct->fabric_thumb_path ?: $sameProduct->fabric_photo;
-                                    @endphp
-                                    @if ($sameMainImage)
-                                        <img src="{{ asset($sameMainImage) }}" alt="{{ $sameProduct->h1 }}" />
-                                    @elseif ($sameFabricImage)
-                                        <img src="{{ asset($sameFabricImage) }}" alt="{{ $sameProduct->h1 }}" />
-                                    @endif
-                                @endforeach
+                            <div class="accordion-item">
+                                <div class="accordion-header">
+                                    <h4>Тип управления рольставни</h4>
+                                    <span class="accordion-arrow">▼</span>
+                                </div>
+                                <div class="accordion-content">
+                                    <div class="control-options">
+                                        <label class="option-label">
+                                            <input type="radio" name="control-type" value="strap" data-price="{{ $product->strap_price ?? 0 }}" {{ $product->control_type == 'strap' ? 'checked' : '' }}>
+                                            <span class="option-name">Ленточный или шнуровой инерционный привод</span>
+                                            <span class="option-price">+{{ $product->strap_price ?? 0 }}₽</span>
+                                        </label>
+                                        <div class="option-description">
+                                            Грузоподъемность до 15 кг. Ручное управление.
+                                        </div>
+                                        
+                                        <label class="option-label">
+                                            <input type="radio" name="control-type" value="cardan" data-price="{{ $product->cardan_price ?? 0 }}" {{ $product->control_type == 'cardan' ? 'checked' : '' }}>
+                                            <span class="option-name">Воротковый привод (кардан)</span>
+                                            <span class="option-price">+{{ $product->cardan_price ?? 0 }}₽</span>
+                                        </label>
+                                        <div class="option-description">
+                                            Грузоподъемность до 35 кг. Ручное управление.
+                                        </div>
+                                        
+                                        <label class="option-label">
+                                            <input type="radio" name="control-type" value="pim" data-price="{{ $product->pim_price ?? 0 }}" {{ $product->control_type == 'pim' ? 'checked' : '' }}>
+                                            <span class="option-name">Пружинно-инерционный механизм (ПИМ)</span>
+                                            <span class="option-price">+{{ $product->pim_price ?? 0 }}₽</span>
+                                        </label>
+                                        <div class="option-description">
+                                            Грузоподъемность от 6 до 80 кг. Ручное управление.
+                                        </div>
+                                        
+                                        <label class="option-label">
+                                            <input type="radio" name="control-type" value="electric" data-price="{{ $product->electric_price ?? 6793 }}" {{ $product->control_type == 'electric' ? 'checked' : '' }}>
+                                            <span class="option-name">Автоматическое управление (электропривод)</span>
+                                            <span class="option-price">+{{ $product->electric_price ?? 6793 }}₽</span>
+                                        </label>
+                                        <div class="option-description">
+                                            Тип управление: выключатель настенный или мини пульт.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="accordion-item">
+                                <div class="accordion-header">
+                                    <h4>Блокирующие устройства</h4>
+                                    <span class="accordion-arrow">▼</span>
+                                </div>
+                                <div class="accordion-content">
+                                    <div class="lock-options">
+                                        <label class="option-label">
+                                            <input type="radio" name="lock-device" value="rigel" data-price="{{ $product->rigel_price ?? 1575 }}" {{ $product->lock_device == 'rigel' ? 'checked' : '' }}>
+                                            <span class="option-name">Ригельный замок (с ключом)</span>
+                                            <span class="option-price">+{{ $product->rigel_price ?? 1575 }}₽</span>
+                                        </label>
+                                        <div class="option-description">
+                                            Используется при ручном управлении. Рольставни запираются на замок. Не рекомендуется использовать при электроприводе.
+                                        </div>
+                                        
+                                        <label class="option-label">
+                                            <input type="radio" name="lock-device" value="shchyolka" data-price="{{ $product->shchyolka_price ?? 171 }}" {{ $product->lock_device == 'shchyolka' ? 'checked' : '' }}>
+                                            <span class="option-name">Ручной ригель (щеколда)</span>
+                                            <span class="option-price">+{{ $product->shchyolka_price ?? 171 }}₽</span>
+                                        </label>
+                                        <div class="option-description">
+                                            Используется при ручном управлении. Любой желающий сможет открыть роллету. Не рекомендуется использовать при электроприводе.
+                                        </div>
+                                        
+                                        <label class="option-label">
+                                            <input type="radio" name="lock-device" value="upper" data-price="{{ $product->upper_price ?? 2358 }}" {{ $product->lock_device == 'upper' ? 'checked' : '' }}>
+                                            <span class="option-name">Верхний ригель (верхние замки)</span>
+                                            <span class="option-price">+{{ $product->upper_price ?? 2358 }}₽</span>
+                                        </label>
+                                        <div class="option-description">
+                                            Используется при управлении воротковый привод или автоматическом управлении для ограничения ручного подъема полотна.
+                                        </div>
+                                        
+                                        <label class="option-label">
+                                            <input type="radio" name="lock-device" value="none" data-price="0" {{ $product->lock_device == 'none' ? 'checked' : '' }}>
+                                            <span class="option-name">Без блокировки</span>
+                                            <span class="option-price">+0₽</span>
+                                        </label>
+                                        <div class="option-description">
+                                            Применяется в основном при изделии для сантехнических проемов.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="accordion-item">
+                                <div class="accordion-header">
+                                    <h4>Дополнительные опции</h4>
+                                    <span class="accordion-arrow">▼</span>
+                                </div>
+                                <div class="accordion-content">
+                                    <div class="additional-options">
+                                        <label class="option-label">
+                                            <input type="checkbox" name="ral-paint" value="ral-paint" data-price="{{ $product->ral_price ?? 8010 }}" {{ $product->ral_paint ? 'checked' : '' }}>
+                                            <span class="option-name">Покраска по RAL</span>
+                                            <span class="option-price">+{{ $product->ral_price ?? 8010 }}₽</span>
+                                        </label>
+                                        <div class="option-description">
+                                            Возможна покраска профиля AER44m/S или AER55m/S. Профиль с пенным заполнением покраске не подлежит!
+                                        </div>
+                                        
+                                        <label class="option-label">
+                                            <input type="checkbox" name="photo-print" value="photo-print" data-price="{{ $product->photo_price ?? 3920 }}" {{ $product->photo_print ? 'checked' : '' }}>
+                                            <span class="option-name">Нанесение фотопечати</span>
+                                            <span class="option-price">+{{ $product->photo_price ?? 3920 }}₽</span>
+                                        </label>
+                                        <div class="option-description">
+                                            Возможна нанесение любого рисунка путем фотопечати на всем изделии.
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="prodForm__calcFormWrap">
-                        <div class="prodForm__formSubtitle">{{ $category->titleh1 }}</div>
-                        <div class="prodForm__formTitle">{{ $product->h1 }}</div>
-                        <div class="prodForm__description">
-                            <p>{{ $product->first_screenn_description }}...</p><span class="more">РџРѕРґСЂРѕР±РЅРµРµ</span>
-                        </div>
+                    <meta name="csrf-token" content="{{ csrf_token() }}">
 
-                        <input type="hidden" name="modelSelect" class="modelSelect" value="{{ $product->model_title }}">
-                        <input type="hidden" name="cloth" class="cloth" value="{{ $product->cloth }}">
-                        <input type="hidden" name="model" class="model" value="{{ $product->model_title }}">
-                        <input type="hidden" class="discount" value="{{ $product->discount }}">
-
-                        <div class="prodForm__sizeWrap">
-                            <label class="prodForm__label">
-                                <p>РЁРёСЂРёРЅР°, РјРј</p>
-                                @if ($product->min_width)
-                                    <input class="prodForm__input width-input" type="number" name="width" value="{{ $product->min_width }}" required />
-                                @else
-                                    <input class="prodForm__input width-input" type="number" name="width" value="500" required />
-                                @endif
-                            </label>
-                            <label class="prodForm__label">
-                                <p>Р’С‹СЃРѕС‚Р°, РјРј</p>
-                                @if ($product->min_height)
-                                    <input class="prodForm__input height-input" type="number" name="height" value="{{ $product->min_height }}" required />
-                                @else
-                                    <input class="prodForm__input height-input" type="number" name="height" value="500" required />
-                                @endif
-                            </label>
-                        </div>
-
-                        <div class="calcWidhType">
-                            <div class="cartForm__optionsList">
-                                <div class="cartForm__listTitle">РўРёРї РјРѕРЅС‚Р°Р¶Р°</div>
-                                <ul>
-                                    <li>
-                                        <label>
-                                            <input class="widthType" type="radio" name="widhType{{ $product->id }}" value="РЁРёСЂРёРЅР° РїРѕ С‚РєР°РЅРё" checked>
-                                            <span>РљРѕСЂРѕР± РІРЅСѓС‚СЂРё (СЃРєСЂС‹С‚С‹Р№)</span>
-                                        </label>
-                                    </li>
-                                    <li>
-                                        <label>
-                                            <input class="widthType" type="radio" name="widhType{{ $product->id }}" value="РЁРёСЂРёРЅР° РїРѕ РіР°Р±Р°СЂРёС‚Сѓ">
-                                            <span>РљРѕСЂРѕР± СЃРЅР°СЂСѓР¶Рё</span>
-                                        </label>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-
-                        <div class="calcWidhType">
-                            <div class="cartForm__optionsList">
-                                <div class="cartForm__listTitle">РўРёРї Р·Р°РїРѕСЂРЅРѕРіРѕ СѓСЃС‚СЂРѕР№СЃС‚РІР°</div>
-                                <ul>
-                                    <li>
-                                        <label>
-                                            <input class="widthType" type="radio" name="lock-type" value="sliders" data-price="0" checked>
-                                            <span>Р—Р°РґРІРёР¶РєРё +0СЂ</span>
-                                        </label>
-                                    </li>
-                                    <li>
-                                        <label>
-                                            <input class="widthType" type="radio" name="lock-type" value="lock" data-price="1600">
-                                            <span>Р—Р°РјРѕРє +1600СЂ</span>
-                                        </label>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-
-                        <div class="product-params-accordion" style="margin-top: 30px;">
-                            <div class="cartForm__optionsList">
-                                <div class="cartForm__listTitle">РҐР°СЂР°РєС‚РµСЂРёСЃС‚РёРєРё С‚РѕРІР°СЂР°</div>
-
-                                <div class="accordion-item">
-                                    <div class="accordion-header">
-                                        <h4>Р’РёРґ РјРѕРЅС‚Р°Р¶Р°</h4>
-                                        <span class="accordion-arrow">в–ј</span>
-                                    </div>
-                                    <div class="accordion-content">
-                                        <div class="installation-options">
-                                            <label class="option-label">
-                                                <input type="radio" name="installation-type" value="overhead" data-price="{{ $product->overhead_price ?? 0 }}" {{ $product->installation_type == 'overhead' ? 'checked' : '' }}>
-                                                <span class="option-name">РќР°РєР»Р°РґРЅРѕР№ РјРѕРЅС‚Р°Р¶</span>
-                                                <span class="option-price">+{{ $product->overhead_price ?? 0 }}в‚Ѕ</span>
-                                            </label>
-                                            <div class="option-description">
-                                                РџСЂРё РІС‹Р±РѕСЂРµ РЅР°РєР»Р°РґРЅРѕРіРѕ РјРѕРЅС‚Р°Р¶Р° РЅРµРѕР±С…РѕРґРёРјРѕ Рє СЂР°Р·РјРµСЂР°Рј РїСЂРѕРµРјР° РґРѕР±Р°РІСЊС‚Рµ 110РјРј РїРѕ С€РёСЂРёРЅРµ Рё 250РјРј РїРѕ РІС‹СЃРѕС‚Рµ.
-                                            </div>
-
-                                            <label class="option-label">
-                                                <input type="radio" name="installation-type" value="built-in" data-price="{{ $product->builtin_price ?? 0 }}" {{ $product->installation_type == 'built-in' ? 'checked' : '' }}>
-                                                <span class="option-name">Р’СЃС‚СЂРѕРµРЅРЅС‹Р№ РјРѕРЅС‚Р°Р¶</span>
-                                                <span class="option-price">+{{ $product->builtin_price ?? 0 }}в‚Ѕ</span>
-                                            </label>
-                                            <div class="option-description">
-                                                РџСЂРё РІС‹Р±РѕСЂРµ РІСЃС‚СЂРѕРµРЅРЅРѕРіРѕ РјРѕРЅС‚Р°Р¶Р° СЂРµРєРѕРјРµРЅРґСѓРµС‚СЃСЏ РѕС‚ СЂР°Р·РјРµСЂРѕРІ РїСЂРѕРµРјР° РѕС‚РЅСЏС‚СЊ РїРѕ С€РёСЂРёРЅРµ Рё РІС‹СЃРѕС‚Рµ 5 РјРј.
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="accordion-item">
-                                    <div class="accordion-header">
-                                        <h4>РўРёРї СѓРїСЂР°РІР»РµРЅРёСЏ СЂРѕР»СЊСЃС‚Р°РІРЅРё</h4>
-                                        <span class="accordion-arrow">в–ј</span>
-                                    </div>
-                                    <div class="accordion-content">
-                                        <div class="control-options">
-                                            <label class="option-label">
-                                                <input type="radio" name="control-type" value="strap" data-price="{{ $product->strap_price ?? 0 }}" {{ $product->control_type == 'strap' ? 'checked' : '' }}>
-                                                <span class="option-name">Р›РµРЅС‚РѕС‡РЅС‹Р№ РёР»Рё С€РЅСѓСЂРѕРІРѕР№ РёРЅРµСЂС†РёРѕРЅРЅС‹Р№ РїСЂРёРІРѕРґ</span>
-                                                <span class="option-price">+{{ $product->strap_price ?? 0 }}в‚Ѕ</span>
-                                            </label>
-                                            <div class="option-description">
-                                                Р“СЂСѓР·РѕРїРѕРґСЉРµРјРЅРѕСЃС‚СЊ РґРѕ 15 РєРі. Р СѓС‡РЅРѕРµ СѓРїСЂР°РІР»РµРЅРёРµ.
-                                            </div>
-
-                                            <label class="option-label">
-                                                <input type="radio" name="control-type" value="cardan" data-price="{{ $product->cardan_price ?? 0 }}" {{ $product->control_type == 'cardan' ? 'checked' : '' }}>
-                                                <span class="option-name">Р’РѕСЂРѕС‚РєРѕРІС‹Р№ РїСЂРёРІРѕРґ (РєР°СЂРґР°РЅ)</span>
-                                                <span class="option-price">+{{ $product->cardan_price ?? 0 }}в‚Ѕ</span>
-                                            </label>
-                                            <div class="option-description">
-                                                Р“СЂСѓР·РѕРїРѕРґСЉРµРјРЅРѕСЃС‚СЊ РґРѕ 35 РєРі. Р СѓС‡РЅРѕРµ СѓРїСЂР°РІР»РµРЅРёРµ.
-                                            </div>
-
-                                            <label class="option-label">
-                                                <input type="radio" name="control-type" value="pim" data-price="{{ $product->pim_price ?? 0 }}" {{ $product->control_type == 'pim' ? 'checked' : '' }}>
-                                                <span class="option-name">РџСЂСѓР¶РёРЅРЅРѕ-РёРЅРµСЂС†РёРѕРЅРЅС‹Р№ РјРµС…Р°РЅРёР·Рј (РџРРњ)</span>
-                                                <span class="option-price">+{{ $product->pim_price ?? 0 }}в‚Ѕ</span>
-                                            </label>
-                                            <div class="option-description">
-                                                Р“СЂСѓР·РѕРїРѕРґСЉРµРјРЅРѕСЃС‚СЊ РѕС‚ 6 РґРѕ 80 РєРі. Р СѓС‡РЅРѕРµ СѓРїСЂР°РІР»РµРЅРёРµ.
-                                            </div>
-
-                                            <label class="option-label">
-                                                <input type="radio" name="control-type" value="electric" data-price="{{ $product->electric_price ?? 6793 }}" {{ $product->control_type == 'electric' ? 'checked' : '' }}>
-                                                <span class="option-name">РђРІС‚РѕРјР°С‚РёС‡РµСЃРєРѕРµ СѓРїСЂР°РІР»РµРЅРёРµ (СЌР»РµРєС‚СЂРѕРїСЂРёРІРѕРґ)</span>
-                                                <span class="option-price">+{{ $product->electric_price ?? 6793 }}в‚Ѕ</span>
-                                            </label>
-                                            <div class="option-description">
-                                                РўРёРї СѓРїСЂР°РІР»РµРЅРёРµ: РІС‹РєР»СЋС‡Р°С‚РµР»СЊ РЅР°СЃС‚РµРЅРЅС‹Р№ РёР»Рё РјРёРЅРё РїСѓР»СЊС‚.
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="accordion-item">
-                                    <div class="accordion-header">
-                                        <h4>Р‘Р»РѕРєРёСЂСѓСЋС‰РёРµ СѓСЃС‚СЂРѕР№СЃС‚РІР°</h4>
-                                        <span class="accordion-arrow">в–ј</span>
-                                    </div>
-                                    <div class="accordion-content">
-                                        <div class="lock-options">
-                                            <label class="option-label">
-                                                <input type="radio" name="lock-device" value="rigel" data-price="{{ $product->rigel_price ?? 1575 }}" {{ $product->lock_device == 'rigel' ? 'checked' : '' }}>
-                                                <span class="option-name">Р РёРіРµР»СЊРЅС‹Р№ Р·Р°РјРѕРє (СЃ РєР»СЋС‡РѕРј)</span>
-                                                <span class="option-price">+{{ $product->rigel_price ?? 1575 }}в‚Ѕ</span>
-                                            </label>
-                                            <div class="option-description">
-                                                РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РїСЂРё СЂСѓС‡РЅРѕРј СѓРїСЂР°РІР»РµРЅРёРё. Р РѕР»СЊСЃС‚Р°РІРЅРё Р·Р°РїРёСЂР°СЋС‚СЃСЏ РЅР° Р·Р°РјРѕРє. РќРµ СЂРµРєРѕРјРµРЅРґСѓРµС‚СЃСЏ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ РїСЂРё СЌР»РµРєС‚СЂРѕРїСЂРёРІРѕРґРµ.
-                                            </div>
-
-                                            <label class="option-label">
-                                                <input type="radio" name="lock-device" value="shchyolka" data-price="{{ $product->shchyolka_price ?? 171 }}" {{ $product->lock_device == 'shchyolka' ? 'checked' : '' }}>
-                                                <span class="option-name">Р СѓС‡РЅРѕР№ СЂРёРіРµР»СЊ (С‰РµРєРѕР»РґР°)</span>
-                                                <span class="option-price">+{{ $product->shchyolka_price ?? 171 }}в‚Ѕ</span>
-                                            </label>
-                                            <div class="option-description">
-                                                РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РїСЂРё СЂСѓС‡РЅРѕРј СѓРїСЂР°РІР»РµРЅРёРё. Р›СЋР±РѕР№ Р¶РµР»Р°СЋС‰РёР№ СЃРјРѕР¶РµС‚ РѕС‚РєСЂС‹С‚СЊ СЂРѕР»Р»РµС‚Сѓ. РќРµ СЂРµРєРѕРјРµРЅРґСѓРµС‚СЃСЏ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ РїСЂРё СЌР»РµРєС‚СЂРѕРїСЂРёРІРѕРґРµ.
-                                            </div>
-
-                                            <label class="option-label">
-                                                <input type="radio" name="lock-device" value="upper" data-price="{{ $product->upper_price ?? 2358 }}" {{ $product->lock_device == 'upper' ? 'checked' : '' }}>
-                                                <span class="option-name">Р’РµСЂС…РЅРёР№ СЂРёРіРµР»СЊ (РІРµСЂС…РЅРёРµ Р·Р°РјРєРё)</span>
-                                                <span class="option-price">+{{ $product->upper_price ?? 2358 }}в‚Ѕ</span>
-                                            </label>
-                                            <div class="option-description">
-                                                РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РїСЂРё СѓРїСЂР°РІР»РµРЅРёРё РІРѕСЂРѕС‚РєРѕРІС‹Р№ РїСЂРёРІРѕРґ РёР»Рё Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРѕРј СѓРїСЂР°РІР»РµРЅРёРё РґР»СЏ РѕРіСЂР°РЅРёС‡РµРЅРёСЏ СЂСѓС‡РЅРѕРіРѕ РїРѕРґСЉРµРјР° РїРѕР»РѕС‚РЅР°.
-                                            </div>
-
-                                            <label class="option-label">
-                                                <input type="radio" name="lock-device" value="none" data-price="0" {{ $product->lock_device == 'none' ? 'checked' : '' }}>
-                                                <span class="option-name">Р‘РµР· Р±Р»РѕРєРёСЂРѕРІРєРё</span>
-                                                <span class="option-price">+0в‚Ѕ</span>
-                                            </label>
-                                            <div class="option-description">
-                                                РџСЂРёРјРµРЅСЏРµС‚СЃСЏ РІ РѕСЃРЅРѕРІРЅРѕРј РїСЂРё РёР·РґРµР»РёРё РґР»СЏ СЃР°РЅС‚РµС…РЅРёС‡РµСЃРєРёС… РїСЂРѕРµРјРѕРІ.
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="accordion-item">
-                                    <div class="accordion-header">
-                                        <h4>Р”РѕРїРѕР»РЅРёС‚РµР»СЊРЅС‹Рµ РѕРїС†РёРё</h4>
-                                        <span class="accordion-arrow">в–ј</span>
-                                    </div>
-                                    <div class="accordion-content">
-                                        <div class="additional-options">
-                                            <label class="option-label">
-                                                <input type="checkbox" name="ral-paint" value="ral-paint" data-price="{{ $product->ral_price ?? 8010 }}" {{ $product->ral_paint ? 'checked' : '' }}>
-                                                <span class="option-name">РџРѕРєСЂР°СЃРєР° РїРѕ RAL</span>
-                                                <span class="option-price">+{{ $product->ral_price ?? 8010 }}в‚Ѕ</span>
-                                            </label>
-                                            <div class="option-description">
-                                                Р’РѕР·РјРѕР¶РЅР° РїРѕРєСЂР°СЃРєР° РїСЂРѕС„РёР»СЏ AER44m/S РёР»Рё AER55m/S. РџСЂРѕС„РёР»СЊ СЃ РїРµРЅРЅС‹Рј Р·Р°РїРѕР»РЅРµРЅРёРµРј РїРѕРєСЂР°СЃРєРµ РЅРµ РїРѕРґР»РµР¶РёС‚!
-                                            </div>
-
-                                            <label class="option-label">
-                                                <input type="checkbox" name="photo-print" value="photo-print" data-price="{{ $product->photo_price ?? 3920 }}" {{ $product->photo_print ? 'checked' : '' }}>
-                                                <span class="option-name">РќР°РЅРµСЃРµРЅРёРµ С„РѕС‚РѕРїРµС‡Р°С‚Рё</span>
-                                                <span class="option-price">+{{ $product->photo_price ?? 3920 }}в‚Ѕ</span>
-                                            </label>
-                                            <div class="option-description">
-                                                Р’РѕР·РјРѕР¶РЅР° РЅР°РЅРµСЃРµРЅРёРµ Р»СЋР±РѕРіРѕ СЂРёСЃСѓРЅРєР° РїСѓС‚РµРј С„РѕС‚РѕРїРµС‡Р°С‚Рё РЅР° РІСЃРµРј РёР·РґРµР»РёРё.
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <meta name="csrf-token" content="{{ csrf_token() }}">
-
-                        <div class="prodForm__howMany"> <button class="minus">-</button><input type="text"
-                                class="quantity-input" placeholder="1" value="1" /><button
-                                class="plus">+</button></div>
-                        <div class="prodForm__priceAndAddToCart">
-                            <div class="prodForm__price">Р¦РµРЅР°: 1200в‚Ѕ</div>
-                            <button class="prodForm__addToCart" data-id="{{ $product->id }}"> Р”РѕР±Р°РІРёС‚СЊ РІ
-                                РєРѕСЂР·РёРЅСѓ </button>
-                        </div>
+                    <div class="prodForm__howMany"> <button class="minus">-</button><input type="text"
+                            class="quantity-input" placeholder="1" value="1" /><button
+                            class="plus">+</button></div>
+                    <div class="prodForm__priceAndAddToCart">
+                        <div class="prodForm__price">Цена: 1200₽</div>
+                        <button class="prodForm__addToCart" data-id="{{ $product->id }}"> Добавить в
+                            корзину </button>
                     </div>
+                </div>
                 </div>
             </section>
         @endif
@@ -554,16 +571,16 @@
             <x-front.section.subgallery :gallerys="$workExamples" :category='$category' title=""></x-front.section.gallery>
         @endif
 
-        <!-- РћРїР»Р°С‚Р° Рё РґРѕСЃС‚Р°РІРєР° -->
+        <!-- Р С›Р С—Р В»Р В°РЎвЂљР В° Р С‘ Р Т‘Р С•РЎРѓРЎвЂљР В°Р Р†Р С”Р В° -->
         <x-front.section.delivery :title="$homePageFields->section_delivery_title" :topText="$homePageFields->section_delivery_top_text" :bottomText="$homePageFields->section_delivery_bottom_text"
             :iconCards="$iconCards"></x-front.section.delivery>
 
-        <!-- Р’РћРџР РћРЎР« Р РћРўР’Р•РўР« -->
+        <!-- Р вЂ™Р С›Р СџР В Р С›Р РЋР В« Р В Р С›Р СћР вЂ™Р вЂўР СћР В« -->
         @if ($subcategory->faq_html)
             <section class="s-faq wrapper">
                 <div class="s-faq__container">
                     <div class="s-faq__title-wrap">
-                        <h2 class="s-faq__title title"> <span>Р’РѕРїСЂРѕСЃС‹ Рё РѕС‚РІРµС‚С‹</span><svg width="114" height="35"
+                        <h2 class="s-faq__title title"> <span>Р вЂ™Р С•Р С—РЎР‚Р С•РЎРѓРЎвЂ№ Р С‘ Р С•РЎвЂљР Р†Р ВµРЎвЂљРЎвЂ№</span><svg width="114" height="35"
                                 viewBox="0 0 114 35" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M112 23.275C1.84952 -10.6834 -7.36586 1.48086 7.50443 32.9053" stroke="currentColor"
                                     stroke-width="4" stroke-miterlimit="3.8637" stroke-linecap="round"></path>
@@ -641,22 +658,22 @@
                 }
             </style>
         @else
-            <x-front.section.faqcat title="Р’РѕРїСЂРѕСЃС‹ Рё РѕС‚РІРµС‚С‹" :faqs="$faqs"></x-front.section.faqcat>
+            <x-front.section.faqcat title="Р вЂ™Р С•Р С—РЎР‚Р С•РЎРѓРЎвЂ№ Р С‘ Р С•РЎвЂљР Р†Р ВµРЎвЂљРЎвЂ№" :faqs="$faqs"></x-front.section.faqcat>
         @endif
 
-        <!-- РЎР•Рћ РўР•РљРЎРў -->
+        <!-- Р РЋР вЂўР С› Р СћР вЂўР С™Р РЋР Сћ -->
         <x-front.section.seo :seoSection="$subcategory->seo"></x-front.section.seo>
 
-        <!-- Р’СЃРµ РєР°С‚РµРіРѕСЂРёРё -->
+        <!-- Р вЂ™РЎРѓР Вµ Р С”Р В°РЎвЂљР ВµР С–Р С•РЎР‚Р С‘Р С‘ -->
         <section class="s-tags wrapper">
-            <h2 class="s-tags__title title"> <span>Р’СЃРµ РєР°С‚РµРіРѕСЂРёРё</span><svg width="114" height="35"
+            <h2 class="s-tags__title title"> <span>Р вЂ™РЎРѓР Вµ Р С”Р В°РЎвЂљР ВµР С–Р С•РЎР‚Р С‘Р С‘</span><svg width="114" height="35"
                     viewBox="0 0 114 35" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M112 23.275C1.84952 -10.6834 -7.36586 1.48086 7.50443 32.9053" stroke="currentColor"
                         stroke-width="4" stroke-miterlimit="3.8637" stroke-linecap="round"></path>
                 </svg></h2>
             <div class="s-tags__tags">
                 <div class="accardionJs">
-                    <div class="accardion__title">Р’СЃРµ РєР°С‚РµРіРѕСЂРёРё</div>
+                    <div class="accardion__title">Р вЂ™РЎРѓР Вµ Р С”Р В°РЎвЂљР ВµР С–Р С•РЎР‚Р С‘Р С‘</div>
                     <div class="accardion__content">
                         @if ($seoCats->isNotEmpty())
                             @foreach ($seoCats as $cat)
@@ -728,7 +745,7 @@
                     modal.appendChild(container);
                     document.body.appendChild(modal);
 
-                }; // Р•СЃР»Рё СѓР¶Рµ РµСЃС‚СЊ РјРѕРґР°Р»РєР°, РІС‹С…РѕРґРёРј
+                }; // Р вЂўРЎРѓР В»Р С‘ РЎС“Р В¶Р Вµ Р ВµРЎРѓРЎвЂљРЎРЉ Р СР С•Р Т‘Р В°Р В»Р С”Р В°, Р Р†РЎвЂ№РЎвЂ¦Р С•Р Т‘Р С‘Р С
 
 
             }
@@ -752,17 +769,17 @@
                             wrapPopupProd();
                         }, 50);
 
-                        console.log('Р—Р°РїСЂРѕСЃ Рє /popup СЃ prodId:', prodId);
+                        console.log('Р вЂ”Р В°Р С—РЎР‚Р С•РЎРѓ Р С” /popup РЎРѓ prodId:', prodId);
 
-                        // РџРѕР»СѓС‡Р°РµРј РґР°РЅРЅС‹Рµ Рѕ С‚РѕРІР°СЂРµ СЃ СЃРµСЂРІРµСЂР°
+                        // Р СџР С•Р В»РЎС“РЎвЂЎР В°Р ВµР С Р Т‘Р В°Р Р…Р Р…РЎвЂ№Р Вµ Р С• РЎвЂљР С•Р Р†Р В°РЎР‚Р Вµ РЎРѓ РЎРѓР ВµРЎР‚Р Р†Р ВµРЎР‚Р В°
                         fetch(`/popup/${prodId}`)
                             .then(response => response.json())
                             .then(product => {
-                                // Р—Р°РїРѕР»РЅСЏРµРј РїРѕРїР°Рї РґР°РЅРЅС‹РјРё С‚РѕРІР°СЂР°
+                                // Р вЂ”Р В°Р С—Р С•Р В»Р Р…РЎРЏР ВµР С Р С—Р С•Р С—Р В°Р С— Р Т‘Р В°Р Р…Р Р…РЎвЂ№Р СР С‘ РЎвЂљР С•Р Р†Р В°РЎР‚Р В°
                                 document.querySelector('#popupProd .prodForm__formSubtitle')
                                     .innerText = product.title;
                                 document.querySelector('#popupProd .prodForm__formTitle')
-                                    .innerText = `Р—Р°РєР°Р·Р°С‚СЊ ${product.title}`;
+                                    .innerText = `Р вЂ”Р В°Р С”Р В°Р В·Р В°РЎвЂљРЎРЉ ${product.title}`;
                                 document.querySelector('#popupProd .prodForm__description p')
                                     .innerText = product.first_screenn_description + ' ';
                                 let prodImg = document.querySelectorAll(
@@ -785,41 +802,41 @@
                                     prodImg[0].src = img2src;
 
                                 }
-                                // РљРѕСЂСЂРµРєС‚РёСЂСѓРµРј РїСѓС‚СЊ
+                                // Р С™Р С•РЎР‚РЎР‚Р ВµР С”РЎвЂљР С‘РЎР‚РЎС“Р ВµР С Р С—РЎС“РЎвЂљРЎРЉ
 
 
                                 // console.log(product.gallery);
-                                // РћС‡РёС‰Р°РµРј СЃС‚Р°СЂСѓСЋ РіР°Р»РµСЂРµСЋ
+                                // Р С›РЎвЂЎР С‘РЎвЂ°Р В°Р ВµР С РЎРѓРЎвЂљР В°РЎР‚РЎС“РЎР‹ Р С–Р В°Р В»Р ВµРЎР‚Р ВµРЎР‹
                                 let gallery = document.querySelector(
                                     '#popupProd .prodForm__bar');
                                 gallery.innerHTML = '';
 
-                                // Р”РѕР±Р°РІР»СЏРµРј РёР·РѕР±СЂР°Р¶РµРЅРёСЏ СЃ СЃСЃС‹Р»РєР°РјРё
+                                // Р вЂќР С•Р В±Р В°Р Р†Р В»РЎРЏР ВµР С Р С‘Р В·Р С•Р В±РЎР‚Р В°Р В¶Р ВµР Р…Р С‘РЎРЏ РЎРѓ РЎРѓРЎРѓРЎвЂ№Р В»Р С”Р В°Р СР С‘
                                 product.gallery.forEach(related => {
                                     let link = document.createElement('a');
-                                    link.href = related.link; // РЎСЃС‹Р»РєР° РЅР° С‚РѕРІР°СЂ
+                                    link.href = related.link; // Р РЋРЎРѓРЎвЂ№Р В»Р С”Р В° Р Р…Р В° РЎвЂљР С•Р Р†Р В°РЎР‚
                                     let img = document.createElement('img');
                                     if (related.image) {
 
                                         img.src =
-                                            `${related.image}`; // РџСѓС‚СЊ Рє РёР·РѕР±СЂР°Р¶РµРЅРёСЋ
+                                            `${related.image}`; // Р СџРЎС“РЎвЂљРЎРЉ Р С” Р С‘Р В·Р С•Р В±РЎР‚Р В°Р В¶Р ВµР Р…Р С‘РЎР‹
                                     } else {
 
                                         img.src =
-                                            `${related.fabric_photo}`; // РџСѓС‚СЊ Рє РёР·РѕР±СЂР°Р¶РµРЅРёСЋ
+                                            `${related.fabric_photo}`; // Р СџРЎС“РЎвЂљРЎРЉ Р С” Р С‘Р В·Р С•Р В±РЎР‚Р В°Р В¶Р ВµР Р…Р С‘РЎР‹
                                     }
 
 
                                     link.appendChild(
-                                        img); // Р’СЃС‚Р°РІР»СЏРµРј РёР·РѕР±СЂР°Р¶РµРЅРёРµ РІ СЃСЃС‹Р»РєСѓ
+                                        img); // Р вЂ™РЎРѓРЎвЂљР В°Р Р†Р В»РЎРЏР ВµР С Р С‘Р В·Р С•Р В±РЎР‚Р В°Р В¶Р ВµР Р…Р С‘Р Вµ Р Р† РЎРѓРЎРѓРЎвЂ№Р В»Р С”РЎС“
                                     gallery.appendChild(
-                                        link); // Р”РѕР±Р°РІР»СЏРµРј СЃСЃС‹Р»РєСѓ РІ РіР°Р»РµСЂРµСЋ
+                                        link); // Р вЂќР С•Р В±Р В°Р Р†Р В»РЎРЏР ВµР С РЎРѓРЎРѓРЎвЂ№Р В»Р С”РЎС“ Р Р† Р С–Р В°Р В»Р ВµРЎР‚Р ВµРЎР‹
 
                                 });
 
                                 console.log(product.model);
 
-                                // Р”РѕР±Р°РІРёС‚СЊ id РґР»СЏ РєРЅРѕРїРєРё РґРѕР±Р°РІРёС‚СЊ РІ РєРѕСЂР·РёРЅСѓ
+                                // Р вЂќР С•Р В±Р В°Р Р†Р С‘РЎвЂљРЎРЉ id Р Т‘Р В»РЎРЏ Р С”Р Р…Р С•Р С—Р С”Р С‘ Р Т‘Р С•Р В±Р В°Р Р†Р С‘РЎвЂљРЎРЉ Р Р† Р С”Р С•РЎР‚Р В·Р С‘Р Р…РЎС“
                                 document.querySelector('#popupProd .prodForm__addToCart')
                                     .setAttribute('data-id', prodId)
 
@@ -861,7 +878,7 @@
                                 }, 100);
                             })
                             .catch(error => {
-                                console.error('РћС€РёР±РєР° РїСЂРё Р·Р°РіСЂСѓР·РєРµ РґР°РЅРЅС‹С… С‚РѕРІР°СЂР°:', error);
+                                console.error('Р С›РЎв‚¬Р С‘Р В±Р С”Р В° Р С—РЎР‚Р С‘ Р В·Р В°Р С–РЎР‚РЎС“Р В·Р С”Р Вµ Р Т‘Р В°Р Р…Р Р…РЎвЂ№РЎвЂ¦ РЎвЂљР С•Р Р†Р В°РЎР‚Р В°:', error);
                             });
 
                     })
@@ -888,22 +905,22 @@
                     let counterMinusBtn = slide.querySelector('.minus');
                     let counterPlusBtn = slide.querySelector('.plus');
                     let counterInput = slide.querySelector('.quantity-input');
-                    // РЈРґР°Р»СЏРµРј СЃС‚Р°СЂС‹Рµ РѕР±СЂР°Р±РѕС‚С‡РёРєРё РїРµСЂРµРґ РґРѕР±Р°РІР»РµРЅРёРµРј РЅРѕРІС‹С…
+                    // Р Р€Р Т‘Р В°Р В»РЎРЏР ВµР С РЎРѓРЎвЂљР В°РЎР‚РЎвЂ№Р Вµ Р С•Р В±РЎР‚Р В°Р В±Р С•РЎвЂљРЎвЂЎР С‘Р С”Р С‘ Р С—Р ВµРЎР‚Р ВµР Т‘ Р Т‘Р С•Р В±Р В°Р Р†Р В»Р ВµР Р…Р С‘Р ВµР С Р Р…Р С•Р Р†РЎвЂ№РЎвЂ¦
                     function removeEventListeners(element, events) {
                         const clone = element.cloneNode(true);
                         element.replaceWith(clone);
                         return clone;
                     }
-                    // РћС‡РёС‰Р°РµРј РѕР±СЂР°Р±РѕС‚С‡РёРєРё РїРµСЂРµРґ РґРѕР±Р°РІР»РµРЅРёРµРј
+                    // Р С›РЎвЂЎР С‘РЎвЂ°Р В°Р ВµР С Р С•Р В±РЎР‚Р В°Р В±Р С•РЎвЂљРЎвЂЎР С‘Р С”Р С‘ Р С—Р ВµРЎР‚Р ВµР Т‘ Р Т‘Р С•Р В±Р В°Р Р†Р В»Р ВµР Р…Р С‘Р ВµР С
                     counterMinusBtn = removeEventListeners(counterMinusBtn, ['click']);
                     counterPlusBtn = removeEventListeners(counterPlusBtn, ['click']);
                     counterInput = removeEventListeners(counterInput, ['input']);
                     let priceNow = 0;
 
-                    // РџРµСЂРµСЃС‡РµС‚ С†РµРЅС‹ СЃ СѓС‡РµС‚РѕРј РєРѕР»РёС‡РµСЃС‚РІР° Рё СЃРєРёРґРєРё
+                    // Р СџР ВµРЎР‚Р ВµРЎРѓРЎвЂЎР ВµРЎвЂљ РЎвЂ Р ВµР Р…РЎвЂ№ РЎРѓ РЎС“РЎвЂЎР ВµРЎвЂљР С•Р С Р С”Р С•Р В»Р С‘РЎвЂЎР ВµРЎРѓРЎвЂљР Р†Р В° Р С‘ РЎРѓР С”Р С‘Р Т‘Р С”Р С‘
                     function rebuildPrice(price, counterValue, discount = 0) {
                         if (price <= 0 || isNaN(price)) {
-                            priceElement.textContent = 'Р¦РµРЅР° РїРѕ Р·Р°РїСЂРѕСЃСѓ';
+                            priceElement.textContent = 'Р В¦Р ВµР Р…Р В° Р С—Р С• Р В·Р В°Р С—РЎР‚Р С•РЎРѓРЎС“';
                             return;
                         }
                         const discountedPrice = price - (price * discount / 100);
@@ -936,12 +953,12 @@
                             priceNow += (parseInt(photoPrint.dataset.price || 0, 10) * counterValue);
                         }
 
-                        // РџСЂРµРѕР±СЂР°Р·СѓРµРј С†РµРЅСѓ РІ С†РµР»РѕРµ С‡РёСЃР»Рѕ
+                        // Р СџРЎР‚Р ВµР С•Р В±РЎР‚Р В°Р В·РЎС“Р ВµР С РЎвЂ Р ВµР Р…РЎС“ Р Р† РЎвЂ Р ВµР В»Р С•Р Вµ РЎвЂЎР С‘РЎРѓР В»Р С•
                         priceNow = Math.floor(priceNow);
-                        priceElement.textContent = `Р¦РµРЅР°: ${priceNow}в‚Ѕ`;
+                        priceElement.textContent = `Р В¦Р ВµР Р…Р В°: ${priceNow}РІвЂљР…`;
                     }
 
-                    // Р¤СѓРЅРєС†РёСЏ РґР»СЏ РїРѕР»СѓС‡РµРЅРёСЏ Рё РѕР±РЅРѕРІР»РµРЅРёСЏ С†РµРЅС‹
+                    // Р В¤РЎС“Р Р…Р С”РЎвЂ Р С‘РЎРЏ Р Т‘Р В»РЎРЏ Р С—Р С•Р В»РЎС“РЎвЂЎР ВµР Р…Р С‘РЎРЏ Р С‘ Р С•Р В±Р Р…Р С•Р Р†Р В»Р ВµР Р…Р С‘РЎРЏ РЎвЂ Р ВµР Р…РЎвЂ№
                     function fetchPrice() {
                         const width = widthInput.value;
                         const height = heightInput.value;
@@ -955,12 +972,12 @@
                         const discount = parseFloat(discountInput?.value) || 0;
 
                         if (!width || !height) {
-                            rebuildPrice(0, quantity, discount); // Р—РґРµСЃСЊ РІРјРµСЃС‚Рѕ 0 Р±СѓРґРµС‚ "Р¦РµРЅР° РїРѕ Р·Р°РїСЂРѕСЃСѓ"
+                            rebuildPrice(0, quantity, discount); // Р вЂ”Р Т‘Р ВµРЎРѓРЎРЉ Р Р†Р СР ВµРЎРѓРЎвЂљР С• 0 Р В±РЎС“Р Т‘Р ВµРЎвЂљ "Р В¦Р ВµР Р…Р В° Р С—Р С• Р В·Р В°Р С—РЎР‚Р С•РЎРѓРЎС“"
                             return;
                         }
 
-                        // РћРїС†РёРѕРЅР°Р»СЊРЅРѕ: РёРЅРґРёРєР°С‚РѕСЂ Р·Р°РіСЂСѓР·РєРё, С‡С‚РѕР±С‹ РЅРµ РїРѕРєР°Р·С‹РІР°Р»Рѕ СЃС‚Р°СЂРѕРµ Р·РЅР°С‡РµРЅРёРµ
-                        priceElement.textContent = 'Р Р°СЃС‡С‘С‚...';
+                        // Р С›Р С—РЎвЂ Р С‘Р С•Р Р…Р В°Р В»РЎРЉР Р…Р С•: Р С‘Р Р…Р Т‘Р С‘Р С”Р В°РЎвЂљР С•РЎР‚ Р В·Р В°Р С–РЎР‚РЎС“Р В·Р С”Р С‘, РЎвЂЎРЎвЂљР С•Р В±РЎвЂ№ Р Р…Р Вµ Р С—Р С•Р С”Р В°Р В·РЎвЂ№Р Р†Р В°Р В»Р С• РЎРѓРЎвЂљР В°РЎР‚Р С•Р Вµ Р В·Р Р…Р В°РЎвЂЎР ВµР Р…Р С‘Р Вµ
+                        priceElement.textContent = 'Р В Р В°РЎРѓРЎвЂЎРЎвЂРЎвЂљ...';
 
                         fetch(
                                 `/sheet-names?width=${width}&height=${height}&model=${model}&control=${control}&cloth=${cloth}&modelId=${modelId}&prodTitle=${prodTitleTorequest}`
@@ -971,19 +988,19 @@
                                 rebuildPrice(basePrice, quantity, discount);
                             })
                             .catch(error => {
-                                console.error('РћС€РёР±РєР° РїСЂРё РїРѕР»СѓС‡РµРЅРёРё С†РµРЅС‹:', error);
+                                console.error('Р С›РЎв‚¬Р С‘Р В±Р С”Р В° Р С—РЎР‚Р С‘ Р С—Р С•Р В»РЎС“РЎвЂЎР ВµР Р…Р С‘Р С‘ РЎвЂ Р ВµР Р…РЎвЂ№:', error);
                                 rebuildPrice(0, quantity,
-                                discount); // Р—РґРµСЃСЊ С‚РѕР¶Рµ "Р¦РµРЅР° РїРѕ Р·Р°РїСЂРѕСЃСѓ" РІ СЃР»СѓС‡Р°Рµ РѕС€РёР±РєРё
+                                discount); // Р вЂ”Р Т‘Р ВµРЎРѓРЎРЉ РЎвЂљР С•Р В¶Р Вµ "Р В¦Р ВµР Р…Р В° Р С—Р С• Р В·Р В°Р С—РЎР‚Р С•РЎРѓРЎС“" Р Р† РЎРѓР В»РЎС“РЎвЂЎР В°Р Вµ Р С•РЎв‚¬Р С‘Р В±Р С”Р С‘
                             });
                     }
 
-                    // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РєРѕР»РёС‡РµСЃС‚РІР°
+                    // Р ВР Р…Р С‘РЎвЂ Р С‘Р В°Р В»Р С‘Р В·Р В°РЎвЂ Р С‘РЎРЏ Р С”Р С•Р В»Р С‘РЎвЂЎР ВµРЎРѓРЎвЂљР Р†Р В°
                     counterInput.value = counterInput.value || 1;
 
-                    // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ UI fallback (РЅР° СЃР»СѓС‡Р°Р№, РµСЃР»Рё fetch РЅРµ СЃСЂР°Р±РѕС‚Р°РµС‚ СЃСЂР°Р·Сѓ)
-                    priceElement.textContent = 'Р¦РµРЅР° РїРѕ Р·Р°РїСЂРѕСЃСѓ';
+                    // Р ВР Р…Р С‘РЎвЂ Р С‘Р В°Р В»Р С‘Р В·Р В°РЎвЂ Р С‘РЎРЏ UI fallback (Р Р…Р В° РЎРѓР В»РЎС“РЎвЂЎР В°Р в„–, Р ВµРЎРѓР В»Р С‘ fetch Р Р…Р Вµ РЎРѓРЎР‚Р В°Р В±Р С•РЎвЂљР В°Р ВµРЎвЂљ РЎРѓРЎР‚Р В°Р В·РЎС“)
+                    priceElement.textContent = 'Р В¦Р ВµР Р…Р В° Р С—Р С• Р В·Р В°Р С—РЎР‚Р С•РЎРѓРЎС“';
 
-                    // РћР±СЂР°Р±РѕС‚С‡РёРєРё РґР»СЏ РёР·РјРµРЅРµРЅРёСЏ РєРѕР»РёС‡РµСЃС‚РІР° С‚РѕРІР°СЂРѕРІ
+                    // Р С›Р В±РЎР‚Р В°Р В±Р С•РЎвЂљРЎвЂЎР С‘Р С”Р С‘ Р Т‘Р В»РЎРЏ Р С‘Р В·Р СР ВµР Р…Р ВµР Р…Р С‘РЎРЏ Р С”Р С•Р В»Р С‘РЎвЂЎР ВµРЎРѓРЎвЂљР Р†Р В° РЎвЂљР С•Р Р†Р В°РЎР‚Р С•Р Р†
                     counterMinusBtn.addEventListener('click', () => {
                         let currentValue = parseInt(counterInput.value) || 1;
                         if (currentValue > 1) {
@@ -998,7 +1015,7 @@
                         fetchPrice();
                     });
 
-                    // Р”Р»СЏ РІРІРѕРґР° РІСЂСѓС‡РЅСѓСЋ
+                    // Р вЂќР В»РЎРЏ Р Р†Р Р†Р С•Р Т‘Р В° Р Р†РЎР‚РЎС“РЎвЂЎР Р…РЎС“РЎР‹
                     counterInput.addEventListener('input', () => {
                         let value = parseInt(counterInput.value);
                         if (isNaN(value) || value < 1) {
@@ -1007,10 +1024,10 @@
                         fetchPrice();
                     });
 
-                    // РР·РЅР°С‡Р°Р»СЊРЅС‹Р№ СЂР°СЃС‡РµС‚ РїСЂРё Р·Р°РіСЂСѓР·РєРµ
+                    // Р ВР В·Р Р…Р В°РЎвЂЎР В°Р В»РЎРЉР Р…РЎвЂ№Р в„– РЎР‚Р В°РЎРѓРЎвЂЎР ВµРЎвЂљ Р С—РЎР‚Р С‘ Р В·Р В°Р С–РЎР‚РЎС“Р В·Р С”Р Вµ
                     fetchPrice();
 
-                    // РћР±РЅРѕРІР»РµРЅРёРµ С†РµРЅС‹ РїСЂРё РёР·РјРµРЅРµРЅРёРё С€РёСЂРёРЅС‹, РІС‹СЃРѕС‚С‹ РёР»Рё РґСЂСѓРіРёС… РїР°СЂР°РјРµС‚СЂРѕРІ
+                    // Р С›Р В±Р Р…Р С•Р Р†Р В»Р ВµР Р…Р С‘Р Вµ РЎвЂ Р ВµР Р…РЎвЂ№ Р С—РЎР‚Р С‘ Р С‘Р В·Р СР ВµР Р…Р ВµР Р…Р С‘Р С‘ РЎв‚¬Р С‘РЎР‚Р С‘Р Р…РЎвЂ№, Р Р†РЎвЂ№РЎРѓР С•РЎвЂљРЎвЂ№ Р С‘Р В»Р С‘ Р Т‘РЎР‚РЎС“Р С–Р С‘РЎвЂ¦ Р С—Р В°РЎР‚Р В°Р СР ВµРЎвЂљРЎР‚Р С•Р Р†
                     widthInput.addEventListener('input', fetchPrice);
                     heightInput.addEventListener('input', fetchPrice);
                     if (controlInput && controlInput instanceof Element) {
@@ -1038,7 +1055,7 @@
 
                 allCards.forEach(element => {
 
-                    // РњРёРЅРјР°Р»СЊРЅСѓСЋ Рё РјР°РєСЃРёРјР°Р»СЊРЅСѓСЋ Р±СЂР°С‚СЊ РёР· РјРѕРґРµР»Рё
+                    // Р СљР С‘Р Р…Р СР В°Р В»РЎРЉР Р…РЎС“РЎР‹ Р С‘ Р СР В°Р С”РЎРѓР С‘Р СР В°Р В»РЎРЉР Р…РЎС“РЎР‹ Р В±РЎР‚Р В°РЎвЂљРЎРЉ Р С‘Р В· Р СР С•Р Т‘Р ВµР В»Р С‘
 
                     let prodTitle = element.querySelector('.bigProdCard__title').innerText.trim();
 
@@ -1046,100 +1063,100 @@
 
                     let counterForDouble = 1
 
-                    if (prodTitle.includes("РЎС‚Р°РЅРґР°СЂС‚")) {
+                    if (prodTitle.includes("Р РЋРЎвЂљР В°Р Р…Р Т‘Р В°РЎР‚РЎвЂљ")) {
                         width = 500;
                         height = 500;
-                    } else if (prodTitle.includes("РЎРїСЂРёРЅРі")) {
+                    } else if (prodTitle.includes("Р РЋР С—РЎР‚Р С‘Р Р…Р С–")) {
                         width = 700;
                         height = 500;
-                    } else if (prodTitle.includes("Р“СЂР°РЅРґ")) {
+                    } else if (prodTitle.includes("Р вЂњРЎР‚Р В°Р Р…Р Т‘")) {
                         width = 700;
                         height = 500;
-                    } else if (prodTitle.includes("РљРІР°С‚СЂРѕ РєР»Р°СЃСЃРёРє")) {
+                    } else if (prodTitle.includes("Р С™Р Р†Р В°РЎвЂљРЎР‚Р С• Р С”Р В»Р В°РЎРѓРЎРѓР С‘Р С”")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("РљРІР°С‚СЂРѕ Р»СЋРєСЃ")) {
+                    } else if (prodTitle.includes("Р С™Р Р†Р В°РЎвЂљРЎР‚Р С• Р В»РЎР‹Р С”РЎРѓ")) {
                         width = 700;
                         height = 500;
-                    } else if (prodTitle.includes("РљР»Р°СЃСЃРёРє РїСЂРµРјРёСѓРј")) {
+                    } else if (prodTitle.includes("Р С™Р В»Р В°РЎРѓРЎРѓР С‘Р С” Р С—РЎР‚Р ВµР СР С‘РЎС“Р С")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("Р”Р°Р±Р» РєР»Р°СЃСЃРёРє")) {
-                        width = 400;
-                        height = 500;
-                        counterForDouble = 2
-                    } else if (prodTitle.includes("Р›СЋРєСЃ РїСЂРµРјРёСѓРј")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Р”Р°Р±Р» Р»СЋРєСЃ")) {
+                    } else if (prodTitle.includes("Р вЂќР В°Р В±Р В» Р С”Р В»Р В°РЎРѓРЎРѓР С‘Р С”")) {
                         width = 400;
                         height = 500;
                         counterForDouble = 2
-                    } else if (prodTitle.includes("РњРёРЅРё")) {
+                    } else if (prodTitle.includes("Р вЂєРЎР‹Р С”РЎРѓ Р С—РЎР‚Р ВµР СР С‘РЎС“Р С")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("РњРёРЅРё РЅСЊСЋ")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("РЈРЅРё-1")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("РЈРЅРё-2")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("РЈРЅРё-1 Р»Р°РјРёРЅР°С†РёСЏ")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("РЈРЅРё-2 Р»Р°РјРёРЅР°С†РёСЏ")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("РљРѕРјР±Рѕ РјРёРЅРё РЅСЊСЋ")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("РљРѕРјР±Рѕ СѓРЅРё-1")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("РљРѕРјР±Рѕ СѓРЅРё-2")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("РљРѕРјР±Рѕ СѓРЅРё-2 Р»Р°РјРёРЅР°С†РёСЏ")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("РљРѕРјР±Рѕ РІ-52 СЃС‚Р°РЅРґР°СЂС‚")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("РљРѕРјР±Рѕ РљР»Р°СЃСЃРёРє")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("РљРѕРјР±Рѕ РІ-52 Р»СЋРєСЃ")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("РљРѕРјР±Рѕ РґР°Р±Р» РєР»Р°СЃСЃРёРє")) {
+                    } else if (prodTitle.includes("Р вЂќР В°Р В±Р В» Р В»РЎР‹Р С”РЎРѓ")) {
                         width = 400;
                         height = 500;
                         counterForDouble = 2
-                    } else if (prodTitle.includes("РљРѕРјР±Рѕ РґР°Р±Р» Р»СЋРєСЃ")) {
+                    } else if (prodTitle.includes("Р СљР С‘Р Р…Р С‘")) {
+                        width = 400;
+                        height = 500;
+                    } else if (prodTitle.includes("Р СљР С‘Р Р…Р С‘ Р Р…РЎРЉРЎР‹")) {
+                        width = 400;
+                        height = 500;
+                    } else if (prodTitle.includes("Р Р€Р Р…Р С‘-1")) {
+                        width = 400;
+                        height = 500;
+                    } else if (prodTitle.includes("Р Р€Р Р…Р С‘-2")) {
+                        width = 400;
+                        height = 500;
+                    } else if (prodTitle.includes("Р Р€Р Р…Р С‘-1 Р В»Р В°Р СР С‘Р Р…Р В°РЎвЂ Р С‘РЎРЏ")) {
+                        width = 400;
+                        height = 500;
+                    } else if (prodTitle.includes("Р Р€Р Р…Р С‘-2 Р В»Р В°Р СР С‘Р Р…Р В°РЎвЂ Р С‘РЎРЏ")) {
+                        width = 400;
+                        height = 500;
+                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• Р СР С‘Р Р…Р С‘ Р Р…РЎРЉРЎР‹")) {
+                        width = 400;
+                        height = 500;
+                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• РЎС“Р Р…Р С‘-1")) {
+                        width = 400;
+                        height = 500;
+                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• РЎС“Р Р…Р С‘-2")) {
+                        width = 400;
+                        height = 500;
+                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• РЎС“Р Р…Р С‘-2 Р В»Р В°Р СР С‘Р Р…Р В°РЎвЂ Р С‘РЎРЏ")) {
+                        width = 400;
+                        height = 500;
+                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• Р Р†-52 РЎРѓРЎвЂљР В°Р Р…Р Т‘Р В°РЎР‚РЎвЂљ")) {
+                        width = 400;
+                        height = 500;
+                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• Р С™Р В»Р В°РЎРѓРЎРѓР С‘Р С”")) {
+                        width = 400;
+                        height = 500;
+                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• Р Р†-52 Р В»РЎР‹Р С”РЎРѓ")) {
+                        width = 400;
+                        height = 500;
+                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• Р Т‘Р В°Р В±Р В» Р С”Р В»Р В°РЎРѓРЎРѓР С‘Р С”")) {
                         width = 400;
                         height = 500;
                         counterForDouble = 2
-                    } else if (prodTitle.includes("РљРѕРјР±Рѕ РєРІР°С‚СЂРѕ РєР»Р°СЃСЃРёРє")) {
+                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• Р Т‘Р В°Р В±Р В» Р В»РЎР‹Р С”РЎРѓ")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("РљРѕРјР±Рѕ РєРІР°С‚СЂРѕ Р»СЋРєСЃ")) {
+                        counterForDouble = 2
+                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• Р С”Р Р†Р В°РЎвЂљРЎР‚Р С• Р С”Р В»Р В°РЎРѓРЎРѓР С‘Р С”")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("РђР»СЋРјРёРЅРёРµРІС‹Рµ 50 РјРј")) {
+                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• Р С”Р Р†Р В°РЎвЂљРЎР‚Р С• Р В»РЎР‹Р С”РЎРѓ")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("РљРѕРјРїР°РєС‚ РџСЂРµРјРёСѓРј")) {
+                    } else if (prodTitle.includes("Р С’Р В»РЎР‹Р СР С‘Р Р…Р С‘Р ВµР Р†РЎвЂ№Р Вµ 50 Р СР С")) {
+                        width = 400;
+                        height = 500;
+                    } else if (prodTitle.includes("Р С™Р С•Р СР С—Р В°Р С”РЎвЂљ Р СџРЎР‚Р ВµР СР С‘РЎС“Р С")) {
                         width = 300;
                         height = 600;
-                    } else if (prodTitle.includes("РҐL РђР±СЃРѕР»СЋС‚")) {
+                    } else if (prodTitle.includes("Р ТђL Р С’Р В±РЎРѓР С•Р В»РЎР‹РЎвЂљ")) {
                         width = 300;
                         height = 600;
                     } else {
                         width = 700;
-                        height = 700; // Р—РЅР°С‡РµРЅРёРµ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ
+                        height = 700; // Р вЂ”Р Р…Р В°РЎвЂЎР ВµР Р…Р С‘Р Вµ Р С—Р С• РЎС“Р СР С•Р В»РЎвЂЎР В°Р Р…Р С‘РЎР‹
                     }
 
 
@@ -1159,28 +1176,28 @@
                         )
                         .then(response => response.json())
                         .then(data => {
-                            const basePrice = data.price * counterForDouble || "Р¦РµРЅР° РїРѕ Р·Р°РїСЂРѕСЃСѓ ";
+                            const basePrice = data.price * counterForDouble || "Р В¦Р ВµР Р…Р В° Р С—Р С• Р В·Р В°Р С—РЎР‚Р С•РЎРѓРЎС“ ";
                             const discount = element.getAttribute('data-discount')
                             if (discount > 0) {
                                 const discountedPrice = basePrice * (1 - discount / 100);
-                                // РџСЂРµРѕР±СЂР°Р·СѓРµРј С†РµРЅСѓ РІ С†РµР»РѕРµ С‡РёСЃР»Рѕ Р±РµР· РєРѕРїРµРµРє
+                                // Р СџРЎР‚Р ВµР С•Р В±РЎР‚Р В°Р В·РЎС“Р ВµР С РЎвЂ Р ВµР Р…РЎС“ Р Р† РЎвЂ Р ВµР В»Р С•Р Вµ РЎвЂЎР С‘РЎРѓР В»Р С• Р В±Р ВµР В· Р С”Р С•Р С—Р ВµР ВµР С”
                                 const priceNow = Math.floor(discountedPrice);
-                                priceElement.innerText = `${priceNow}в‚Ѕ`;
-                                normalPriceElement.innerText = `${basePrice}в‚Ѕ`;
+                                priceElement.innerText = `${priceNow}РІвЂљР…`;
+                                normalPriceElement.innerText = `${basePrice}РІвЂљР…`;
 
                                 normalPriceElement.style.textDecoration = "line-through";
                             } else {
-                                priceElement.innerText = `${basePrice}в‚Ѕ`;
-                                normalPriceElement.innerText = ""; // РћС‡РёС‰Р°РµРј СЃС‚Р°СЂСѓСЋ С†РµРЅСѓ
+                                priceElement.innerText = `${basePrice}РІвЂљР…`;
+                                normalPriceElement.innerText = ""; // Р С›РЎвЂЎР С‘РЎвЂ°Р В°Р ВµР С РЎРѓРЎвЂљР В°РЎР‚РЎС“РЎР‹ РЎвЂ Р ВµР Р…РЎС“
                             }
                         })
-                        .catch(error => console.error('РћС€РёР±РєР° РїСЂРё РїРѕР»СѓС‡РµРЅРёРё С†РµРЅС‹:', error));
+                        .catch(error => console.error('Р С›РЎв‚¬Р С‘Р В±Р С”Р В° Р С—РЎР‚Р С‘ Р С—Р С•Р В»РЎС“РЎвЂЎР ВµР Р…Р С‘Р С‘ РЎвЂ Р ВµР Р…РЎвЂ№:', error));
                 });
 
             }
             rebuilCardsPrice()
 
-            // РџР°РіРёРЅР°С†РёСЏ
+            // Р СџР В°Р С–Р С‘Р Р…Р В°РЎвЂ Р С‘РЎРЏ
 
 
             function fetchProducts(url) {
@@ -1189,22 +1206,22 @@
                             "X-Requested-With": "XMLHttpRequest"
                         }
                     })
-                    .then(response => response.json()) // РџРѕР»СѓС‡Р°РµРј РґР°РЅРЅС‹Рµ РІ С„РѕСЂРјР°С‚Рµ JSON
+                    .then(response => response.json()) // Р СџР С•Р В»РЎС“РЎвЂЎР В°Р ВµР С Р Т‘Р В°Р Р…Р Р…РЎвЂ№Р Вµ Р Р† РЎвЂћР С•РЎР‚Р СР В°РЎвЂљР Вµ JSON
                     .then(data => {
-                        // РћР±РЅРѕРІР»СЏРµРј РєРѕРЅС‚РµРЅС‚ РїСЂРѕРґСѓРєС‚РѕРІ
+                        // Р С›Р В±Р Р…Р С•Р Р†Р В»РЎРЏР ВµР С Р С”Р С•Р Р…РЎвЂљР ВµР Р…РЎвЂљ Р С—РЎР‚Р С•Р Т‘РЎС“Р С”РЎвЂљР С•Р Р†
                         document.getElementById("productsWrap").innerHTML = data.filterProduts;
-                        // РћР±РЅРѕРІР»СЏРµРј РїР°РіРёРЅР°С†РёСЋ
+                        // Р С›Р В±Р Р…Р С•Р Р†Р В»РЎРЏР ВµР С Р С—Р В°Р С–Р С‘Р Р…Р В°РЎвЂ Р С‘РЎР‹
                         document.getElementById("pagination").innerHTML = data.pagination;
                     })
-                    .catch(error => console.error('РћС€РёР±РєР°:', error)); // РћР±СЂР°Р±РѕС‚РєР° РѕС€РёР±РѕРє
+                    .catch(error => console.error('Р С›РЎв‚¬Р С‘Р В±Р С”Р В°:', error)); // Р С›Р В±РЎР‚Р В°Р В±Р С•РЎвЂљР С”Р В° Р С•РЎв‚¬Р С‘Р В±Р С•Р С”
             }
 
             document.body.addEventListener("click", function(e) {
                 let pageLink = e.target.closest("#pagination a");
                 if (pageLink) {
-                    e.preventDefault(); // РћС‚РјРµРЅСЏРµРј СЃС‚Р°РЅРґР°СЂС‚РЅС‹Р№ РїРµСЂРµС…РѕРґ
-                    let pageUrl = new URL(pageLink.href); // РџРѕР»СѓС‡Р°РµРј URL РёР· СЃСЃС‹Р»РєРё
-                    let pageNumber = pageUrl.searchParams.get("page"); // Р‘РµСЂРµРј РЅРѕРјРµСЂ СЃС‚СЂР°РЅРёС†С‹
+                    e.preventDefault(); // Р С›РЎвЂљР СР ВµР Р…РЎРЏР ВµР С РЎРѓРЎвЂљР В°Р Р…Р Т‘Р В°РЎР‚РЎвЂљР Р…РЎвЂ№Р в„– Р С—Р ВµРЎР‚Р ВµРЎвЂ¦Р С•Р Т‘
+                    let pageUrl = new URL(pageLink.href); // Р СџР С•Р В»РЎС“РЎвЂЎР В°Р ВµР С URL Р С‘Р В· РЎРѓРЎРѓРЎвЂ№Р В»Р С”Р С‘
+                    let pageNumber = pageUrl.searchParams.get("page"); // Р вЂР ВµРЎР‚Р ВµР С Р Р…Р С•Р СР ВµРЎР‚ РЎРѓРЎвЂљРЎР‚Р В°Р Р…Р С‘РЎвЂ РЎвЂ№
                     fetchFilteredProducts(pageNumber);
                     loadPopupsContent()
                 }
@@ -1212,7 +1229,7 @@
 
             document.querySelectorAll('.sidebarFilter__label input[type="checkbox"]').forEach(function(checkbox) {
                 checkbox.addEventListener('change', function() {
-                    fetchFilteredProducts(1); // РџСЂРё РёР·РјРµРЅРµРЅРёРё С„РёР»СЊС‚СЂР° Р·Р°РіСЂСѓР¶Р°РµРј РїРµСЂРІСѓСЋ СЃС‚СЂР°РЅРёС†Сѓ
+                    fetchFilteredProducts(1); // Р СџРЎР‚Р С‘ Р С‘Р В·Р СР ВµР Р…Р ВµР Р…Р С‘Р С‘ РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚Р В° Р В·Р В°Р С–РЎР‚РЎС“Р В¶Р В°Р ВµР С Р С—Р ВµРЎР‚Р Р†РЎС“РЎР‹ РЎРѓРЎвЂљРЎР‚Р В°Р Р…Р С‘РЎвЂ РЎС“
                     rebuilCardsPrice()
                     loadPopupsContent()
                 });
@@ -1237,7 +1254,7 @@
                             models: selectedModels,
                             colors: selectedColors,
                             materials: selectedMaterials,
-                            page: page, // РџРµСЂРµРґР°РµРј СЃС‚СЂР°РЅРёС†Сѓ РІ Р·Р°РїСЂРѕСЃ
+                            page: page, // Р СџР ВµРЎР‚Р ВµР Т‘Р В°Р ВµР С РЎРѓРЎвЂљРЎР‚Р В°Р Р…Р С‘РЎвЂ РЎС“ Р Р† Р В·Р В°Р С—РЎР‚Р С•РЎРѓ
                         })
                     })
                     .then(response => response.json())
@@ -1253,29 +1270,29 @@
                         </div>
                         <div class="bigProdCard__controls">
                             <div class="bigProdCard__cart control"><i class="fas fa-cart-arrow-down"></i>
-                                <div class="bigProdCard__toolTip">Р’ РєРѕСЂР·РёРЅСѓ</div>
+                                <div class="bigProdCard__toolTip">Р вЂ™ Р С”Р С•РЎР‚Р В·Р С‘Р Р…РЎС“</div>
                             </div>
                             <div class="bigProdCard__quckView control quickProd" data-modal="#popupProd" data-prod="${product.id}"><i class="fas fa-eye"></i>
-                                <div class="bigProdCard__toolTip">Р‘С‹СЃС‚СЂС‹Р№ РїСЂРѕСЃРјРѕС‚СЂ</div>
+                                <div class="bigProdCard__toolTip">Р вЂРЎвЂ№РЎРѓРЎвЂљРЎР‚РЎвЂ№Р в„– Р С—РЎР‚Р С•РЎРѓР СР С•РЎвЂљРЎР‚</div>
                             </div>
                             <div class="bigProdCard__favorites control"><i class="far fa-heart"></i>
-                                <div class="bigProdCard__toolTip">Р”РѕР±Р°РІРёС‚СЊ РІ РёР·Р±СЂР°РЅРЅРѕРµ</div>
+                                <div class="bigProdCard__toolTip">Р вЂќР С•Р В±Р В°Р Р†Р С‘РЎвЂљРЎРЉ Р Р† Р С‘Р В·Р В±РЎР‚Р В°Р Р…Р Р…Р С•Р Вµ</div>
                             </div>
                         </div>
                     </div>
                     <div class="bigProdCard__info">
-                        <a class="bigProdCard__category" href="${product.category ? '/' + product.category.slug : '#'}">${product.category ? product.category.titleh1 : 'Р‘РµР· РєР°С‚РµРіРѕСЂРёРё'}</a>
+                        <a class="bigProdCard__category" href="${product.category ? '/' + product.category.slug : '#'}">${product.category ? product.category.titleh1 : 'Р вЂР ВµР В· Р С”Р В°РЎвЂљР ВµР С–Р С•РЎР‚Р С‘Р С‘'}</a>
                         <a class="bigProdCard__title" href="${product.slug ? '/' + product.category.slug + '/' + product.subcategory.slug + '/' + product.slug : '#'}">${product.h1}</a>
                         <div class="bigProdCard__priceWrap">
-                            <span class="normalPrice" style="text-decoration: line-through;">${product.price}в‚Ѕ</span>
-                            <span class="discount">${product.old_price}в‚Ѕ</span>
+                            <span class="normalPrice" style="text-decoration: line-through;">${product.price}РІвЂљР…</span>
+                            <span class="discount">${product.old_price}РІвЂљР…</span>
                         </div>
                     </div>
                 </div>
             </div>
         `).join('');
 
-                        // РћР±РЅРѕРІР»СЏРµРј РїР°РіРёРЅР°С†РёСЋ
+                        // Р С›Р В±Р Р…Р С•Р Р†Р В»РЎРЏР ВµР С Р С—Р В°Р С–Р С‘Р Р…Р В°РЎвЂ Р С‘РЎР‹
                         document.querySelector('.pagination').innerHTML = data.pagination;
                         rebuilCardsPrice()
                         loadPopupsContent()
@@ -1294,20 +1311,20 @@
                 const maxPriceDisplay = document.getElementById('max-price-display');
                 const minPriceInput = document.getElementById('min-price');
                 const maxPriceInput = document.getElementById('max-price');
-                const productCards = document.querySelectorAll('.card'); // РљР°СЂС‚РѕС‡РєРё С‚РѕРІР°СЂРѕРІ
+                const productCards = document.querySelectorAll('.card'); // Р С™Р В°РЎР‚РЎвЂљР С•РЎвЂЎР С”Р С‘ РЎвЂљР С•Р Р†Р В°РЎР‚Р С•Р Р†
 
                 let min = 0,
                     max = 15000;
                 let currentMin = min,
                     currentMax = max;
 
-                // Р¤СѓРЅРєС†РёСЏ РѕР±РЅРѕРІР»РµРЅРёСЏ РїРѕР»РѕР¶РµРЅРёСЏ РїРѕР»Р·СѓРЅРєРѕРІ
+                // Р В¤РЎС“Р Р…Р С”РЎвЂ Р С‘РЎРЏ Р С•Р В±Р Р…Р С•Р Р†Р В»Р ВµР Р…Р С‘РЎРЏ Р С—Р С•Р В»Р С•Р В¶Р ВµР Р…Р С‘РЎРЏ Р С—Р С•Р В»Р В·РЎС“Р Р…Р С”Р С•Р Р†
                 function updateThumbPosition(thumb, value) {
                     const percent = ((value - min) / (max - min)) * 100;
                     thumb.style.left = `${percent}%`;
                 }
 
-                // Р¤СѓРЅРєС†РёСЏ РѕР±РЅРѕРІР»РµРЅРёСЏ РґРёР°РїР°Р·РѕРЅР°
+                // Р В¤РЎС“Р Р…Р С”РЎвЂ Р С‘РЎРЏ Р С•Р В±Р Р…Р С•Р Р†Р В»Р ВµР Р…Р С‘РЎРЏ Р Т‘Р С‘Р В°Р С—Р В°Р В·Р С•Р Р…Р В°
                 function updateRange() {
                     const minPercent = ((currentMin - min) / (max - min)) * 100;
                     const maxPercent = ((currentMax - min) / (max - min)) * 100;
@@ -1315,21 +1332,21 @@
                     range.style.width = `${maxPercent - minPercent}%`;
                 }
 
-                // Р¤СѓРЅРєС†РёСЏ С„РёР»СЊС‚СЂР°С†РёРё С‚РѕРІР°СЂРѕРІ
+                // Р В¤РЎС“Р Р…Р С”РЎвЂ Р С‘РЎРЏ РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚Р В°РЎвЂ Р С‘Р С‘ РЎвЂљР С•Р Р†Р В°РЎР‚Р С•Р Р†
                 function filterProducts() {
                     productCards.forEach(card => {
                         const discountSpan = card.querySelector('.discount');
-                        const price = parseFloat(discountSpan?.textContent.replace('в‚Ѕ', '').trim()) || 0;
+                        const price = parseFloat(discountSpan?.textContent.replace('РІвЂљР…', '').trim()) || 0;
 
                         if (price >= currentMin && price <= currentMax) {
-                            card.style.display = ''; // РџРѕРєР°Р·С‹РІР°РµРј РєР°СЂС‚РѕС‡РєСѓ
+                            card.style.display = ''; // Р СџР С•Р С”Р В°Р В·РЎвЂ№Р Р†Р В°Р ВµР С Р С”Р В°РЎР‚РЎвЂљР С•РЎвЂЎР С”РЎС“
                         } else {
-                            card.style.display = 'none'; // РЎРєСЂС‹РІР°РµРј РєР°СЂС‚РѕС‡РєСѓ
+                            card.style.display = 'none'; // Р РЋР С”РЎР‚РЎвЂ№Р Р†Р В°Р ВµР С Р С”Р В°РЎР‚РЎвЂљР С•РЎвЂЎР С”РЎС“
                         }
                     });
                 }
 
-                // Р¤СѓРЅРєС†РёСЏ РїРµСЂРµРјРµС‰РµРЅРёСЏ РїРѕР»Р·СѓРЅРєР°
+                // Р В¤РЎС“Р Р…Р С”РЎвЂ Р С‘РЎРЏ Р С—Р ВµРЎР‚Р ВµР СР ВµРЎвЂ°Р ВµР Р…Р С‘РЎРЏ Р С—Р С•Р В»Р В·РЎС“Р Р…Р С”Р В°
                 function moveThumb(thumb, event) {
                     const rect = slider.getBoundingClientRect();
                     const offsetX = event.touches ? event.touches[0].clientX - rect.left : event.clientX - rect
@@ -1349,10 +1366,10 @@
 
                     updateThumbPosition(thumb, value);
                     updateRange();
-                    filterProducts(); // Р¤РёР»СЊС‚СЂСѓРµРј С‚РѕРІР°СЂС‹ СЃСЂР°Р·Сѓ РїРѕСЃР»Рµ РїРµСЂРµРјРµС‰РµРЅРёСЏ
+                    filterProducts(); // Р В¤Р С‘Р В»РЎРЉРЎвЂљРЎР‚РЎС“Р ВµР С РЎвЂљР С•Р Р†Р В°РЎР‚РЎвЂ№ РЎРѓРЎР‚Р В°Р В·РЎС“ Р С—Р С•РЎРѓР В»Р Вµ Р С—Р ВµРЎР‚Р ВµР СР ВµРЎвЂ°Р ВµР Р…Р С‘РЎРЏ
                 }
 
-                // РћР±СЂР°Р±РѕС‚С‡РёРєРё СЃРѕР±С‹С‚РёР№ РґР»СЏ РїРµСЂРµРјРµС‰РµРЅРёСЏ РїРѕР»Р·СѓРЅРєРѕРІ
+                // Р С›Р В±РЎР‚Р В°Р В±Р С•РЎвЂљРЎвЂЎР С‘Р С”Р С‘ РЎРѓР С•Р В±РЎвЂ№РЎвЂљР С‘Р в„– Р Т‘Р В»РЎРЏ Р С—Р ВµРЎР‚Р ВµР СР ВµРЎвЂ°Р ВµР Р…Р С‘РЎРЏ Р С—Р С•Р В»Р В·РЎС“Р Р…Р С”Р С•Р Р†
                 [leftThumb, rightThumb].forEach((thumb) => {
                     thumb.addEventListener('mousedown', (e) => {
                         const moveHandler = (event) => moveThumb(thumb, event);
@@ -1375,7 +1392,7 @@
                     });
                 });
 
-                // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ
+                // Р ВР Р…Р С‘РЎвЂ Р С‘Р В°Р В»Р С‘Р В·Р В°РЎвЂ Р С‘РЎРЏ
                 updateThumbPosition(leftThumb, currentMin);
                 updateThumbPosition(rightThumb, currentMax);
                 updateRange();
@@ -1401,16 +1418,19 @@
                         return;
                     }
 
-                    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]')
+                        .getAttribute('content');
+
                     const widthToCalc = formWrapper.querySelector('.width-input')?.value || '';
                     const heightToCalc = formWrapper.querySelector('.height-input')?.value || '';
                     const installationType = formWrapper.querySelector('input[name^="widhType"]:checked')?.value || 'inside';
                     const lockType = formWrapper.querySelector('input[name="lock-type"]:checked')?.value || 'sliders';
-                    const lockPrice = parseInt(formWrapper.querySelector('input[name="lock-type"]:checked')?.dataset.price || 0, 10);
+                    const lockPrice = parseInt(formWrapper.querySelector('input[name="lock-type"]:checked')?.dataset.price || 0);
                     const prodsCouunter = formWrapper.querySelector('.quantity-input')?.value || 1;
-                    const prodPriceText = formWrapper.querySelector('.prodForm__price')?.innerText || '';
+                    const prodPriceText = formWrapper.querySelector('.prodForm__price')
+                        ?.innerText || '';
                     const prodPrice = parseInt(prodPriceText.replace(/\D/g, ''), 10) || 0;
-                    const cardCounter = document.querySelector('.header__cartCounter');
+                    const cardCounter = document.querySelector('.header__cartCounter')
 
                     fetch('/cart/add', {
                             method: 'POST',
@@ -1433,9 +1453,7 @@
                         .then(data => {
                             if (data.success) {
                                 alert(data.message);
-                                if (cardCounter) {
-                                    cardCounter.innerHTML = data.cart_count;
-                                }
+                                cardCounter.innerHTML = data.cart_count
                             } else {
                                 alert('Ошибка добавления товара в корзину');
                             }
