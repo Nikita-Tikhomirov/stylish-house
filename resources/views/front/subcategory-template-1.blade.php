@@ -259,8 +259,10 @@
                 </div>
             </section>
 
-        <!-- Виды монтажа -->
-        @if (!empty($installationTypes) && $installationTypes->isNotEmpty())
+        <!-- Блоки подкатегорий / виды монтажа -->
+        @if (($showSubcatSections ?? false) && !empty($subcategoriesWithProducts) && $subcategoriesWithProducts->isNotEmpty())
+            <x-subcat-sections :category="$category" :subcategoriesWithProducts="$subcategoriesWithProducts" :headerInfo="$headerInfo" />
+        @elseif (!empty($installationTypes) && $installationTypes->isNotEmpty())
             <x-front.section.subcategory-installation-types :installationTypes="$installationTypes" />
         @else
             <x-front.section.rollets-installation />

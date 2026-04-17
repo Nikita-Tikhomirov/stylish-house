@@ -1,6 +1,6 @@
 <section class="s-subcatSections wrapper blueControls">
     @foreach ($subcategoriesWithProducts as $subcatData)
-        @if($subcatData['subcategory']->show_in_more_cats && $subcatData['products']->count() > 0)
+        @if($subcatData['products']->count() > 0)
             <div class="s-subcatSections__section">
                 <h2 class="s-subcatSections__title">
                     {{ $subcatData['subcategory']->titleh1 }}

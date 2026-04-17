@@ -36,6 +36,16 @@ class SubcategoryController extends Controller
     protected const TEMPLATE_MIN_VARIANT = 1;
     protected const TEMPLATE_MAX_VARIANT = 2;
 
+    protected function resolveTemplateVariant(Subcategory $subcategory): int
+    {
+        $variant = (int) ($subcategory->template_variant ?? self::TEMPLATE_MIN_VARIANT);
+        if ($variant < self::TEMPLATE_MIN_VARIANT || $variant > self::TEMPLATE_MAX_VARIANT) {
+            return self::TEMPLATE_MIN_VARIANT;
+        }
+
+        return $variant;
+    }
+
     protected function resolveTemplateBySubcategory(Subcategory $subcategory, string $context): string
     {
         $defaultTemplate = $context === 'edit'
@@ -122,8 +132,14 @@ class SubcategoryController extends Controller
     public function show(Request $request, string $category_slug, string $subcategory_slug)
     {
         $subcategory = Subcategory::where('slug', $subcategory_slug)->firstOrFail();
-        // SEO-клон
-        $sourceSubcategoryId = $subcategory->clone_subcategory_id ?: $subcategory->id;
+        $templateVariant = $this->resolveTemplateVariant($subcategory);
+        $isRolletCategory = (int) $subcategory->category_id === self::TEMPLATE_CATEGORY_ID;
+        $useOwnProductsForTemplate = $isRolletCategory && $templateVariant === 2;
+
+        // Для шаблона 2 всегда работаем с товарами текущей подкатегории.
+        $sourceSubcategoryId = $useOwnProductsForTemplate
+            ? $subcategory->id
+            : ($subcategory->clone_subcategory_id ?: $subcategory->id);
 
         // Получаем категории, подкатегории и товары, где show_in_catalog = true
         $categoriesInCatalogMenu = Category::where('show_in_catalog', true)
@@ -252,6 +268,26 @@ class SubcategoryController extends Controller
             ->with(['category', 'subcategory'])
             ->paginate(12);
 
+        $subcategoriesWithProducts = collect();
+        if ($isRolletCategory) {
+            $categorySubcategories = Subcategory::where('category_id', $subcategory->category_id)
+                ->orderBy('id')
+                ->get();
+
+            $subcategoriesWithProducts = $categorySubcategories->map(function ($subcat) {
+                $productsSourceId = $subcat->clone_subcategory_id ?: $subcat->id;
+                $products = Product::where('subcategory_id', $productsSourceId)
+                    ->with(['category', 'subcategory'])
+                    ->limit(8)
+                    ->get();
+
+                return [
+                    'subcategory' => $subcat,
+                    'products' => $products,
+                ];
+            });
+        }
+
 
         $seoCats = Subcategory::whereIn('id', $subcategory->related_subcategory_ids ?? [])->get();
         $curtainSubcats = Subcategory::whereIn('id', $headerInfo->curtain_subcategories ?? [])->with('category')->get();
@@ -261,7 +297,7 @@ class SubcategoryController extends Controller
         // Resolve front template by subcategory mapping with fallback to default template.
         $frontTemplate = $this->resolveTemplateBySubcategory($subcategory, 'front');
 
-        return view($frontTemplate, compact('subcategory', 'categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'reviews', 'homePageFields', 'iconCards', 'faqs', 'workExamples', 'category', 'videoReviews', 'installationTypes', 'filterProduts', 'filterColors', 'models', 'cart', 'firstProduct', 'sameModelProducts', 'materials', 'headerInfo', 'seoCats', 'curtainSubcats', 'blindSubcats','selectedModels'));
+        return view($frontTemplate, compact('subcategory', 'categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'reviews', 'homePageFields', 'iconCards', 'faqs', 'workExamples', 'category', 'videoReviews', 'installationTypes', 'subcategoriesWithProducts', 'filterProduts', 'filterColors', 'models', 'cart', 'firstProduct', 'sameModelProducts', 'materials', 'headerInfo', 'seoCats', 'curtainSubcats', 'blindSubcats','selectedModels'));
     }
     /**
      * Show the form for editing the specified resource.
