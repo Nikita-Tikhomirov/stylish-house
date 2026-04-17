@@ -141,7 +141,286 @@
 
         <!-- Калькулятор -->
         @if (!empty($firstProduct))
-            <x-front.section.rollets-product-calculator :product="$firstProduct" :sameModelProducts="$sameModelProducts" :category="$category" />
+            @php
+                $product = $firstProduct;
+            @endphp
+            <section class="prodMain wrapper catCalculator" style="padding-top: 40px;">
+                <h2 class="prodMain__title title"> <span>Рассчитать стоимость рольставен</span><svg width="114" height="35"
+                        viewBox="0 0 114 35" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M112 23.275C1.84952 -10.6834 -7.36586 1.48086 7.50443 32.9053" stroke="currentColor"
+                            stroke-width="4" stroke-miterlimit="3.8637" stroke-linecap="round"></path>
+                    </svg></h2>
+
+                <div class="prodForm">
+                    <div class="prodForm__galleryWrapOuter">
+                        <div class="prodForm__galleryWrap">
+                            <div class="prodForm__imgWrap">
+                                @php
+                                    $productMainImage = $product->image_thumb_path ?: $product->image_path;
+                                    $productFabricImage = $product->fabric_thumb_path ?: $product->fabric_photo;
+                                @endphp
+                                @if ($productMainImage)
+                                    <img src="{{ asset($productMainImage) }}" alt="{{ $product->h1 }}" />
+                                @endif
+                                @if ($productFabricImage)
+                                    <img src="{{ asset($productFabricImage) }}" alt="{{ $product->h1 }}" />
+                                @endif
+                            </div>
+
+                            <div class="prodForm__bar">
+                                @foreach ($sameModelProducts as $sameProduct)
+                                    @php
+                                        $sameMainImage = $sameProduct->image_thumb_path ?: $sameProduct->image_path;
+                                        $sameFabricImage = $sameProduct->fabric_thumb_path ?: $sameProduct->fabric_photo;
+                                    @endphp
+                                    @if ($sameMainImage)
+                                        <img src="{{ asset($sameMainImage) }}" alt="{{ $sameProduct->h1 }}" />
+                                    @elseif ($sameFabricImage)
+                                        <img src="{{ asset($sameFabricImage) }}" alt="{{ $sameProduct->h1 }}" />
+                                    @endif
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="prodForm__calcFormWrap">
+                        <div class="prodForm__formSubtitle">{{ $category->titleh1 }}</div>
+                        <div class="prodForm__formTitle">{{ $product->h1 }}</div>
+                        <div class="prodForm__description">
+                            <p>{{ $product->first_screenn_description }}...</p><span class="more">Подробнее</span>
+                        </div>
+
+                        <input type="hidden" name="modelSelect" class="modelSelect" value="{{ $product->model_title }}">
+                        <input type="hidden" name="cloth" class="cloth" value="{{ $product->cloth }}">
+                        <input type="hidden" name="model" class="model" value="{{ $product->model_title }}">
+                        <input type="hidden" class="discount" value="{{ $product->discount }}">
+
+                        <div class="prodForm__sizeWrap">
+                            <label class="prodForm__label">
+                                <p>Ширина, мм</p>
+                                @if ($product->min_width)
+                                    <input class="prodForm__input width-input" type="number" name="width" value="{{ $product->min_width }}" required />
+                                @else
+                                    <input class="prodForm__input width-input" type="number" name="width" value="500" required />
+                                @endif
+                            </label>
+                            <label class="prodForm__label">
+                                <p>Высота, мм</p>
+                                @if ($product->min_height)
+                                    <input class="prodForm__input height-input" type="number" name="height" value="{{ $product->min_height }}" required />
+                                @else
+                                    <input class="prodForm__input height-input" type="number" name="height" value="500" required />
+                                @endif
+                            </label>
+                        </div>
+
+                        <div class="calcWidhType">
+                            <div class="cartForm__optionsList">
+                                <div class="cartForm__listTitle">Тип монтажа</div>
+                                <ul>
+                                    <li>
+                                        <label>
+                                            <input class="widthType" type="radio" name="widhType{{ $product->id }}" value="Ширина по ткани" checked>
+                                            <span>Короб внутри (скрытый)</span>
+                                        </label>
+                                    </li>
+                                    <li>
+                                        <label>
+                                            <input class="widthType" type="radio" name="widhType{{ $product->id }}" value="Ширина по габариту">
+                                            <span>Короб снаружи</span>
+                                        </label>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="calcWidhType">
+                            <div class="cartForm__optionsList">
+                                <div class="cartForm__listTitle">Тип запорного устройства</div>
+                                <ul>
+                                    <li>
+                                        <label>
+                                            <input class="widthType" type="radio" name="lock-type" value="sliders" data-price="0" checked>
+                                            <span>Задвижки +0р</span>
+                                        </label>
+                                    </li>
+                                    <li>
+                                        <label>
+                                            <input class="widthType" type="radio" name="lock-type" value="lock" data-price="1600">
+                                            <span>Замок +1600р</span>
+                                        </label>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="product-params-accordion" style="margin-top: 30px;">
+                            <div class="cartForm__optionsList">
+                                <div class="cartForm__listTitle">Характеристики товара</div>
+
+                                <div class="accordion-item">
+                                    <div class="accordion-header">
+                                        <h4>Вид монтажа</h4>
+                                        <span class="accordion-arrow">▼</span>
+                                    </div>
+                                    <div class="accordion-content">
+                                        <div class="installation-options">
+                                            <label class="option-label">
+                                                <input type="radio" name="installation-type" value="overhead" data-price="{{ $product->overhead_price ?? 0 }}" {{ $product->installation_type == 'overhead' ? 'checked' : '' }}>
+                                                <span class="option-name">Накладной монтаж</span>
+                                                <span class="option-price">+{{ $product->overhead_price ?? 0 }}₽</span>
+                                            </label>
+                                            <div class="option-description">
+                                                При выборе накладного монтажа необходимо к размерам проема добавьте 110мм по ширине и 250мм по высоте.
+                                            </div>
+
+                                            <label class="option-label">
+                                                <input type="radio" name="installation-type" value="built-in" data-price="{{ $product->builtin_price ?? 0 }}" {{ $product->installation_type == 'built-in' ? 'checked' : '' }}>
+                                                <span class="option-name">Встроенный монтаж</span>
+                                                <span class="option-price">+{{ $product->builtin_price ?? 0 }}₽</span>
+                                            </label>
+                                            <div class="option-description">
+                                                При выборе встроенного монтажа рекомендуется от размеров проема отнять по ширине и высоте 5 мм.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="accordion-item">
+                                    <div class="accordion-header">
+                                        <h4>Тип управления рольставни</h4>
+                                        <span class="accordion-arrow">▼</span>
+                                    </div>
+                                    <div class="accordion-content">
+                                        <div class="control-options">
+                                            <label class="option-label">
+                                                <input type="radio" name="control-type" value="strap" data-price="{{ $product->strap_price ?? 0 }}" {{ $product->control_type == 'strap' ? 'checked' : '' }}>
+                                                <span class="option-name">Ленточный или шнуровой инерционный привод</span>
+                                                <span class="option-price">+{{ $product->strap_price ?? 0 }}₽</span>
+                                            </label>
+                                            <div class="option-description">
+                                                Грузоподъемность до 15 кг. Ручное управление.
+                                            </div>
+
+                                            <label class="option-label">
+                                                <input type="radio" name="control-type" value="cardan" data-price="{{ $product->cardan_price ?? 0 }}" {{ $product->control_type == 'cardan' ? 'checked' : '' }}>
+                                                <span class="option-name">Воротковый привод (кардан)</span>
+                                                <span class="option-price">+{{ $product->cardan_price ?? 0 }}₽</span>
+                                            </label>
+                                            <div class="option-description">
+                                                Грузоподъемность до 35 кг. Ручное управление.
+                                            </div>
+
+                                            <label class="option-label">
+                                                <input type="radio" name="control-type" value="pim" data-price="{{ $product->pim_price ?? 0 }}" {{ $product->control_type == 'pim' ? 'checked' : '' }}>
+                                                <span class="option-name">Пружинно-инерционный механизм (ПИМ)</span>
+                                                <span class="option-price">+{{ $product->pim_price ?? 0 }}₽</span>
+                                            </label>
+                                            <div class="option-description">
+                                                Грузоподъемность от 6 до 80 кг. Ручное управление.
+                                            </div>
+
+                                            <label class="option-label">
+                                                <input type="radio" name="control-type" value="electric" data-price="{{ $product->electric_price ?? 6793 }}" {{ $product->control_type == 'electric' ? 'checked' : '' }}>
+                                                <span class="option-name">Автоматическое управление (электропривод)</span>
+                                                <span class="option-price">+{{ $product->electric_price ?? 6793 }}₽</span>
+                                            </label>
+                                            <div class="option-description">
+                                                Тип управление: выключатель настенный или мини пульт.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="accordion-item">
+                                    <div class="accordion-header">
+                                        <h4>Блокирующие устройства</h4>
+                                        <span class="accordion-arrow">▼</span>
+                                    </div>
+                                    <div class="accordion-content">
+                                        <div class="lock-options">
+                                            <label class="option-label">
+                                                <input type="radio" name="lock-device" value="rigel" data-price="{{ $product->rigel_price ?? 1575 }}" {{ $product->lock_device == 'rigel' ? 'checked' : '' }}>
+                                                <span class="option-name">Ригельный замок (с ключом)</span>
+                                                <span class="option-price">+{{ $product->rigel_price ?? 1575 }}₽</span>
+                                            </label>
+                                            <div class="option-description">
+                                                Используется при ручном управлении. Рольставни запираются на замок. Не рекомендуется использовать при электроприводе.
+                                            </div>
+
+                                            <label class="option-label">
+                                                <input type="radio" name="lock-device" value="shchyolka" data-price="{{ $product->shchyolka_price ?? 171 }}" {{ $product->lock_device == 'shchyolka' ? 'checked' : '' }}>
+                                                <span class="option-name">Ручной ригель (щеколда)</span>
+                                                <span class="option-price">+{{ $product->shchyolka_price ?? 171 }}₽</span>
+                                            </label>
+                                            <div class="option-description">
+                                                Используется при ручном управлении. Любой желающий сможет открыть роллету. Не рекомендуется использовать при электроприводе.
+                                            </div>
+
+                                            <label class="option-label">
+                                                <input type="radio" name="lock-device" value="upper" data-price="{{ $product->upper_price ?? 2358 }}" {{ $product->lock_device == 'upper' ? 'checked' : '' }}>
+                                                <span class="option-name">Верхний ригель (верхние замки)</span>
+                                                <span class="option-price">+{{ $product->upper_price ?? 2358 }}₽</span>
+                                            </label>
+                                            <div class="option-description">
+                                                Используется при управлении воротковый привод или автоматическом управлении для ограничения ручного подъема полотна.
+                                            </div>
+
+                                            <label class="option-label">
+                                                <input type="radio" name="lock-device" value="none" data-price="0" {{ $product->lock_device == 'none' ? 'checked' : '' }}>
+                                                <span class="option-name">Без блокировки</span>
+                                                <span class="option-price">+0₽</span>
+                                            </label>
+                                            <div class="option-description">
+                                                Применяется в основном при изделии для сантехнических проемов.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="accordion-item">
+                                    <div class="accordion-header">
+                                        <h4>Дополнительные опции</h4>
+                                        <span class="accordion-arrow">▼</span>
+                                    </div>
+                                    <div class="accordion-content">
+                                        <div class="additional-options">
+                                            <label class="option-label">
+                                                <input type="checkbox" name="ral-paint" value="ral-paint" data-price="{{ $product->ral_price ?? 8010 }}" {{ $product->ral_paint ? 'checked' : '' }}>
+                                                <span class="option-name">Покраска по RAL</span>
+                                                <span class="option-price">+{{ $product->ral_price ?? 8010 }}₽</span>
+                                            </label>
+                                            <div class="option-description">
+                                                Возможна покраска профиля AER44m/S или AER55m/S. Профиль с пенным заполнением покраске не подлежит!
+                                            </div>
+
+                                            <label class="option-label">
+                                                <input type="checkbox" name="photo-print" value="photo-print" data-price="{{ $product->photo_price ?? 3920 }}" {{ $product->photo_print ? 'checked' : '' }}>
+                                                <span class="option-name">Нанесение фотопечати</span>
+                                                <span class="option-price">+{{ $product->photo_price ?? 3920 }}₽</span>
+                                            </label>
+                                            <div class="option-description">
+                                                Возможна нанесение любого рисунка путем фотопечати на всем изделии.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <meta name="csrf-token" content="{{ csrf_token() }}">
+
+                        <div class="prodForm__howMany"> <button class="minus">-</button><input type="text"
+                                class="quantity-input" placeholder="1" value="1" /><button
+                                class="plus">+</button></div>
+                        <div class="prodForm__priceAndAddToCart">
+                            <div class="prodForm__price">Цена: 1200₽</div>
+                            <button class="prodForm__addToCart" data-id="{{ $product->id }}"> Добавить в
+                                корзину </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
         @endif
 
         @if (!empty($workExamples) && $workExamples->isNotEmpty())
