@@ -1,0 +1,13 @@
+User-agent: *
+Disallow: /admin/*
+Disallow: /*?*
+Disallow: /?*
+
+User-agent: Yandex
+Disallow: /admin/*
+Disallow: /*?*
+Disallow: /?*
+
+Host: https://stylish-house.net/
+
+Sitemap: https://stylish-house.net/sitemap.xml

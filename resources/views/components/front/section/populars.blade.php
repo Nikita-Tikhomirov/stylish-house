@@ -1,0 +1,94 @@
+<div class="s-populars wrapper blueControls homePopulars">
+    <div class="s-populars__title-wrap">
+        <h2 class="s-populars__title title"> <span>Популярные товары </span><svg width="114" height="35"
+                viewBox="0 0 114 35" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M112 23.275C1.84952 -10.6834 -7.36586 1.48086 7.50443 32.9053" stroke="currentColor"
+                    stroke-width="4" stroke-miterlimit="3.8637" stroke-linecap="round"></path>
+            </svg></h2>
+        <ul class="s-populars__tabsNav">
+            @foreach ($categories as $category)
+                <li data-catid="{{ $category->id }}" class="{{ $loop->first ? 'active' : '' }}">
+                    <span>{{ $category->titleh1 }}</span>
+                    <svg width="52" height="13" viewBox="0 0 52 13" fill="none"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 8.97127C11.6061 -5.48521 33 3.99996 51 11.4635" stroke="currentColor"
+                            stroke-width="2" stroke-miterlimit="3.8637" stroke-linecap="round"></path>
+                    </svg>
+                </li>
+            @endforeach
+        </ul>
+    </div>
+    <div class="s-populars__cards">
+        <div class="s-populars__swiper swiper">
+            <div class="swiper-wrapper" id="products-container">
+                @foreach ($homePopulars as $product)
+                    <div class="s-populars__slide swiper-slide card" id="prod{{ $product->id }}" data-modelid="{{ $product->model_id ?? '' }}"  data-model="{{ $product->model_title }}" data-cloth="{{ $product->cloth }}"  data-discount="{{ $product->discount }}">
+                        <div class="bigProdCard">
+                            <div class="bigProdCard__wrap">
+                                <div class="bigProdCard__img-wrap">
+
+                                    <div class="bigProdCard__imgCustomWrap">
+                                        @php
+                                            $mainImagePath = $product->image_thumb_path ?: $product->image_path;
+                                            $fabricImagePath = $product->fabric_thumb_path ?: $product->fabric_photo;
+                                        @endphp
+                                        @if ($mainImagePath)
+                                            <img src="{{ asset($mainImagePath) }}" alt="" />
+                                        @endif
+
+                                        @if ($fabricImagePath)
+                                            <img src="{{ asset($fabricImagePath) }}" alt="" />
+                                            
+                                        @endif
+                                    </div>
+
+                                    <div class="bigProdCard__controls">
+                                        <div class="bigProdCard__cart control"><i class="fas fa-cart-arrow-down"></i>
+                                            <div class="bigProdCard__toolTip">В корзину</div>
+                                        </div>
+                                        <div class="bigProdCard__quckView control quickProd"  data-prod="{{$product->id}}" data-modal="#popupProd"><i
+                                                class="fas fa-eye"></i>
+                                            <div class="bigProdCard__toolTip">Быстрый просмотр</div>
+                                        </div>
+                                        <div class="bigProdCard__favorites control"><i class="far fa-heart"></i>
+                                            <div class="bigProdCard__toolTip">Добавить в избранное</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="bigProdCard__info">
+                                    <a class="bigProdCard__category"
+                                        href="{{ route('subcategory.show', ['category_slug' => $product->category->slug, 'subcategory_slug' => $product->subcategory->slug]) }}">{{ $product->category->titleh1 }}</a><a
+                                        class="bigProdCard__title"
+                                        href="{{ route('product.show', ['category_slug' => $product->category->slug, 'subcategory_slug' => $product->subcategory->slug, 'product_slug' => $product->slug]) }}/">{{ $product->h1 }}</a>
+
+                                        <div class="bigProdCard__priceWrap">
+                                            @if ($product->discount)
+                                                <span class="normalPrice">1000₽</span>
+                                            @endif
+
+                                            <span class="discount">500₽</span>
+                                        </div>
+
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+    <div class="swiper-pagination"></div>
+    <div class="swiper-button-prev"></div>
+    <div class="swiper-button-next"> </div>
+</div>
+
+
+
+<style>
+    @media only screen and (min-width: 1351px) {
+        .s-populars__cards {
+            min-height: 475px;
+        }
+    }
+</style>
