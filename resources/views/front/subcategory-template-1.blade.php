@@ -267,7 +267,7 @@
         @endif
 
         <!-- Калькулятор -->
-        @if (!empty($firstProduct))
+        @if (($showTemplateCalculator ?? true) && !empty($firstProduct))
             @php
                 $product = $firstProduct;
             @endphp

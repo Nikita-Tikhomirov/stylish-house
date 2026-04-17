@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace App\Http\Controllers;
 
@@ -34,7 +34,7 @@ class SubcategoryController extends Controller
     protected const DEFAULT_EDIT_TEMPLATE = 'admin.subcatEdit';
     protected const TEMPLATE_CATEGORY_ID = 16;
     protected const TEMPLATE_MIN_VARIANT = 1;
-    protected const TEMPLATE_MAX_VARIANT = 4;
+    protected const TEMPLATE_MAX_VARIANT = 2;
 
     protected function resolveTemplateBySubcategory(Subcategory $subcategory, string $context): string
     {
@@ -402,7 +402,7 @@ class SubcategoryController extends Controller
     public function updateVisibility(Request $request, $category_slug, $subcategory_slug)
     {
         $request->validate([
-            'template_variant' => 'nullable|integer|min:1|max:4',
+            'template_variant' => 'nullable|integer|min:1|max:2',
         ]);
 
         $category = Category::where('slug', $category_slug)->firstOrFail();

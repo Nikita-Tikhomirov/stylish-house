@@ -312,8 +312,6 @@
                     <select class="form-control" name="template_variant" id="template_variant">
                         <option value="1" {{ (int) ($subcategory->template_variant ?? 1) === 1 ? 'selected' : '' }}>Сантех роллеты 1</option>
                         <option value="2" {{ (int) ($subcategory->template_variant ?? 1) === 2 ? 'selected' : '' }}>Шаблон 2</option>
-                        <option value="3" {{ (int) ($subcategory->template_variant ?? 1) === 3 ? 'selected' : '' }}>Шаблон 3</option>
-                        <option value="4" {{ (int) ($subcategory->template_variant ?? 1) === 4 ? 'selected' : '' }}>Шаблон 4</option>
                     </select>
                 </div>
                 <button class="btn btn-primary" type="button" id="applyTemplateButton">Сохранить</button>

@@ -1,1 +1,2 @@
-@include('front.subcategory')
+@php($showTemplateCalculator = false)
+@include('front.subcategory-template-1')
