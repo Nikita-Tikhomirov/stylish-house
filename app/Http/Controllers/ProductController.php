@@ -64,10 +64,10 @@ class ProductController extends Controller
             'title' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:products,slug',
             'description' => 'nullable|string',
-            'first_screenn_description' => 'required|string|max:255',
+            'first_screenn_description' => 'required|string',
             'h1' => 'required|string|max:255',
             'coef' => 'required|string|max:255',
-            'subcategory_id' => 'required|string|max:255'
+            'subcategory_id' => 'required|exists:subcategories,id',
         ]);
 
         $subcategory = Subcategory::findOrFail($request->subcategory_id);
