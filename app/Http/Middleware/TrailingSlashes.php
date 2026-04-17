@@ -7,7 +7,6 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Str;
-use Config;
 
 class TrailingSlashes
 {
@@ -18,10 +17,22 @@ class TrailingSlashes
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!preg_match('/.+\/$/', $request->getRequestUri())) {
-            $base_url = 'https://stylish-house.net';
-            return Redirect::to($base_url . $request->getRequestUri() . '/');
+        // Никогда не редиректим не-GET запросы (POST/PUT/DELETE), иначе ломаются формы.
+        if (!$request->isMethod('GET') && !$request->isMethod('HEAD')) {
+            return $next($request);
         }
+
+        $path = $request->getPathInfo();
+        if ($path !== '/' && !Str::endsWith($path, '/')) {
+            $queryString = $request->getQueryString();
+            $targetUrl = $request->getSchemeAndHttpHost() . $path . '/';
+            if ($queryString) {
+                $targetUrl .= '?' . $queryString;
+            }
+
+            return Redirect::to($targetUrl, 301);
+        }
+
         return $next($request);
     }
 }
