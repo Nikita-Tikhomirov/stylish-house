@@ -1,5 +1,6 @@
 {{-- @include('front.head') --}}
 <x-front.head title="{{ $subcategory->title }}" description="{{ $subcategory->description }}"></x-front.head>
+@vite('resources/css/prod.css')
 
 <body class="p-index">
 
@@ -1052,4 +1053,3 @@
 
 </body>
 </html>
-
