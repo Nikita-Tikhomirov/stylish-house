@@ -23,6 +23,21 @@ class TrailingSlashes
         }
 
         $path = $request->getPathInfo();
+
+        // Админку и служебные маршруты не переписываем.
+        if (
+            Str::startsWith($path, '/admin')
+            || Str::startsWith($path, '/api')
+            || Str::startsWith($path, '/_ignition')
+            || Str::startsWith($path, '/login')
+            || Str::startsWith($path, '/logout')
+            || Str::startsWith($path, '/register')
+            || Str::startsWith($path, '/password')
+            || Str::startsWith($path, '/sanctum')
+        ) {
+            return $next($request);
+        }
+
         if ($path !== '/' && !Str::endsWith($path, '/')) {
             $queryString = $request->getQueryString();
             $targetUrl = $request->getSchemeAndHttpHost() . $path . '/';
