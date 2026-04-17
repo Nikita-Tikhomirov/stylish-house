@@ -135,12 +135,12 @@
 
     <main class="layout">
 
-        <!-- Р СџР ВµРЎР‚Р Р†РЎвЂ№Р в„– РЎРЊР С”РЎР‚Р В°Р Р… -->
+        <!-- Первый экран -->
         <section class="s-catMain wrapper">
             <div class="s-catMain__img"><img src="{{ Storage::url($subcategory->img) }}" alt="" /></div>
             <div class="breadcrumbs">
                 <ul class="breadcrumbs__list">
-                    <li class=""><a class="breadcrumbs__link" href="{{ route('front.home') }}">Р вЂњР В»Р В°Р Р†Р Р…Р В°РЎРЏ</a></li>
+                    <li class=""><a class="breadcrumbs__link" href="{{ route('front.home') }}">Главная</a></li>
 
                     <li class="breadcrumbs__item"><svg class="breadcrumbs__arrow" width="5" height="9"
                             viewBox="0 0 5 9" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -169,10 +169,10 @@
             <div class="s-catMain__text">{{ $subcategory->first_screen_text }}</div>
         </section>
 
-        <!-- Р вЂ™РЎвЂ№Р Р†Р С•Р Т‘ РЎвЂљР С•Р Р†Р В°РЎР‚Р С•Р Р† Р С”Р В°Р С” Р Р†Р ВµР В·Р Т‘Р Вµ -->
+        <!-- Вывод товаров как везде -->
 
             <section class="popularsWithFilter wrapper">
-                <h2 class="popularsWithFilter__title title"> <span>Р СџР С•Р С—РЎС“Р В»РЎРЏРЎР‚Р Р…РЎвЂ№Р Вµ РЎвЂљР С•Р Р†Р В°РЎР‚РЎвЂ№</span><svg width="114"
+                <h2 class="popularsWithFilter__title title"> <span>Популярные товары</span><svg width="114"
                         height="35" viewBox="0 0 114 35" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M112 23.275C1.84952 -10.6834 -7.36586 1.48086 7.50443 32.9053" stroke="currentColor"
                             stroke-width="4" stroke-miterlimit="3.8637" stroke-linecap="round"></path>
@@ -259,20 +259,20 @@
                 </div>
             </section>
 
-        <!-- Р вЂ™Р С‘Р Т‘РЎвЂ№ Р СР С•Р Р…РЎвЂљР В°Р В¶Р В° -->
+        <!-- Виды монтажа -->
         @if (!empty($installationTypes) && $installationTypes->isNotEmpty())
             <x-front.section.subcategory-installation-types :installationTypes="$installationTypes" />
         @else
             <x-front.section.rollets-installation />
         @endif
 
-        <!-- Р С™Р В°Р В»РЎРЉР С”РЎС“Р В»РЎРЏРЎвЂљР С•РЎР‚ -->
+        <!-- Калькулятор -->
         @if (!empty($firstProduct))
             @php
                 $product = $firstProduct;
             @endphp
             <section class="prodMain wrapper catCalculator" style="padding-top: 40px;">
-                <h2 class="prodMain__title title"> <span>Р В Р В°РЎРѓРЎРѓРЎвЂЎР С‘РЎвЂљР В°РЎвЂљРЎРЉ РЎРѓРЎвЂљР С•Р С‘Р СР С•РЎРѓРЎвЂљРЎРЉ РЎР‚Р С•Р В»РЎРЉРЎРѓРЎвЂљР В°Р Р†Р ВµР Р…</span><svg width="114" height="35"
+                <h2 class="prodMain__title title"> <span>Рассчитать стоимость рольставен</span><svg width="114" height="35"
                         viewBox="0 0 114 35" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M112 23.275C1.84952 -10.6834 -7.36586 1.48086 7.50443 32.9053" stroke="currentColor"
                             stroke-width="4" stroke-miterlimit="3.8637" stroke-linecap="round"></path>
@@ -571,16 +571,16 @@
             <x-front.section.subgallery :gallerys="$workExamples" :category='$category' title=""></x-front.section.gallery>
         @endif
 
-        <!-- Р С›Р С—Р В»Р В°РЎвЂљР В° Р С‘ Р Т‘Р С•РЎРѓРЎвЂљР В°Р Р†Р С”Р В° -->
+        <!-- Оплата и доставка -->
         <x-front.section.delivery :title="$homePageFields->section_delivery_title" :topText="$homePageFields->section_delivery_top_text" :bottomText="$homePageFields->section_delivery_bottom_text"
             :iconCards="$iconCards"></x-front.section.delivery>
 
-        <!-- Р вЂ™Р С›Р СџР В Р С›Р РЋР В« Р В Р С›Р СћР вЂ™Р вЂўР СћР В« -->
+        <!-- ВОПРОСЫ И ОТВЕТЫ -->
         @if ($subcategory->faq_html)
             <section class="s-faq wrapper">
                 <div class="s-faq__container">
                     <div class="s-faq__title-wrap">
-                        <h2 class="s-faq__title title"> <span>Р вЂ™Р С•Р С—РЎР‚Р С•РЎРѓРЎвЂ№ Р С‘ Р С•РЎвЂљР Р†Р ВµРЎвЂљРЎвЂ№</span><svg width="114" height="35"
+                        <h2 class="s-faq__title title"> <span>Вопросы и ответы</span><svg width="114" height="35"
                                 viewBox="0 0 114 35" fill="none" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M112 23.275C1.84952 -10.6834 -7.36586 1.48086 7.50443 32.9053" stroke="currentColor"
                                     stroke-width="4" stroke-miterlimit="3.8637" stroke-linecap="round"></path>
@@ -658,22 +658,22 @@
                 }
             </style>
         @else
-            <x-front.section.faqcat title="Р вЂ™Р С•Р С—РЎР‚Р С•РЎРѓРЎвЂ№ Р С‘ Р С•РЎвЂљР Р†Р ВµРЎвЂљРЎвЂ№" :faqs="$faqs"></x-front.section.faqcat>
+            <x-front.section.faqcat title="Вопросы и ответы" :faqs="$faqs"></x-front.section.faqcat>
         @endif
 
-        <!-- Р РЋР вЂўР С› Р СћР вЂўР С™Р РЋР Сћ -->
+        <!-- СЕО ТЕКСТ -->
         <x-front.section.seo :seoSection="$subcategory->seo"></x-front.section.seo>
 
-        <!-- Р вЂ™РЎРѓР Вµ Р С”Р В°РЎвЂљР ВµР С–Р С•РЎР‚Р С‘Р С‘ -->
+        <!-- Все категории -->
         <section class="s-tags wrapper">
-            <h2 class="s-tags__title title"> <span>Р вЂ™РЎРѓР Вµ Р С”Р В°РЎвЂљР ВµР С–Р С•РЎР‚Р С‘Р С‘</span><svg width="114" height="35"
+            <h2 class="s-tags__title title"> <span>Все категории</span><svg width="114" height="35"
                     viewBox="0 0 114 35" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M112 23.275C1.84952 -10.6834 -7.36586 1.48086 7.50443 32.9053" stroke="currentColor"
                         stroke-width="4" stroke-miterlimit="3.8637" stroke-linecap="round"></path>
                 </svg></h2>
             <div class="s-tags__tags">
                 <div class="accardionJs">
-                    <div class="accardion__title">Р вЂ™РЎРѓР Вµ Р С”Р В°РЎвЂљР ВµР С–Р С•РЎР‚Р С‘Р С‘</div>
+                    <div class="accardion__title">Все категории</div>
                     <div class="accardion__content">
                         @if ($seoCats->isNotEmpty())
                             @foreach ($seoCats as $cat)
@@ -745,7 +745,7 @@
                     modal.appendChild(container);
                     document.body.appendChild(modal);
 
-                }; // Р вЂўРЎРѓР В»Р С‘ РЎС“Р В¶Р Вµ Р ВµРЎРѓРЎвЂљРЎРЉ Р СР С•Р Т‘Р В°Р В»Р С”Р В°, Р Р†РЎвЂ№РЎвЂ¦Р С•Р Т‘Р С‘Р С
+                }; // Если уже есть модалка, выходим
 
 
             }
@@ -769,17 +769,17 @@
                             wrapPopupProd();
                         }, 50);
 
-                        console.log('Р вЂ”Р В°Р С—РЎР‚Р С•РЎРѓ Р С” /popup РЎРѓ prodId:', prodId);
+                        console.log('Запрос к /popup с prodId:', prodId);
 
-                        // Р СџР С•Р В»РЎС“РЎвЂЎР В°Р ВµР С Р Т‘Р В°Р Р…Р Р…РЎвЂ№Р Вµ Р С• РЎвЂљР С•Р Р†Р В°РЎР‚Р Вµ РЎРѓ РЎРѓР ВµРЎР‚Р Р†Р ВµРЎР‚Р В°
+                        // Получаем данные о товаре с сервера
                         fetch(`/popup/${prodId}`)
                             .then(response => response.json())
                             .then(product => {
-                                // Р вЂ”Р В°Р С—Р С•Р В»Р Р…РЎРЏР ВµР С Р С—Р С•Р С—Р В°Р С— Р Т‘Р В°Р Р…Р Р…РЎвЂ№Р СР С‘ РЎвЂљР С•Р Р†Р В°РЎР‚Р В°
+                                // Заполняем попап данными товара
                                 document.querySelector('#popupProd .prodForm__formSubtitle')
                                     .innerText = product.title;
                                 document.querySelector('#popupProd .prodForm__formTitle')
-                                    .innerText = `Р вЂ”Р В°Р С”Р В°Р В·Р В°РЎвЂљРЎРЉ ${product.title}`;
+                                    .innerText = `Заказать ${product.title}`;
                                 document.querySelector('#popupProd .prodForm__description p')
                                     .innerText = product.first_screenn_description + ' ';
                                 let prodImg = document.querySelectorAll(
@@ -802,41 +802,41 @@
                                     prodImg[0].src = img2src;
 
                                 }
-                                // Р С™Р С•РЎР‚РЎР‚Р ВµР С”РЎвЂљР С‘РЎР‚РЎС“Р ВµР С Р С—РЎС“РЎвЂљРЎРЉ
+                                // Корректируем путь
 
 
                                 // console.log(product.gallery);
-                                // Р С›РЎвЂЎР С‘РЎвЂ°Р В°Р ВµР С РЎРѓРЎвЂљР В°РЎР‚РЎС“РЎР‹ Р С–Р В°Р В»Р ВµРЎР‚Р ВµРЎР‹
+                                // Очищаем старую галерею
                                 let gallery = document.querySelector(
                                     '#popupProd .prodForm__bar');
                                 gallery.innerHTML = '';
 
-                                // Р вЂќР С•Р В±Р В°Р Р†Р В»РЎРЏР ВµР С Р С‘Р В·Р С•Р В±РЎР‚Р В°Р В¶Р ВµР Р…Р С‘РЎРЏ РЎРѓ РЎРѓРЎРѓРЎвЂ№Р В»Р С”Р В°Р СР С‘
+                                // Добавляем изображения с ссылками
                                 product.gallery.forEach(related => {
                                     let link = document.createElement('a');
-                                    link.href = related.link; // Р РЋРЎРѓРЎвЂ№Р В»Р С”Р В° Р Р…Р В° РЎвЂљР С•Р Р†Р В°РЎР‚
+                                    link.href = related.link; // Ссылка на товар
                                     let img = document.createElement('img');
                                     if (related.image) {
 
                                         img.src =
-                                            `${related.image}`; // Р СџРЎС“РЎвЂљРЎРЉ Р С” Р С‘Р В·Р С•Р В±РЎР‚Р В°Р В¶Р ВµР Р…Р С‘РЎР‹
+                                            `${related.image}`; // Путь к изображению
                                     } else {
 
                                         img.src =
-                                            `${related.fabric_photo}`; // Р СџРЎС“РЎвЂљРЎРЉ Р С” Р С‘Р В·Р С•Р В±РЎР‚Р В°Р В¶Р ВµР Р…Р С‘РЎР‹
+                                            `${related.fabric_photo}`; // Путь к изображению
                                     }
 
 
                                     link.appendChild(
-                                        img); // Р вЂ™РЎРѓРЎвЂљР В°Р Р†Р В»РЎРЏР ВµР С Р С‘Р В·Р С•Р В±РЎР‚Р В°Р В¶Р ВµР Р…Р С‘Р Вµ Р Р† РЎРѓРЎРѓРЎвЂ№Р В»Р С”РЎС“
+                                        img); // Вставляем изображение в ссылку
                                     gallery.appendChild(
-                                        link); // Р вЂќР С•Р В±Р В°Р Р†Р В»РЎРЏР ВµР С РЎРѓРЎРѓРЎвЂ№Р В»Р С”РЎС“ Р Р† Р С–Р В°Р В»Р ВµРЎР‚Р ВµРЎР‹
+                                        link); // Добавляем ссылку в галерею
 
                                 });
 
                                 console.log(product.model);
 
-                                // Р вЂќР С•Р В±Р В°Р Р†Р С‘РЎвЂљРЎРЉ id Р Т‘Р В»РЎРЏ Р С”Р Р…Р С•Р С—Р С”Р С‘ Р Т‘Р С•Р В±Р В°Р Р†Р С‘РЎвЂљРЎРЉ Р Р† Р С”Р С•РЎР‚Р В·Р С‘Р Р…РЎС“
+                                // Добавить id для кнопки добавить в корзину
                                 document.querySelector('#popupProd .prodForm__addToCart')
                                     .setAttribute('data-id', prodId)
 
@@ -878,7 +878,7 @@
                                 }, 100);
                             })
                             .catch(error => {
-                                console.error('Р С›РЎв‚¬Р С‘Р В±Р С”Р В° Р С—РЎР‚Р С‘ Р В·Р В°Р С–РЎР‚РЎС“Р В·Р С”Р Вµ Р Т‘Р В°Р Р…Р Р…РЎвЂ№РЎвЂ¦ РЎвЂљР С•Р Р†Р В°РЎР‚Р В°:', error);
+                                console.error('Ошибка при загрузке данных товара:', error);
                             });
 
                     })
@@ -905,22 +905,22 @@
                     let counterMinusBtn = slide.querySelector('.minus');
                     let counterPlusBtn = slide.querySelector('.plus');
                     let counterInput = slide.querySelector('.quantity-input');
-                    // Р Р€Р Т‘Р В°Р В»РЎРЏР ВµР С РЎРѓРЎвЂљР В°РЎР‚РЎвЂ№Р Вµ Р С•Р В±РЎР‚Р В°Р В±Р С•РЎвЂљРЎвЂЎР С‘Р С”Р С‘ Р С—Р ВµРЎР‚Р ВµР Т‘ Р Т‘Р С•Р В±Р В°Р Р†Р В»Р ВµР Р…Р С‘Р ВµР С Р Р…Р С•Р Р†РЎвЂ№РЎвЂ¦
+                    // Удаляем старые обработчики перед добавлением новых
                     function removeEventListeners(element, events) {
                         const clone = element.cloneNode(true);
                         element.replaceWith(clone);
                         return clone;
                     }
-                    // Р С›РЎвЂЎР С‘РЎвЂ°Р В°Р ВµР С Р С•Р В±РЎР‚Р В°Р В±Р С•РЎвЂљРЎвЂЎР С‘Р С”Р С‘ Р С—Р ВµРЎР‚Р ВµР Т‘ Р Т‘Р С•Р В±Р В°Р Р†Р В»Р ВµР Р…Р С‘Р ВµР С
+                    // Очищаем обработчики перед добавлением
                     counterMinusBtn = removeEventListeners(counterMinusBtn, ['click']);
                     counterPlusBtn = removeEventListeners(counterPlusBtn, ['click']);
                     counterInput = removeEventListeners(counterInput, ['input']);
                     let priceNow = 0;
 
-                    // Р СџР ВµРЎР‚Р ВµРЎРѓРЎвЂЎР ВµРЎвЂљ РЎвЂ Р ВµР Р…РЎвЂ№ РЎРѓ РЎС“РЎвЂЎР ВµРЎвЂљР С•Р С Р С”Р С•Р В»Р С‘РЎвЂЎР ВµРЎРѓРЎвЂљР Р†Р В° Р С‘ РЎРѓР С”Р С‘Р Т‘Р С”Р С‘
+                    // Пересчет цены с учетом количества и скидки
                     function rebuildPrice(price, counterValue, discount = 0) {
                         if (price <= 0 || isNaN(price)) {
-                            priceElement.textContent = 'Р В¦Р ВµР Р…Р В° Р С—Р С• Р В·Р В°Р С—РЎР‚Р С•РЎРѓРЎС“';
+                            priceElement.textContent = 'Цена по запросу';
                             return;
                         }
                         const discountedPrice = price - (price * discount / 100);
@@ -953,12 +953,12 @@
                             priceNow += (parseInt(photoPrint.dataset.price || 0, 10) * counterValue);
                         }
 
-                        // Р СџРЎР‚Р ВµР С•Р В±РЎР‚Р В°Р В·РЎС“Р ВµР С РЎвЂ Р ВµР Р…РЎС“ Р Р† РЎвЂ Р ВµР В»Р С•Р Вµ РЎвЂЎР С‘РЎРѓР В»Р С•
+                        // Преобразуем цену в целое число
                         priceNow = Math.floor(priceNow);
-                        priceElement.textContent = `Р В¦Р ВµР Р…Р В°: ${priceNow}РІвЂљР…`;
+                        priceElement.textContent = `Цена: ${priceNow}₽`;
                     }
 
-                    // Р В¤РЎС“Р Р…Р С”РЎвЂ Р С‘РЎРЏ Р Т‘Р В»РЎРЏ Р С—Р С•Р В»РЎС“РЎвЂЎР ВµР Р…Р С‘РЎРЏ Р С‘ Р С•Р В±Р Р…Р С•Р Р†Р В»Р ВµР Р…Р С‘РЎРЏ РЎвЂ Р ВµР Р…РЎвЂ№
+                    // Функция для получения и обновления цены
                     function fetchPrice() {
                         const width = widthInput.value;
                         const height = heightInput.value;
@@ -972,12 +972,12 @@
                         const discount = parseFloat(discountInput?.value) || 0;
 
                         if (!width || !height) {
-                            rebuildPrice(0, quantity, discount); // Р вЂ”Р Т‘Р ВµРЎРѓРЎРЉ Р Р†Р СР ВµРЎРѓРЎвЂљР С• 0 Р В±РЎС“Р Т‘Р ВµРЎвЂљ "Р В¦Р ВµР Р…Р В° Р С—Р С• Р В·Р В°Р С—РЎР‚Р С•РЎРѓРЎС“"
+                            rebuildPrice(0, quantity, discount); // Здесь вместо 0 будет "Цена по запросу"
                             return;
                         }
 
-                        // Р С›Р С—РЎвЂ Р С‘Р С•Р Р…Р В°Р В»РЎРЉР Р…Р С•: Р С‘Р Р…Р Т‘Р С‘Р С”Р В°РЎвЂљР С•РЎР‚ Р В·Р В°Р С–РЎР‚РЎС“Р В·Р С”Р С‘, РЎвЂЎРЎвЂљР С•Р В±РЎвЂ№ Р Р…Р Вµ Р С—Р С•Р С”Р В°Р В·РЎвЂ№Р Р†Р В°Р В»Р С• РЎРѓРЎвЂљР В°РЎР‚Р С•Р Вµ Р В·Р Р…Р В°РЎвЂЎР ВµР Р…Р С‘Р Вµ
-                        priceElement.textContent = 'Р В Р В°РЎРѓРЎвЂЎРЎвЂРЎвЂљ...';
+                        // Опционально: индикатор загрузки, чтобы не показывало старое значение
+                        priceElement.textContent = 'Расчёт...';
 
                         fetch(
                                 `/sheet-names?width=${width}&height=${height}&model=${model}&control=${control}&cloth=${cloth}&modelId=${modelId}&prodTitle=${prodTitleTorequest}`
@@ -988,19 +988,19 @@
                                 rebuildPrice(basePrice, quantity, discount);
                             })
                             .catch(error => {
-                                console.error('Р С›РЎв‚¬Р С‘Р В±Р С”Р В° Р С—РЎР‚Р С‘ Р С—Р С•Р В»РЎС“РЎвЂЎР ВµР Р…Р С‘Р С‘ РЎвЂ Р ВµР Р…РЎвЂ№:', error);
+                                console.error('Ошибка при получении цены:', error);
                                 rebuildPrice(0, quantity,
-                                discount); // Р вЂ”Р Т‘Р ВµРЎРѓРЎРЉ РЎвЂљР С•Р В¶Р Вµ "Р В¦Р ВµР Р…Р В° Р С—Р С• Р В·Р В°Р С—РЎР‚Р С•РЎРѓРЎС“" Р Р† РЎРѓР В»РЎС“РЎвЂЎР В°Р Вµ Р С•РЎв‚¬Р С‘Р В±Р С”Р С‘
+                                discount); // Здесь тоже "Цена по запросу" в случае ошибки
                             });
                     }
 
-                    // Р ВР Р…Р С‘РЎвЂ Р С‘Р В°Р В»Р С‘Р В·Р В°РЎвЂ Р С‘РЎРЏ Р С”Р С•Р В»Р С‘РЎвЂЎР ВµРЎРѓРЎвЂљР Р†Р В°
+                    // Инициализация количества
                     counterInput.value = counterInput.value || 1;
 
-                    // Р ВР Р…Р С‘РЎвЂ Р С‘Р В°Р В»Р С‘Р В·Р В°РЎвЂ Р С‘РЎРЏ UI fallback (Р Р…Р В° РЎРѓР В»РЎС“РЎвЂЎР В°Р в„–, Р ВµРЎРѓР В»Р С‘ fetch Р Р…Р Вµ РЎРѓРЎР‚Р В°Р В±Р С•РЎвЂљР В°Р ВµРЎвЂљ РЎРѓРЎР‚Р В°Р В·РЎС“)
-                    priceElement.textContent = 'Р В¦Р ВµР Р…Р В° Р С—Р С• Р В·Р В°Р С—РЎР‚Р С•РЎРѓРЎС“';
+                    // Инициализация UI fallback (на случай, если fetch не сработает сразу)
+                    priceElement.textContent = 'Цена по запросу';
 
-                    // Р С›Р В±РЎР‚Р В°Р В±Р С•РЎвЂљРЎвЂЎР С‘Р С”Р С‘ Р Т‘Р В»РЎРЏ Р С‘Р В·Р СР ВµР Р…Р ВµР Р…Р С‘РЎРЏ Р С”Р С•Р В»Р С‘РЎвЂЎР ВµРЎРѓРЎвЂљР Р†Р В° РЎвЂљР С•Р Р†Р В°РЎР‚Р С•Р Р†
+                    // Обработчики для изменения количества товаров
                     counterMinusBtn.addEventListener('click', () => {
                         let currentValue = parseInt(counterInput.value) || 1;
                         if (currentValue > 1) {
@@ -1015,7 +1015,7 @@
                         fetchPrice();
                     });
 
-                    // Р вЂќР В»РЎРЏ Р Р†Р Р†Р С•Р Т‘Р В° Р Р†РЎР‚РЎС“РЎвЂЎР Р…РЎС“РЎР‹
+                    // Для ввода вручную
                     counterInput.addEventListener('input', () => {
                         let value = parseInt(counterInput.value);
                         if (isNaN(value) || value < 1) {
@@ -1024,10 +1024,10 @@
                         fetchPrice();
                     });
 
-                    // Р ВР В·Р Р…Р В°РЎвЂЎР В°Р В»РЎРЉР Р…РЎвЂ№Р в„– РЎР‚Р В°РЎРѓРЎвЂЎР ВµРЎвЂљ Р С—РЎР‚Р С‘ Р В·Р В°Р С–РЎР‚РЎС“Р В·Р С”Р Вµ
+                    // Изначальный расчет при загрузке
                     fetchPrice();
 
-                    // Р С›Р В±Р Р…Р С•Р Р†Р В»Р ВµР Р…Р С‘Р Вµ РЎвЂ Р ВµР Р…РЎвЂ№ Р С—РЎР‚Р С‘ Р С‘Р В·Р СР ВµР Р…Р ВµР Р…Р С‘Р С‘ РЎв‚¬Р С‘РЎР‚Р С‘Р Р…РЎвЂ№, Р Р†РЎвЂ№РЎРѓР С•РЎвЂљРЎвЂ№ Р С‘Р В»Р С‘ Р Т‘РЎР‚РЎС“Р С–Р С‘РЎвЂ¦ Р С—Р В°РЎР‚Р В°Р СР ВµРЎвЂљРЎР‚Р С•Р Р†
+                    // Обновление цены при изменении ширины, высоты или других параметров
                     widthInput.addEventListener('input', fetchPrice);
                     heightInput.addEventListener('input', fetchPrice);
                     if (controlInput && controlInput instanceof Element) {
@@ -1055,7 +1055,7 @@
 
                 allCards.forEach(element => {
 
-                    // Р СљР С‘Р Р…Р СР В°Р В»РЎРЉР Р…РЎС“РЎР‹ Р С‘ Р СР В°Р С”РЎРѓР С‘Р СР В°Р В»РЎРЉР Р…РЎС“РЎР‹ Р В±РЎР‚Р В°РЎвЂљРЎРЉ Р С‘Р В· Р СР С•Р Т‘Р ВµР В»Р С‘
+                    // Минмальную и максимальную брать из модели
 
                     let prodTitle = element.querySelector('.bigProdCard__title').innerText.trim();
 
@@ -1063,39 +1063,39 @@
 
                     let counterForDouble = 1
 
-                    if (prodTitle.includes("Р РЋРЎвЂљР В°Р Р…Р Т‘Р В°РЎР‚РЎвЂљ")) {
+                    if (prodTitle.includes("Стандарт")) {
                         width = 500;
                         height = 500;
-                    } else if (prodTitle.includes("Р РЋР С—РЎР‚Р С‘Р Р…Р С–")) {
+                    } else if (prodTitle.includes("Спринг")) {
                         width = 700;
                         height = 500;
-                    } else if (prodTitle.includes("Р вЂњРЎР‚Р В°Р Р…Р Т‘")) {
+                    } else if (prodTitle.includes("Гранд")) {
                         width = 700;
                         height = 500;
-                    } else if (prodTitle.includes("Р С™Р Р†Р В°РЎвЂљРЎР‚Р С• Р С”Р В»Р В°РЎРѓРЎРѓР С‘Р С”")) {
+                    } else if (prodTitle.includes("Кватро классик")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("Р С™Р Р†Р В°РЎвЂљРЎР‚Р С• Р В»РЎР‹Р С”РЎРѓ")) {
+                    } else if (prodTitle.includes("Кватро люкс")) {
                         width = 700;
                         height = 500;
-                    } else if (prodTitle.includes("Р С™Р В»Р В°РЎРѓРЎРѓР С‘Р С” Р С—РЎР‚Р ВµР СР С‘РЎС“Р С")) {
+                    } else if (prodTitle.includes("Классик премиум")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("Р вЂќР В°Р В±Р В» Р С”Р В»Р В°РЎРѓРЎРѓР С‘Р С”")) {
+                    } else if (prodTitle.includes("Дабл классик")) {
                         width = 400;
                         height = 500;
                         counterForDouble = 2
-                    } else if (prodTitle.includes("Р вЂєРЎР‹Р С”РЎРѓ Р С—РЎР‚Р ВµР СР С‘РЎС“Р С")) {
+                    } else if (prodTitle.includes("Люкс премиум")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("Р вЂќР В°Р В±Р В» Р В»РЎР‹Р С”РЎРѓ")) {
+                    } else if (prodTitle.includes("Дабл люкс")) {
                         width = 400;
                         height = 500;
                         counterForDouble = 2
-                    } else if (prodTitle.includes("Р СљР С‘Р Р…Р С‘")) {
+                    } else if (prodTitle.includes("Мини")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("Р СљР С‘Р Р…Р С‘ Р Р…РЎРЉРЎР‹")) {
+                    } else if (prodTitle.includes("Мини нью")) {
                         width = 400;
                         height = 500;
                     } else if (prodTitle.includes("Р Р€Р Р…Р С‘-1")) {
@@ -1104,59 +1104,59 @@
                     } else if (prodTitle.includes("Р Р€Р Р…Р С‘-2")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("Р Р€Р Р…Р С‘-1 Р В»Р В°Р СР С‘Р Р…Р В°РЎвЂ Р С‘РЎРЏ")) {
+                    } else if (prodTitle.includes("Уни-1 ламинация")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("Р Р€Р Р…Р С‘-2 Р В»Р В°Р СР С‘Р Р…Р В°РЎвЂ Р С‘РЎРЏ")) {
+                    } else if (prodTitle.includes("Уни-2 ламинация")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• Р СР С‘Р Р…Р С‘ Р Р…РЎРЉРЎР‹")) {
+                    } else if (prodTitle.includes("Комбо мини нью")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• РЎС“Р Р…Р С‘-1")) {
+                    } else if (prodTitle.includes("Комбо уни-1")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• РЎС“Р Р…Р С‘-2")) {
+                    } else if (prodTitle.includes("Комбо уни-2")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• РЎС“Р Р…Р С‘-2 Р В»Р В°Р СР С‘Р Р…Р В°РЎвЂ Р С‘РЎРЏ")) {
+                    } else if (prodTitle.includes("Комбо уни-2 ламинация")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• Р Р†-52 РЎРѓРЎвЂљР В°Р Р…Р Т‘Р В°РЎР‚РЎвЂљ")) {
+                    } else if (prodTitle.includes("Комбо в-52 стандарт")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• Р С™Р В»Р В°РЎРѓРЎРѓР С‘Р С”")) {
+                    } else if (prodTitle.includes("Комбо Классик")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• Р Р†-52 Р В»РЎР‹Р С”РЎРѓ")) {
+                    } else if (prodTitle.includes("Комбо в-52 люкс")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• Р Т‘Р В°Р В±Р В» Р С”Р В»Р В°РЎРѓРЎРѓР С‘Р С”")) {
-                        width = 400;
-                        height = 500;
-                        counterForDouble = 2
-                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• Р Т‘Р В°Р В±Р В» Р В»РЎР‹Р С”РЎРѓ")) {
+                    } else if (prodTitle.includes("Комбо дабл классик")) {
                         width = 400;
                         height = 500;
                         counterForDouble = 2
-                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• Р С”Р Р†Р В°РЎвЂљРЎР‚Р С• Р С”Р В»Р В°РЎРѓРЎРѓР С‘Р С”")) {
+                    } else if (prodTitle.includes("Комбо дабл люкс")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("Р С™Р С•Р СР В±Р С• Р С”Р Р†Р В°РЎвЂљРЎР‚Р С• Р В»РЎР‹Р С”РЎРѓ")) {
+                        counterForDouble = 2
+                    } else if (prodTitle.includes("Комбо кватро классик")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("Р С’Р В»РЎР‹Р СР С‘Р Р…Р С‘Р ВµР Р†РЎвЂ№Р Вµ 50 Р СР С")) {
+                    } else if (prodTitle.includes("Комбо кватро люкс")) {
                         width = 400;
                         height = 500;
-                    } else if (prodTitle.includes("Р С™Р С•Р СР С—Р В°Р С”РЎвЂљ Р СџРЎР‚Р ВµР СР С‘РЎС“Р С")) {
+                    } else if (prodTitle.includes("Алюминиевые 50 мм")) {
+                        width = 400;
+                        height = 500;
+                    } else if (prodTitle.includes("Компакт Премиум")) {
                         width = 300;
                         height = 600;
-                    } else if (prodTitle.includes("Р ТђL Р С’Р В±РЎРѓР С•Р В»РЎР‹РЎвЂљ")) {
+                    } else if (prodTitle.includes("ХL Абсолют")) {
                         width = 300;
                         height = 600;
                     } else {
                         width = 700;
-                        height = 700; // Р вЂ”Р Р…Р В°РЎвЂЎР ВµР Р…Р С‘Р Вµ Р С—Р С• РЎС“Р СР С•Р В»РЎвЂЎР В°Р Р…Р С‘РЎР‹
+                        height = 700; // Значение по умолчанию
                     }
 
 
@@ -1176,28 +1176,28 @@
                         )
                         .then(response => response.json())
                         .then(data => {
-                            const basePrice = data.price * counterForDouble || "Р В¦Р ВµР Р…Р В° Р С—Р С• Р В·Р В°Р С—РЎР‚Р С•РЎРѓРЎС“ ";
+                            const basePrice = data.price * counterForDouble || "Цена по запросу ";
                             const discount = element.getAttribute('data-discount')
                             if (discount > 0) {
                                 const discountedPrice = basePrice * (1 - discount / 100);
-                                // Р СџРЎР‚Р ВµР С•Р В±РЎР‚Р В°Р В·РЎС“Р ВµР С РЎвЂ Р ВµР Р…РЎС“ Р Р† РЎвЂ Р ВµР В»Р С•Р Вµ РЎвЂЎР С‘РЎРѓР В»Р С• Р В±Р ВµР В· Р С”Р С•Р С—Р ВµР ВµР С”
+                                // Преобразуем цену в целое число без копеек
                                 const priceNow = Math.floor(discountedPrice);
-                                priceElement.innerText = `${priceNow}РІвЂљР…`;
-                                normalPriceElement.innerText = `${basePrice}РІвЂљР…`;
+                                priceElement.innerText = `${priceNow}₽`;
+                                normalPriceElement.innerText = `${basePrice}₽`;
 
                                 normalPriceElement.style.textDecoration = "line-through";
                             } else {
-                                priceElement.innerText = `${basePrice}РІвЂљР…`;
-                                normalPriceElement.innerText = ""; // Р С›РЎвЂЎР С‘РЎвЂ°Р В°Р ВµР С РЎРѓРЎвЂљР В°РЎР‚РЎС“РЎР‹ РЎвЂ Р ВµР Р…РЎС“
+                                priceElement.innerText = `${basePrice}₽`;
+                                normalPriceElement.innerText = ""; // Очищаем старую цену
                             }
                         })
-                        .catch(error => console.error('Р С›РЎв‚¬Р С‘Р В±Р С”Р В° Р С—РЎР‚Р С‘ Р С—Р С•Р В»РЎС“РЎвЂЎР ВµР Р…Р С‘Р С‘ РЎвЂ Р ВµР Р…РЎвЂ№:', error));
+                        .catch(error => console.error('Ошибка при получении цены:', error));
                 });
 
             }
             rebuilCardsPrice()
 
-            // Р СџР В°Р С–Р С‘Р Р…Р В°РЎвЂ Р С‘РЎРЏ
+            // Пагинация
 
 
             function fetchProducts(url) {
@@ -1206,22 +1206,22 @@
                             "X-Requested-With": "XMLHttpRequest"
                         }
                     })
-                    .then(response => response.json()) // Р СџР С•Р В»РЎС“РЎвЂЎР В°Р ВµР С Р Т‘Р В°Р Р…Р Р…РЎвЂ№Р Вµ Р Р† РЎвЂћР С•РЎР‚Р СР В°РЎвЂљР Вµ JSON
+                    .then(response => response.json()) // Получаем данные в формате JSON
                     .then(data => {
-                        // Р С›Р В±Р Р…Р С•Р Р†Р В»РЎРЏР ВµР С Р С”Р С•Р Р…РЎвЂљР ВµР Р…РЎвЂљ Р С—РЎР‚Р С•Р Т‘РЎС“Р С”РЎвЂљР С•Р Р†
+                        // Обновляем контент продуктов
                         document.getElementById("productsWrap").innerHTML = data.filterProduts;
-                        // Р С›Р В±Р Р…Р С•Р Р†Р В»РЎРЏР ВµР С Р С—Р В°Р С–Р С‘Р Р…Р В°РЎвЂ Р С‘РЎР‹
+                        // Обновляем пагинацию
                         document.getElementById("pagination").innerHTML = data.pagination;
                     })
-                    .catch(error => console.error('Р С›РЎв‚¬Р С‘Р В±Р С”Р В°:', error)); // Р С›Р В±РЎР‚Р В°Р В±Р С•РЎвЂљР С”Р В° Р С•РЎв‚¬Р С‘Р В±Р С•Р С”
+                    .catch(error => console.error('Ошибка:', error)); // Обработка ошибок
             }
 
             document.body.addEventListener("click", function(e) {
                 let pageLink = e.target.closest("#pagination a");
                 if (pageLink) {
-                    e.preventDefault(); // Р С›РЎвЂљР СР ВµР Р…РЎРЏР ВµР С РЎРѓРЎвЂљР В°Р Р…Р Т‘Р В°РЎР‚РЎвЂљР Р…РЎвЂ№Р в„– Р С—Р ВµРЎР‚Р ВµРЎвЂ¦Р С•Р Т‘
-                    let pageUrl = new URL(pageLink.href); // Р СџР С•Р В»РЎС“РЎвЂЎР В°Р ВµР С URL Р С‘Р В· РЎРѓРЎРѓРЎвЂ№Р В»Р С”Р С‘
-                    let pageNumber = pageUrl.searchParams.get("page"); // Р вЂР ВµРЎР‚Р ВµР С Р Р…Р С•Р СР ВµРЎР‚ РЎРѓРЎвЂљРЎР‚Р В°Р Р…Р С‘РЎвЂ РЎвЂ№
+                    e.preventDefault(); // Отменяем стандартный переход
+                    let pageUrl = new URL(pageLink.href); // Получаем URL из ссылки
+                    let pageNumber = pageUrl.searchParams.get("page"); // Берем номер страницы
                     fetchFilteredProducts(pageNumber);
                     loadPopupsContent()
                 }
@@ -1229,7 +1229,7 @@
 
             document.querySelectorAll('.sidebarFilter__label input[type="checkbox"]').forEach(function(checkbox) {
                 checkbox.addEventListener('change', function() {
-                    fetchFilteredProducts(1); // Р СџРЎР‚Р С‘ Р С‘Р В·Р СР ВµР Р…Р ВµР Р…Р С‘Р С‘ РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚Р В° Р В·Р В°Р С–РЎР‚РЎС“Р В¶Р В°Р ВµР С Р С—Р ВµРЎР‚Р Р†РЎС“РЎР‹ РЎРѓРЎвЂљРЎР‚Р В°Р Р…Р С‘РЎвЂ РЎС“
+                    fetchFilteredProducts(1); // При изменении фильтра загружаем первую страницу
                     rebuilCardsPrice()
                     loadPopupsContent()
                 });
@@ -1254,7 +1254,7 @@
                             models: selectedModels,
                             colors: selectedColors,
                             materials: selectedMaterials,
-                            page: page, // Р СџР ВµРЎР‚Р ВµР Т‘Р В°Р ВµР С РЎРѓРЎвЂљРЎР‚Р В°Р Р…Р С‘РЎвЂ РЎС“ Р Р† Р В·Р В°Р С—РЎР‚Р С•РЎРѓ
+                            page: page, // Передаем страницу в запрос
                         })
                     })
                     .then(response => response.json())
@@ -1270,29 +1270,29 @@
                         </div>
                         <div class="bigProdCard__controls">
                             <div class="bigProdCard__cart control"><i class="fas fa-cart-arrow-down"></i>
-                                <div class="bigProdCard__toolTip">Р вЂ™ Р С”Р С•РЎР‚Р В·Р С‘Р Р…РЎС“</div>
+                                <div class="bigProdCard__toolTip">В корзину</div>
                             </div>
                             <div class="bigProdCard__quckView control quickProd" data-modal="#popupProd" data-prod="${product.id}"><i class="fas fa-eye"></i>
-                                <div class="bigProdCard__toolTip">Р вЂРЎвЂ№РЎРѓРЎвЂљРЎР‚РЎвЂ№Р в„– Р С—РЎР‚Р С•РЎРѓР СР С•РЎвЂљРЎР‚</div>
+                                <div class="bigProdCard__toolTip">Быстрый просмотр</div>
                             </div>
                             <div class="bigProdCard__favorites control"><i class="far fa-heart"></i>
-                                <div class="bigProdCard__toolTip">Р вЂќР С•Р В±Р В°Р Р†Р С‘РЎвЂљРЎРЉ Р Р† Р С‘Р В·Р В±РЎР‚Р В°Р Р…Р Р…Р С•Р Вµ</div>
+                                <div class="bigProdCard__toolTip">Добавить в избранное</div>
                             </div>
                         </div>
                     </div>
                     <div class="bigProdCard__info">
-                        <a class="bigProdCard__category" href="${product.category ? '/' + product.category.slug : '#'}">${product.category ? product.category.titleh1 : 'Р вЂР ВµР В· Р С”Р В°РЎвЂљР ВµР С–Р С•РЎР‚Р С‘Р С‘'}</a>
+                        <a class="bigProdCard__category" href="${product.category ? '/' + product.category.slug : '#'}">${product.category ? product.category.titleh1 : 'Без категории'}</a>
                         <a class="bigProdCard__title" href="${product.slug ? '/' + product.category.slug + '/' + product.subcategory.slug + '/' + product.slug : '#'}">${product.h1}</a>
                         <div class="bigProdCard__priceWrap">
-                            <span class="normalPrice" style="text-decoration: line-through;">${product.price}РІвЂљР…</span>
-                            <span class="discount">${product.old_price}РІвЂљР…</span>
+                            <span class="normalPrice" style="text-decoration: line-through;">${product.price}₽</span>
+                            <span class="discount">${product.old_price}₽</span>
                         </div>
                     </div>
                 </div>
             </div>
         `).join('');
 
-                        // Р С›Р В±Р Р…Р С•Р Р†Р В»РЎРЏР ВµР С Р С—Р В°Р С–Р С‘Р Р…Р В°РЎвЂ Р С‘РЎР‹
+                        // Обновляем пагинацию
                         document.querySelector('.pagination').innerHTML = data.pagination;
                         rebuilCardsPrice()
                         loadPopupsContent()
@@ -1311,20 +1311,20 @@
                 const maxPriceDisplay = document.getElementById('max-price-display');
                 const minPriceInput = document.getElementById('min-price');
                 const maxPriceInput = document.getElementById('max-price');
-                const productCards = document.querySelectorAll('.card'); // Р С™Р В°РЎР‚РЎвЂљР С•РЎвЂЎР С”Р С‘ РЎвЂљР С•Р Р†Р В°РЎР‚Р С•Р Р†
+                const productCards = document.querySelectorAll('.card'); // Карточки товаров
 
                 let min = 0,
                     max = 15000;
                 let currentMin = min,
                     currentMax = max;
 
-                // Р В¤РЎС“Р Р…Р С”РЎвЂ Р С‘РЎРЏ Р С•Р В±Р Р…Р С•Р Р†Р В»Р ВµР Р…Р С‘РЎРЏ Р С—Р С•Р В»Р С•Р В¶Р ВµР Р…Р С‘РЎРЏ Р С—Р С•Р В»Р В·РЎС“Р Р…Р С”Р С•Р Р†
+                // Функция обновления положения ползунков
                 function updateThumbPosition(thumb, value) {
                     const percent = ((value - min) / (max - min)) * 100;
                     thumb.style.left = `${percent}%`;
                 }
 
-                // Р В¤РЎС“Р Р…Р С”РЎвЂ Р С‘РЎРЏ Р С•Р В±Р Р…Р С•Р Р†Р В»Р ВµР Р…Р С‘РЎРЏ Р Т‘Р С‘Р В°Р С—Р В°Р В·Р С•Р Р…Р В°
+                // Функция обновления диапазона
                 function updateRange() {
                     const minPercent = ((currentMin - min) / (max - min)) * 100;
                     const maxPercent = ((currentMax - min) / (max - min)) * 100;
@@ -1332,21 +1332,21 @@
                     range.style.width = `${maxPercent - minPercent}%`;
                 }
 
-                // Р В¤РЎС“Р Р…Р С”РЎвЂ Р С‘РЎРЏ РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚Р В°РЎвЂ Р С‘Р С‘ РЎвЂљР С•Р Р†Р В°РЎР‚Р С•Р Р†
+                // Функция фильтрации товаров
                 function filterProducts() {
                     productCards.forEach(card => {
                         const discountSpan = card.querySelector('.discount');
-                        const price = parseFloat(discountSpan?.textContent.replace('РІвЂљР…', '').trim()) || 0;
+                        const price = parseFloat(discountSpan?.textContent.replace('₽', '').trim()) || 0;
 
                         if (price >= currentMin && price <= currentMax) {
-                            card.style.display = ''; // Р СџР С•Р С”Р В°Р В·РЎвЂ№Р Р†Р В°Р ВµР С Р С”Р В°РЎР‚РЎвЂљР С•РЎвЂЎР С”РЎС“
+                            card.style.display = ''; // Показываем карточку
                         } else {
-                            card.style.display = 'none'; // Р РЋР С”РЎР‚РЎвЂ№Р Р†Р В°Р ВµР С Р С”Р В°РЎР‚РЎвЂљР С•РЎвЂЎР С”РЎС“
+                            card.style.display = 'none'; // Скрываем карточку
                         }
                     });
                 }
 
-                // Р В¤РЎС“Р Р…Р С”РЎвЂ Р С‘РЎРЏ Р С—Р ВµРЎР‚Р ВµР СР ВµРЎвЂ°Р ВµР Р…Р С‘РЎРЏ Р С—Р С•Р В»Р В·РЎС“Р Р…Р С”Р В°
+                // Функция перемещения ползунка
                 function moveThumb(thumb, event) {
                     const rect = slider.getBoundingClientRect();
                     const offsetX = event.touches ? event.touches[0].clientX - rect.left : event.clientX - rect
@@ -1366,10 +1366,10 @@
 
                     updateThumbPosition(thumb, value);
                     updateRange();
-                    filterProducts(); // Р В¤Р С‘Р В»РЎРЉРЎвЂљРЎР‚РЎС“Р ВµР С РЎвЂљР С•Р Р†Р В°РЎР‚РЎвЂ№ РЎРѓРЎР‚Р В°Р В·РЎС“ Р С—Р С•РЎРѓР В»Р Вµ Р С—Р ВµРЎР‚Р ВµР СР ВµРЎвЂ°Р ВµР Р…Р С‘РЎРЏ
+                    filterProducts(); // Фильтруем товары сразу после перемещения
                 }
 
-                // Р С›Р В±РЎР‚Р В°Р В±Р С•РЎвЂљРЎвЂЎР С‘Р С”Р С‘ РЎРѓР С•Р В±РЎвЂ№РЎвЂљР С‘Р в„– Р Т‘Р В»РЎРЏ Р С—Р ВµРЎР‚Р ВµР СР ВµРЎвЂ°Р ВµР Р…Р С‘РЎРЏ Р С—Р С•Р В»Р В·РЎС“Р Р…Р С”Р С•Р Р†
+                // Обработчики событий для перемещения ползунков
                 [leftThumb, rightThumb].forEach((thumb) => {
                     thumb.addEventListener('mousedown', (e) => {
                         const moveHandler = (event) => moveThumb(thumb, event);
@@ -1392,7 +1392,7 @@
                     });
                 });
 
-                // Р ВР Р…Р С‘РЎвЂ Р С‘Р В°Р В»Р С‘Р В·Р В°РЎвЂ Р С‘РЎРЏ
+                // Инициализация
                 updateThumbPosition(leftThumb, currentMin);
                 updateThumbPosition(rightThumb, currentMax);
                 updateRange();
