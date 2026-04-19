@@ -58,6 +58,10 @@
                                 </li>
                                 <li class="nav-item">
                                     <a class="nav-link"
+                                        href="{{ route('admin.prices.min') }}">Генератор min_price</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link"
                                         href="{{route('admin.product_thumbnails.page')}}">Миниатюры товаров</a>
                                 </li>
                                 {{-- <li class="nav-item">
