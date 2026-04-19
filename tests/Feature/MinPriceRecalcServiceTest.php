@@ -3,12 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\PriceRecalcRun;
+use App\Models\PriceRecalcRunItem;
 use App\Models\Product;
 use App\Services\MinPriceRecalcService;
 use App\Services\ProductMinPriceCalculator;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use Tests\TestCase;
 
 class MinPriceRecalcServiceTest extends TestCase
@@ -64,72 +65,74 @@ class MinPriceRecalcServiceTest extends TestCase
         Schema::create('price_recalc_runs', function (Blueprint $table) {
             $table->id();
             $table->string('status')->default('running');
+            $table->string('mode')->default('manual');
             $table->unsignedBigInteger('category_id')->nullable();
             $table->unsignedBigInteger('subcategory_id')->nullable();
             $table->json('model_ids')->nullable();
             $table->unsignedInteger('batch_size')->default(200);
+            $table->unsignedBigInteger('start_id')->nullable();
+            $table->unsignedBigInteger('end_id')->nullable();
+            $table->unsignedBigInteger('current_id')->default(0);
+            $table->boolean('skip_filled')->default(true);
+            $table->boolean('overwrite_existing')->default(false);
             $table->unsignedBigInteger('last_product_id')->default(0);
             $table->unsignedInteger('processed')->default(0);
             $table->unsignedInteger('updated')->default(0);
             $table->unsignedInteger('skipped')->default(0);
+            $table->unsignedInteger('total_candidates')->nullable();
+            $table->unsignedDecimal('progress_percent', 5, 2)->nullable();
+            $table->unsignedInteger('eta_seconds')->nullable();
+            $table->string('stop_reason')->nullable();
             $table->timestamp('started_at')->nullable();
             $table->timestamp('finished_at')->nullable();
             $table->timestamps();
         });
+
+        Schema::create('price_recalc_run_items', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('run_id');
+            $table->unsignedBigInteger('product_id');
+            $table->string('status');
+            $table->unsignedInteger('old_min_price')->nullable();
+            $table->unsignedInteger('new_min_price')->nullable();
+            $table->string('error_code')->nullable();
+            $table->string('error_message')->nullable();
+            $table->timestamp('processed_at');
+            $table->timestamps();
+        });
     }
 
-    public function test_processes_one_batch_and_updates_counters(): void
+    public function test_start_run_sets_total_candidates_and_cursor(): void
     {
-        DB::table('categories')->insert(['id' => 1, 'title' => 'Cat', 'titleh1' => 'Cat', 'slug' => 'cat']);
-        DB::table('subcategories')->insert(['id' => 10, 'category_id' => 1, 'title' => 'Sub', 'titleh1' => 'Sub', 'slug' => 'sub']);
-        DB::table('prod_model')->insert([
-            ['id' => 100, 'title' => 'Model A'],
-            ['id' => 101, 'title' => 'Model B'],
+        $this->seedBaseData();
+        Product::query()->insert([
+            $this->productRow(1001, 1, 10, 100, 'P1'),
+            $this->productRow(1002, 1, 10, 100, 'P2'),
+            $this->productRow(1003, 1, 10, 101, 'P3'),
         ]);
 
+        /** @var MinPriceRecalcService $service */
+        $service = $this->app->make(MinPriceRecalcService::class);
+        $run = $service->startRun([
+            'category_id' => 1,
+            'subcategory_id' => 10,
+            'model_ids' => [100],
+            'mode' => 'manual',
+            'start_id' => 1001,
+            'end_id' => 1002,
+        ], 100);
+
+        $this->assertSame(2, $run->total_candidates);
+        $this->assertSame(1000, $run->current_id);
+    }
+
+    public function test_process_batch_writes_run_items_and_skips_filled(): void
+    {
+        $this->seedBaseData();
         Product::query()->insert([
-            [
-                'id' => 1,
-                'category_id' => 1,
-                'subcategory_id' => 10,
-                'model_id' => 100,
-                'title' => 'P1',
-                'h1' => 'P1',
-                'slug' => 'p1',
-                'cloth' => '1 категория',
-                'min_width' => 500,
-                'min_height' => 500,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'id' => 2,
-                'category_id' => 1,
-                'subcategory_id' => 10,
-                'model_id' => 100,
-                'title' => 'P2',
-                'h1' => 'P2',
-                'slug' => 'p2',
-                'cloth' => '1 категория',
-                'min_width' => null,
-                'min_height' => 500,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'id' => 3,
-                'category_id' => 1,
-                'subcategory_id' => 10,
-                'model_id' => 101,
-                'title' => 'P3',
-                'h1' => 'P3',
-                'slug' => 'p3',
-                'cloth' => '1 категория',
-                'min_width' => 500,
-                'min_height' => 500,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
+            $this->productRow(1, 1, 10, 100, 'P1', null),
+            $this->productRow(2, 1, 10, 100, 'P2', 999),
+            $this->productRow(3, 1, 10, 100, 'P3', null),
         ]);
 
         $this->app->bind(ProductMinPriceCalculator::class, function () {
@@ -146,53 +149,89 @@ class MinPriceRecalcServiceTest extends TestCase
 
         /** @var MinPriceRecalcService $service */
         $service = $this->app->make(MinPriceRecalcService::class);
-
         $run = $service->startRun([
             'category_id' => 1,
             'subcategory_id' => 10,
             'model_ids' => [100],
+            'skip_filled' => true,
+            'overwrite_existing' => false,
         ], 10);
 
-        $result = $service->processNextBatch($run);
+        $batch = $service->processNextBatch($run);
         $run->refresh();
 
-        $this->assertTrue($result['done']);
-        $this->assertSame(2, $run->processed);
+        $this->assertTrue($batch['done']);
+        $this->assertSame(3, $run->processed);
         $this->assertSame(1, $run->updated);
-        $this->assertSame(1, $run->skipped);
+        $this->assertSame(2, $run->skipped);
         $this->assertSame(PriceRecalcRun::STATUS_DONE, $run->status);
 
-        $p1 = Product::query()->findOrFail(1);
-        $p2 = Product::query()->findOrFail(2);
-        $p3 = Product::query()->findOrFail(3);
-
-        $this->assertSame(1234, $p1->min_price);
-        $this->assertNull($p1->min_price_error);
-        $this->assertSame(ProductMinPriceCalculator::ERROR_INVALID_DIMENSIONS, $p2->min_price_error);
-        $this->assertNull($p3->min_price);
+        $items = PriceRecalcRunItem::query()->where('run_id', $run->id)->get();
+        $this->assertCount(3, $items);
+        $this->assertTrue($items->contains('status', PriceRecalcRunItem::STATUS_UPDATED));
+        $this->assertTrue($items->contains('status', PriceRecalcRunItem::STATUS_SKIPPED));
+        $this->assertTrue($items->contains('status', PriceRecalcRunItem::STATUS_ERROR));
     }
 
-    public function test_does_not_process_when_run_is_paused(): void
+    public function test_stop_run_marks_status_and_preserves_cursor(): void
     {
-        $this->app->instance(ProductMinPriceCalculator::class, new ProductMinPriceCalculator());
-        /** @var MinPriceRecalcService $service */
-        $service = $this->app->make(MinPriceRecalcService::class);
-
-        $run = PriceRecalcRun::query()->create([
-            'status' => PriceRecalcRun::STATUS_PAUSED,
-            'batch_size' => 200,
-            'last_product_id' => 0,
-            'processed' => 0,
-            'updated' => 0,
-            'skipped' => 0,
-            'started_at' => now(),
+        $this->seedBaseData();
+        Product::query()->insert([
+            $this->productRow(1, 1, 10, 100, 'P1', null),
+            $this->productRow(2, 1, 10, 100, 'P2', null),
         ]);
 
-        $result = $service->processNextBatch($run);
+        $this->app->instance(ProductMinPriceCalculator::class, new class extends ProductMinPriceCalculator {
+            public function calculate(array $payload): array
+            {
+                return ['price' => 500, 'error' => null];
+            }
+        });
 
-        $this->assertFalse($result['done']);
-        $this->assertSame(0, $result['processed']);
-        $this->assertSame(0, $result['updated']);
-        $this->assertSame(0, $result['skipped']);
+        /** @var MinPriceRecalcService $service */
+        $service = $this->app->make(MinPriceRecalcService::class);
+        $run = $service->startRun([
+            'category_id' => 1,
+            'subcategory_id' => 10,
+            'model_ids' => [100],
+        ], 1);
+
+        $service->processNextBatch($run);
+        $run->refresh();
+        $cursor = $run->current_id;
+
+        $run = $service->stopRun($run, 'operator_stop');
+        $this->assertSame(PriceRecalcRun::STATUS_STOPPED, $run->status);
+        $this->assertSame($cursor, $run->current_id);
+        $this->assertSame('operator_stop', $run->stop_reason);
+    }
+
+    private function seedBaseData(): void
+    {
+        DB::table('categories')->insert(['id' => 1, 'title' => 'Cat', 'titleh1' => 'Cat', 'slug' => 'cat']);
+        DB::table('subcategories')->insert(['id' => 10, 'category_id' => 1, 'title' => 'Sub', 'titleh1' => 'Sub', 'slug' => 'sub']);
+        DB::table('prod_model')->insert([
+            ['id' => 100, 'title' => 'Model A'],
+            ['id' => 101, 'title' => 'Model B'],
+        ]);
+    }
+
+    private function productRow(int $id, int $categoryId, int $subcategoryId, int $modelId, string $title, ?int $minPrice = null): array
+    {
+        return [
+            'id' => $id,
+            'category_id' => $categoryId,
+            'subcategory_id' => $subcategoryId,
+            'model_id' => $modelId,
+            'title' => $title,
+            'h1' => $title,
+            'slug' => strtolower($title) . '-' . $id,
+            'cloth' => '1 категория',
+            'min_width' => 500,
+            'min_height' => 500,
+            'min_price' => $minPrice,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
     }
 }

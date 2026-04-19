@@ -14,6 +14,11 @@ class RecalculateMinPrices extends Command
                             {--category= : Category id filter}
                             {--subcategory= : Subcategory id filter}
                             {--models=* : Model ids filter}
+                            {--start-id= : Start product id}
+                            {--end-id= : End product id}
+                            {--mode=manual : manual|auto}
+                            {--skip-filled=1 : 1/0 skip already filled min_price}
+                            {--overwrite=0 : 1/0 force overwrite existing min_price}
                             {--steps=1 : Number of next-batch iterations}';
 
     protected $description = 'Process min price recalculation in batches';
@@ -32,11 +37,21 @@ class RecalculateMinPrices extends Command
             }
         } else {
             $batchSize = max(50, min(500, (int) $this->option('batch')));
-            $run = $service->startRun([
-                'category_id' => $this->option('category') ? (int) $this->option('category') : null,
-                'subcategory_id' => $this->option('subcategory') ? (int) $this->option('subcategory') : null,
-                'model_ids' => array_map('intval', (array) $this->option('models')),
-            ], $batchSize);
+            try {
+                $run = $service->startRun([
+                    'category_id' => $this->option('category') ? (int) $this->option('category') : null,
+                    'subcategory_id' => $this->option('subcategory') ? (int) $this->option('subcategory') : null,
+                    'model_ids' => array_map('intval', (array) $this->option('models')),
+                    'mode' => (string) $this->option('mode'),
+                    'start_id' => $this->option('start-id') ? (int) $this->option('start-id') : null,
+                    'end_id' => $this->option('end-id') ? (int) $this->option('end-id') : null,
+                    'skip_filled' => (bool) ((int) $this->option('skip-filled')),
+                    'overwrite_existing' => (bool) ((int) $this->option('overwrite')),
+                ], $batchSize);
+            } catch (\RuntimeException $exception) {
+                $this->error("Active run exists: #{$exception->getMessage()}");
+                return self::FAILURE;
+            }
 
             $this->info("Created run #{$run->id}.");
         }

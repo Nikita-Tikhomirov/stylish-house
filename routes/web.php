@@ -28,6 +28,7 @@ use App\Http\Controllers\FabrickController;
 use App\Http\Controllers\HeaderInfo;
 use App\Http\Controllers\SliderController;
 use App\Http\Controllers\ProductGenerator;
+use App\Http\Controllers\MinPriceRunController;
 use App\Http\Controllers\FormController;
 
 
@@ -237,11 +238,16 @@ Route::post('/admin/product/{id}/update-rolshveni-params', [ProductController::c
     Route::put('/admin/prodgenerator/generate', [ProductGenerator::class, 'create'])->name('admin.prod_generator.create');
 
     // Пакетный пересчет минимальной цены
-    Route::get('/admin/prices/min', [ProductGenerator::class, 'minPricePage'])->name('admin.prices.min');
-    Route::post('/admin/prices/min/start', [ProductGenerator::class, 'startMinPriceRecalc'])->name('admin.prices.min.start');
-    Route::post('/admin/prices/min/next', [ProductGenerator::class, 'nextMinPriceBatch'])->name('admin.prices.min.next');
-    Route::post('/admin/prices/min/pause', [ProductGenerator::class, 'pauseMinPriceRecalc'])->name('admin.prices.min.pause');
-    Route::post('/admin/prices/min/resume', [ProductGenerator::class, 'resumeMinPriceRecalc'])->name('admin.prices.min.resume');
+    Route::get('/admin/prices/min', [MinPriceRunController::class, 'page'])->name('admin.prices.min');
+    Route::post('/admin/prices/min/start', [MinPriceRunController::class, 'start'])->name('admin.prices.min.start');
+    Route::post('/admin/prices/min/next', [MinPriceRunController::class, 'next'])->name('admin.prices.min.next');
+    Route::post('/admin/prices/min/pause', [MinPriceRunController::class, 'pause'])->name('admin.prices.min.pause');
+    Route::post('/admin/prices/min/resume', [MinPriceRunController::class, 'resume'])->name('admin.prices.min.resume');
+    Route::post('/admin/prices/min/stop', [MinPriceRunController::class, 'stop'])->name('admin.prices.min.stop');
+    Route::get('/admin/prices/min/state', [MinPriceRunController::class, 'state'])->name('admin.prices.min.state');
+    Route::get('/admin/prices/min/runs', [MinPriceRunController::class, 'runs'])->name('admin.prices.min.runs');
+    Route::get('/admin/prices/min/results', [MinPriceRunController::class, 'results'])->name('admin.prices.min.results');
+    Route::get('/admin/prices/min/results/export', [MinPriceRunController::class, 'export'])->name('admin.prices.min.export');
 
     Route::get('/colors', [ColorController::class, 'index']);
 
