@@ -12,9 +12,111 @@ use App\Models\Tab;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use App\Jobs\CleanCategoryDuplicates;
+use App\Models\PriceRecalcRun;
+use App\Services\MinPriceRecalcService;
+use Illuminate\Http\JsonResponse;
 
 class ProductGenerator extends Controller
 {
+    public function minPricePage()
+    {
+        $categories = Category::orderBy('titleh1')->get(['id', 'titleh1']);
+        $subcategories = Subcategory::orderBy('titleh1')->get(['id', 'category_id', 'titleh1']);
+        $models = ProdModel::orderBy('title')->get(['id', 'title']);
+
+        $activeRun = PriceRecalcRun::query()
+            ->whereIn('status', [PriceRecalcRun::STATUS_RUNNING, PriceRecalcRun::STATUS_PAUSED])
+            ->latest('id')
+            ->first();
+
+        return view('admin.min-price-generator', compact('categories', 'subcategories', 'models', 'activeRun'));
+    }
+
+    public function startMinPriceRecalc(Request $request, MinPriceRecalcService $service): JsonResponse
+    {
+        $data = $request->validate([
+            'category_id' => 'nullable|integer|exists:categories,id',
+            'subcategory_id' => 'nullable|integer|exists:subcategories,id',
+            'model_ids' => 'nullable|array',
+            'model_ids.*' => 'integer|exists:prod_model,id',
+            'batch_size' => 'nullable|integer|min:50|max:500',
+        ]);
+
+        $run = $service->startRun([
+            'category_id' => $data['category_id'] ?? null,
+            'subcategory_id' => $data['subcategory_id'] ?? null,
+            'model_ids' => $data['model_ids'] ?? [],
+        ], (int) ($data['batch_size'] ?? 200));
+
+        return response()->json([
+            'message' => 'Запуск пересчета создан',
+            'run' => $run,
+        ]);
+    }
+
+    public function nextMinPriceBatch(Request $request, MinPriceRecalcService $service): JsonResponse
+    {
+        $data = $request->validate([
+            'run_id' => 'required|integer|exists:price_recalc_runs,id',
+        ]);
+
+        /** @var PriceRecalcRun $run */
+        $run = PriceRecalcRun::query()->findOrFail($data['run_id']);
+        if ($run->status !== PriceRecalcRun::STATUS_RUNNING) {
+            return response()->json([
+                'message' => 'Запуск не находится в статусе running',
+                'run' => $run,
+            ], 422);
+        }
+
+        $batchResult = $service->processNextBatch($run);
+        $run->refresh();
+
+        return response()->json([
+            'message' => $batchResult['done'] ? 'Пересчет завершен' : 'Пакет обработан',
+            'run' => $run,
+            'batch' => $batchResult,
+        ]);
+    }
+
+    public function pauseMinPriceRecalc(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'run_id' => 'required|integer|exists:price_recalc_runs,id',
+        ]);
+
+        /** @var PriceRecalcRun $run */
+        $run = PriceRecalcRun::query()->findOrFail($data['run_id']);
+        if ($run->status === PriceRecalcRun::STATUS_RUNNING) {
+            $run->status = PriceRecalcRun::STATUS_PAUSED;
+            $run->save();
+        }
+
+        return response()->json([
+            'message' => 'Запуск поставлен на паузу',
+            'run' => $run,
+        ]);
+    }
+
+    public function resumeMinPriceRecalc(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'run_id' => 'required|integer|exists:price_recalc_runs,id',
+        ]);
+
+        /** @var PriceRecalcRun $run */
+        $run = PriceRecalcRun::query()->findOrFail($data['run_id']);
+        if ($run->status === PriceRecalcRun::STATUS_PAUSED) {
+            $run->status = PriceRecalcRun::STATUS_RUNNING;
+            $run->save();
+        }
+
+        return response()->json([
+            'message' => 'Запуск продолжен',
+            'run' => $run,
+        ]);
+    }
+
     public function index()
     {
 

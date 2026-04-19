@@ -236,6 +236,13 @@ Route::post('/admin/product/{id}/update-rolshveni-params', [ProductController::c
     Route::get('/admin/prodgenerator/index', [ProductGenerator::class, 'index'])->name('admin.prod_generator.index');
     Route::put('/admin/prodgenerator/generate', [ProductGenerator::class, 'create'])->name('admin.prod_generator.create');
 
+    // Пакетный пересчет минимальной цены
+    Route::get('/admin/prices/min', [ProductGenerator::class, 'minPricePage'])->name('admin.prices.min');
+    Route::post('/admin/prices/min/start', [ProductGenerator::class, 'startMinPriceRecalc'])->name('admin.prices.min.start');
+    Route::post('/admin/prices/min/next', [ProductGenerator::class, 'nextMinPriceBatch'])->name('admin.prices.min.next');
+    Route::post('/admin/prices/min/pause', [ProductGenerator::class, 'pauseMinPriceRecalc'])->name('admin.prices.min.pause');
+    Route::post('/admin/prices/min/resume', [ProductGenerator::class, 'resumeMinPriceRecalc'])->name('admin.prices.min.resume');
+
     Route::get('/colors', [ColorController::class, 'index']);
 
     // Route::post('/admin/pages/upload-image', function (Request $request) {

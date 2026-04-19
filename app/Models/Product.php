@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Product extends Model
 {
     use HasFactory;
-    protected $fillable = ['title', 'slug', 'description', 'h1', 'category_id', 'subcategory_id', 'image_path', 'image_thumb_path', 'related_product_ids', 'alternative_product_ids', 'first_screenn_description', 'color', 'model', 'coef', 'show_in_menu', 'show_in_catalog', 'seo', 'discount', 'home_actions', 'home_populars', 'model_id','fabric_id','cloth','material','characteristic','min_width','min_height','fabric_photo', 'fabric_thumb_path',
+    protected $fillable = ['title', 'slug', 'description', 'h1', 'category_id', 'subcategory_id', 'image_path', 'image_thumb_path', 'related_product_ids', 'alternative_product_ids', 'first_screenn_description', 'color', 'model', 'coef', 'show_in_menu', 'show_in_catalog', 'seo', 'discount', 'home_actions', 'home_populars', 'model_id','fabric_id','cloth','material','characteristic','min_width','min_height','min_price','min_price_updated_at','min_price_error','fabric_photo', 'fabric_thumb_path',
     // Параметры рольставен
     'installation_type', 'control_type', 'lock_device', 'ral_paint', 'photo_print',
     // Цены монтажа
@@ -52,6 +52,8 @@ class Product extends Model
     protected $casts = [
         'related_product_ids' => 'array',
         'alternative_product_ids' => 'array',
+        'min_price' => 'integer',
+        'min_price_updated_at' => 'datetime',
         // Параметры рольставен
         'installation_type' => 'string',
         'control_type' => 'string', 
