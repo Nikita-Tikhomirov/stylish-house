@@ -248,6 +248,8 @@ Route::post('/admin/product/{id}/update-rolshveni-params', [ProductController::c
     Route::get('/admin/prices/min/runs', [MinPriceRunController::class, 'runs'])->name('admin.prices.min.runs');
     Route::get('/admin/prices/min/results', [MinPriceRunController::class, 'results'])->name('admin.prices.min.results');
     Route::get('/admin/prices/min/results/export', [MinPriceRunController::class, 'export'])->name('admin.prices.min.export');
+    Route::get('/admin/prices/min/sizes/preview', [MinPriceRunController::class, 'sizesPreview'])->name('admin.prices.min.sizes.preview');
+    Route::post('/admin/prices/min/sizes/update', [MinPriceRunController::class, 'sizesUpdate'])->name('admin.prices.min.sizes.update');
 
     Route::get('/colors', [ColorController::class, 'index']);
 

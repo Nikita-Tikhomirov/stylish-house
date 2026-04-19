@@ -152,6 +152,43 @@
 <div class="row mt-3">
     <div class="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
         <div class="card">
+            <h5 class="card-header">Массовая запись размеров</h5>
+            <div class="card-body">
+                <div class="mpg-grid">
+                    <div class="form-group mpg-col-3">
+                        <label for="size_min_width">Min width</label>
+                        <input id="size_min_width" type="number" class="form-control" min="1" placeholder="например 450">
+                    </div>
+                    <div class="form-group mpg-col-3">
+                        <label for="size_min_height">Min height</label>
+                        <input id="size_min_height" type="number" class="form-control" min="1" placeholder="например 600">
+                    </div>
+                    <div class="form-group mpg-col-3">
+                        <label for="size_write_mode">Режим записи</label>
+                        <select id="size_write_mode" class="form-control">
+                            <option value="overwrite">overwrite</option>
+                            <option value="skip_filled">skip_filled</option>
+                        </select>
+                    </div>
+                    <div class="form-group mpg-col-3">
+                        <label>&nbsp;</label>
+                        <div class="mpg-actions">
+                            <button id="size_preview_btn" class="btn btn-outline-primary" type="button">Preview</button>
+                            <button id="size_apply_btn" class="btn btn-primary" type="button">Apply</button>
+                        </div>
+                    </div>
+                    <div class="mpg-col-12">
+                        <div id="size_result" class="mpg-muted">Используются текущие фильтры выше (категория, подкатегория, модели, start/end ID).</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+        <div class="card">
             <h5 class="card-header">Прогресс и состояние</h5>
             <div class="card-body">
                 <div class="mpg-grid">
@@ -282,6 +319,12 @@
         const modeSelect = document.getElementById('mode');
         const skipFilledInput = document.getElementById('skip_filled');
         const overwriteInput = document.getElementById('overwrite_existing');
+        const sizeMinWidthInput = document.getElementById('size_min_width');
+        const sizeMinHeightInput = document.getElementById('size_min_height');
+        const sizeWriteModeInput = document.getElementById('size_write_mode');
+        const sizePreviewButton = document.getElementById('size_preview_btn');
+        const sizeApplyButton = document.getElementById('size_apply_btn');
+        const sizeResultNode = document.getElementById('size_result');
 
         const runIdNode = document.getElementById('run_id');
         const runStatusNode = document.getElementById('run_status');
@@ -351,6 +394,11 @@
         function setStatusMessage(text, isError = false) {
             statusMessageNode.textContent = text || '';
             statusMessageNode.style.color = isError ? '#dc3545' : '#198754';
+        }
+
+        function setSizeResult(text, isError = false) {
+            sizeResultNode.textContent = text || '';
+            sizeResultNode.style.color = isError ? '#dc3545' : '#6c757d';
         }
 
         function boolToText(value) {
@@ -524,18 +572,77 @@
             }
         }
 
-        function buildStartPayload() {
+        function buildFilterPayload() {
             return {
                 category_id: categorySelect.value || null,
                 subcategory_id: subcategorySelect.value || null,
                 model_ids: selectedModelIds(),
-                batch_size: parseInt(batchSizeInput.value, 10) || 200,
-                mode: modeSelect.value || 'manual',
                 start_id: startIdInput.value ? parseInt(startIdInput.value, 10) : null,
                 end_id: endIdInput.value ? parseInt(endIdInput.value, 10) : null,
+            };
+        }
+
+        function buildStartPayload() {
+            return {
+                ...buildFilterPayload(),
+                batch_size: parseInt(batchSizeInput.value, 10) || 200,
+                mode: modeSelect.value || 'manual',
                 skip_filled: skipFilledInput.checked,
                 overwrite_existing: overwriteInput.checked,
             };
+        }
+
+        function parsePositiveInt(value) {
+            if (value === null || value === undefined || String(value).trim() === '') {
+                return null;
+            }
+            const parsed = parseInt(value, 10);
+            return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+        }
+
+        async function previewSizes() {
+            try {
+                const params = new URLSearchParams();
+                const filters = buildFilterPayload();
+
+                if (filters.category_id !== null) params.set('category_id', String(filters.category_id));
+                if (filters.subcategory_id !== null) params.set('subcategory_id', String(filters.subcategory_id));
+                if (filters.start_id !== null) params.set('start_id', String(filters.start_id));
+                if (filters.end_id !== null) params.set('end_id', String(filters.end_id));
+                (filters.model_ids || []).forEach(modelId => params.append('model_ids[]', String(modelId)));
+
+                const url = `{{ route('admin.prices.min.sizes.preview') }}?${params.toString()}`;
+                const data = await fetchJson(url);
+                setSizeResult(`Preview: найдено ${data.matched || 0} товаров`);
+            } catch (error) {
+                setSizeResult(error.message, true);
+            }
+        }
+
+        async function applySizes() {
+            try {
+                const minWidth = parsePositiveInt(sizeMinWidthInput.value);
+                const minHeight = parsePositiveInt(sizeMinHeightInput.value);
+
+                if (minWidth === null && minHeight === null) {
+                    setSizeResult('Укажите min_width или min_height', true);
+                    return;
+                }
+
+                const payload = {
+                    ...buildFilterPayload(),
+                    min_width: minWidth,
+                    min_height: minHeight,
+                    write_mode: sizeWriteModeInput.value || 'overwrite',
+                };
+
+                const data = await postJson('{{ route('admin.prices.min.sizes.update') }}', payload);
+                const rangeFrom = data?.range?.from ?? '-';
+                const rangeTo = data?.range?.to ?? '-';
+                setSizeResult(`Apply: найдено ${data.matched || 0}, обновлено ${data.updated || 0}, пропущено ${data.skipped || 0}, диапазон ${rangeFrom}..${rangeTo}`);
+            } catch (error) {
+                setSizeResult(error.message, true);
+            }
         }
 
         async function startRun() {
@@ -721,6 +828,8 @@
         });
         loadResultsButton.addEventListener('click', () => loadResults(1));
         exportResultsButton.addEventListener('click', exportResults);
+        sizePreviewButton.addEventListener('click', previewSizes);
+        sizeApplyButton.addEventListener('click', applySizes);
         prevPageButton.addEventListener('click', () => {
             if (resultsPage > 1) loadResults(resultsPage - 1);
         });

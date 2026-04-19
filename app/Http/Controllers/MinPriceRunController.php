@@ -210,6 +210,48 @@ class MinPriceRunController extends Controller
         ]);
     }
 
+    public function sizesPreview(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'category_id' => 'nullable|integer|exists:categories,id',
+            'subcategory_id' => 'nullable|integer|exists:subcategories,id',
+            'model_ids' => 'nullable|array',
+            'model_ids.*' => 'integer|exists:prod_model,id',
+            'start_id' => 'nullable|integer|min:1',
+            'end_id' => 'nullable|integer|min:1',
+        ]);
+
+        return response()->json([
+            'matched' => $this->service->countSizeCandidates($this->extractFilterPayload($data)),
+        ]);
+    }
+
+    public function sizesUpdate(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'category_id' => 'nullable|integer|exists:categories,id',
+            'subcategory_id' => 'nullable|integer|exists:subcategories,id',
+            'model_ids' => 'nullable|array',
+            'model_ids.*' => 'integer|exists:prod_model,id',
+            'start_id' => 'nullable|integer|min:1',
+            'end_id' => 'nullable|integer|min:1',
+            'min_width' => 'nullable|integer|min:1|required_without:min_height',
+            'min_height' => 'nullable|integer|min:1|required_without:min_width',
+            'write_mode' => 'required|string|in:overwrite,skip_filled',
+        ]);
+
+        $result = $this->service->applyMinSizes(
+            $this->extractFilterPayload($data),
+            [
+                'min_width' => $data['min_width'] ?? null,
+                'min_height' => $data['min_height'] ?? null,
+            ],
+            $data['write_mode']
+        );
+
+        return response()->json($result);
+    }
+
     private function resolveRun(Request $request): PriceRecalcRun
     {
         $data = $request->validate([
@@ -217,5 +259,32 @@ class MinPriceRunController extends Controller
         ]);
 
         return PriceRecalcRun::query()->findOrFail($data['run_id']);
+    }
+
+    /**
+     * @param array{
+     * category_id?:int|null,
+     * subcategory_id?:int|null,
+     * model_ids?:array<int>|null,
+     * start_id?:int|null,
+     * end_id?:int|null
+     * } $data
+     * @return array{
+     * category_id:int|null,
+     * subcategory_id:int|null,
+     * model_ids:array<int>,
+     * start_id:int|null,
+     * end_id:int|null
+     * }
+     */
+    private function extractFilterPayload(array $data): array
+    {
+        return [
+            'category_id' => $data['category_id'] ?? null,
+            'subcategory_id' => $data['subcategory_id'] ?? null,
+            'model_ids' => $data['model_ids'] ?? [],
+            'start_id' => $data['start_id'] ?? null,
+            'end_id' => $data['end_id'] ?? null,
+        ];
     }
 }

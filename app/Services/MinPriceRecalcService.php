@@ -13,6 +13,9 @@ use RuntimeException;
 
 class MinPriceRecalcService
 {
+    private const SIZE_WRITE_MODE_OVERWRITE = 'overwrite';
+    private const SIZE_WRITE_MODE_SKIP_FILLED = 'skip_filled';
+
     public function __construct(
         private readonly ProductMinPriceCalculator $calculator
     ) {
@@ -361,6 +364,109 @@ class MinPriceRecalcService
         return $builder->get();
     }
 
+    /**
+     * @param array{
+     * category_id?:int|null,
+     * subcategory_id?:int|null,
+     * model_ids?:array<int>,
+     * start_id?:int|null,
+     * end_id?:int|null
+     * } $filters
+     */
+    public function countSizeCandidates(array $filters): int
+    {
+        $normalizedFilters = $this->normalizeFilters($filters);
+        return $this->buildProductsQueryByFilters($normalizedFilters)->count();
+    }
+
+    /**
+     * @param array{
+     * category_id?:int|null,
+     * subcategory_id?:int|null,
+     * model_ids?:array<int>,
+     * start_id?:int|null,
+     * end_id?:int|null
+     * } $filters
+     * @param array{
+     * min_width?:int|null,
+     * min_height?:int|null
+     * } $sizePayload
+     * @return array{
+     * matched:int,
+     * updated:int,
+     * skipped:int,
+     * range:array{from:int|null,to:int|null}
+     * }
+     */
+    public function applyMinSizes(array $filters, array $sizePayload, string $writeMode): array
+    {
+        $normalizedFilters = $this->normalizeFilters($filters);
+        $baseQuery = $this->buildProductsQueryByFilters($normalizedFilters)->orderBy('id');
+
+        $matched = (clone $baseQuery)->count();
+        $rangeRow = (clone $baseQuery)
+            ->selectRaw('MIN(id) as from_id, MAX(id) as to_id')
+            ->first();
+
+        if ($matched === 0) {
+            return [
+                'matched' => 0,
+                'updated' => 0,
+                'skipped' => 0,
+                'range' => [
+                    'from' => null,
+                    'to' => null,
+                ],
+            ];
+        }
+
+        $writeMode = in_array($writeMode, [self::SIZE_WRITE_MODE_OVERWRITE, self::SIZE_WRITE_MODE_SKIP_FILLED], true)
+            ? $writeMode
+            : self::SIZE_WRITE_MODE_OVERWRITE;
+
+        $newWidth = $sizePayload['min_width'] ?? null;
+        $newHeight = $sizePayload['min_height'] ?? null;
+        $products = (clone $baseQuery)->get(['id', 'min_width', 'min_height']);
+
+        $updated = 0;
+        $skipped = 0;
+
+        foreach ($products as $product) {
+            $attributesToWrite = [];
+
+            if ($newWidth !== null) {
+                if ($writeMode === self::SIZE_WRITE_MODE_OVERWRITE || $this->isEmptyMinSize($product->min_width)) {
+                    $attributesToWrite['min_width'] = $newWidth;
+                }
+            }
+
+            if ($newHeight !== null) {
+                if ($writeMode === self::SIZE_WRITE_MODE_OVERWRITE || $this->isEmptyMinSize($product->min_height)) {
+                    $attributesToWrite['min_height'] = $newHeight;
+                }
+            }
+
+            if (empty($attributesToWrite)) {
+                $skipped++;
+                continue;
+            }
+
+            $product->fill($attributesToWrite);
+            $product->save();
+            $updated++;
+        }
+
+        return [
+            'matched' => $matched,
+            'updated' => $updated,
+            'skipped' => $skipped,
+            'range' => [
+                'from' => $rangeRow?->from_id !== null ? (int) $rangeRow->from_id : null,
+                'to' => $rangeRow?->to_id !== null ? (int) $rangeRow->to_id : null,
+            ],
+        ];
+    }
+
     private function buildProductsQuery(PriceRecalcRun $run, bool $applyCursor): Builder
     {
         $query = Product::query()
@@ -371,28 +477,117 @@ class MinPriceRecalcService
             $query->where('id', '>', (int) $run->current_id);
         }
 
-        if (!empty($run->start_id)) {
-            $query->where('id', '>=', (int) $run->start_id);
-        }
+        $filters = $this->normalizeFilters([
+            'category_id' => $run->category_id,
+            'subcategory_id' => $run->subcategory_id,
+            'model_ids' => is_array($run->model_ids) ? $run->model_ids : [],
+            'start_id' => $run->start_id,
+            'end_id' => $run->end_id,
+        ]);
 
-        if (!empty($run->end_id)) {
-            $query->where('id', '<=', (int) $run->end_id);
-        }
-
-        if (!empty($run->category_id)) {
-            $query->where('category_id', $run->category_id);
-        }
-
-        if (!empty($run->subcategory_id)) {
-            $query->where('subcategory_id', $run->subcategory_id);
-        }
-
-        $modelIds = is_array($run->model_ids) ? $run->model_ids : [];
-        if (!empty($modelIds)) {
-            $query->whereIn('model_id', $modelIds);
-        }
+        $this->applyFiltersToQuery($query, $filters);
 
         return $query;
+    }
+
+    /**
+     * @param array{
+     * category_id?:int|null,
+     * subcategory_id?:int|null,
+     * model_ids?:array<int>,
+     * start_id?:int|null,
+     * end_id?:int|null
+     * } $filters
+     */
+    private function buildProductsQueryByFilters(array $filters): Builder
+    {
+        $query = Product::query()->orderBy('id');
+        $this->applyFiltersToQuery($query, $filters);
+
+        return $query;
+    }
+
+    /**
+     * @param array{
+     * category_id:int|null,
+     * subcategory_id:int|null,
+     * model_ids:array<int>,
+     * start_id:int|null,
+     * end_id:int|null
+     * } $filters
+     */
+    private function applyFiltersToQuery(Builder $query, array $filters): void
+    {
+        if (!empty($filters['start_id'])) {
+            $query->where('id', '>=', (int) $filters['start_id']);
+        }
+
+        if (!empty($filters['end_id'])) {
+            $query->where('id', '<=', (int) $filters['end_id']);
+        }
+
+        if (!empty($filters['category_id'])) {
+            $query->where('category_id', (int) $filters['category_id']);
+        }
+
+        if (!empty($filters['subcategory_id'])) {
+            $query->where('subcategory_id', (int) $filters['subcategory_id']);
+        }
+
+        if (!empty($filters['model_ids'])) {
+            $query->whereIn('model_id', $filters['model_ids']);
+        }
+    }
+
+    /**
+     * @param array{
+     * category_id?:int|null,
+     * subcategory_id?:int|null,
+     * model_ids?:array<int>,
+     * start_id?:int|null,
+     * end_id?:int|null
+     * } $filters
+     * @return array{
+     * category_id:int|null,
+     * subcategory_id:int|null,
+     * model_ids:array<int>,
+     * start_id:int|null,
+     * end_id:int|null
+     * }
+     */
+    private function normalizeFilters(array $filters): array
+    {
+        $startId = isset($filters['start_id']) ? (int) $filters['start_id'] : null;
+        $endId = isset($filters['end_id']) ? (int) $filters['end_id'] : null;
+
+        if ($startId !== null && $endId !== null && $startId > $endId) {
+            [$startId, $endId] = [$endId, $startId];
+        }
+
+        $modelIds = array_values(array_filter(
+            array_map(
+                static fn ($id): int => (int) $id,
+                is_array($filters['model_ids'] ?? null) ? $filters['model_ids'] : []
+            ),
+            static fn (int $id): bool => $id > 0
+        ));
+
+        return [
+            'category_id' => isset($filters['category_id']) ? (int) $filters['category_id'] : null,
+            'subcategory_id' => isset($filters['subcategory_id']) ? (int) $filters['subcategory_id'] : null,
+            'model_ids' => $modelIds,
+            'start_id' => $startId,
+            'end_id' => $endId,
+        ];
+    }
+
+    private function isEmptyMinSize($value): bool
+    {
+        if ($value === null) {
+            return true;
+        }
+
+        return (int) $value <= 0;
     }
 
     private function refreshProgressMetrics(PriceRecalcRun $run): void
