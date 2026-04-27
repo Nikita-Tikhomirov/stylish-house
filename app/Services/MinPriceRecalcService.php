@@ -167,6 +167,8 @@ class MinPriceRecalcService
             $status = PriceRecalcRunItem::STATUS_SKIPPED;
             $errorCode = null;
             $errorMessage = null;
+            $productModel = $product->getRelationValue('model');
+            $modelTitle = trim((string) ($productModel?->title ?? ''));
 
             if ($run->skip_filled && !$run->overwrite_existing && $product->min_price !== null) {
                 $errorCode = 'already_filled';
@@ -174,12 +176,12 @@ class MinPriceRecalcService
             } elseif (empty($product->min_width) || empty($product->min_height)) {
                 $errorCode = ProductMinPriceCalculator::ERROR_INVALID_DIMENSIONS;
                 $errorMessage = 'Missing min dimensions';
-            } elseif (!$product->model || empty($product->model->title)) {
+            } elseif ($modelTitle === '') {
                 $errorCode = ProductMinPriceCalculator::ERROR_SHEET_NOT_FOUND;
                 $errorMessage = 'Model title not found';
             } else {
                 $result = $this->calculator->calculate([
-                    'model' => $product->model->title,
+                    'model' => $modelTitle,
                     'cloth' => $product->cloth,
                     'control' => false,
                     'modelId' => $product->model_id,
