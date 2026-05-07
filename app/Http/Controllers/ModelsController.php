@@ -11,7 +11,7 @@ class ModelsController extends Controller
     public function index()
     {
         $models = ProdModel::all(); // Get all categories
-        return view('admin.models', compact('models'));
+        return view()->file(resource_path('views/admin/models.Blade.php'), compact('models'));
 
     }
     public function create()
