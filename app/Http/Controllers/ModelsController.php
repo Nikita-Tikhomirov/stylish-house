@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers;
 
@@ -11,7 +11,7 @@ class ModelsController extends Controller
     public function index()
     {
         $models = ProdModel::all(); // Get all categories
-        return view()->file(resource_path('views/admin/models.Blade.php'), compact('models'));
+        return view('admin.models', compact('models'));
 
     }
     public function create()
@@ -85,3 +85,4 @@ class ModelsController extends Controller
         return response()->noContent();
     }
 }
+
