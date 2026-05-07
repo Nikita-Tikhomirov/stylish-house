@@ -110,7 +110,7 @@ class ProductMinPriceCalculator
             $price = $calcPrice($groups, $prodTitle, $width, $height);
             return $price === null
                 ? ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND]
-                : ['price' => (int) round($price), 'error' => null];
+                : ['price' => $this->finalizePrice((float) $price, $prodTitle), 'error' => null];
         }
 
         if (in_array($modelName, ['Дерево, бамбук 25 мм'], true)) {
@@ -127,7 +127,7 @@ class ProductMinPriceCalculator
             $price = $calcPrice($groups, $prodTitle, $width, $height);
             return $price === null
                 ? ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND]
-                : ['price' => (int) round($price), 'error' => null];
+                : ['price' => $this->finalizePrice((float) $price, $prodTitle), 'error' => null];
         }
 
         if (mb_strtolower(trim($modelName)) === 'горизонтальные алюминиевые') {
@@ -153,7 +153,7 @@ class ProductMinPriceCalculator
             $price = $calcPrice($groups, $prodTitle, $width, $height);
             return $price === null
                 ? ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND]
-                : ['price' => (int) round($price), 'error' => null];
+                : ['price' => $this->finalizePrice((float) $price, $prodTitle), 'error' => null];
         }
 
         if (mb_strtolower(trim($modelName)) === 'вертикальные') {
@@ -184,7 +184,7 @@ class ProductMinPriceCalculator
                 return ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND];
             }
 
-            return ['price' => (int) round($pricePerM2 * $area), 'error' => null];
+            return ['price' => $this->finalizePrice((float) ($pricePerM2 * $area), $prodTitle), 'error' => null];
         }
 
         if ($startCol === null || $startRow === null) {
@@ -250,12 +250,23 @@ class ProductMinPriceCalculator
                             return ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND];
                         }
 
-                        return ['price' => (int) round((float) $price), 'error' => null];
+                        return ['price' => $this->finalizePrice((float) $price, $prodTitle), 'error' => null];
                     }
                 }
             }
         }
 
         return ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND];
+    }
+
+    private function finalizePrice(float $basePrice, string $prodTitle): int
+    {
+        $multiplier = $this->hasDoubleKeyword($prodTitle) ? 2 : 1;
+        return (int) round($basePrice * $multiplier);
+    }
+
+    private function hasDoubleKeyword(string $prodTitle): bool
+    {
+        return mb_stripos($prodTitle, 'дабл') !== false;
     }
 }

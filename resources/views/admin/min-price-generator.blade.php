@@ -102,7 +102,7 @@
                         <label for="model_ids">Модели (множественный выбор)</label>
                         <select id="model_ids" class="form-control" multiple size="8">
                             @foreach($models as $model)
-                                <option value="{{ $model->id }}">{{ $model->title }}</option>
+                                <option value="{{ $model->id }}">{{ $model->h1 ?: $model->title }}</option>
                             @endforeach
                         </select>
                         <div class="mpg-muted">Ctrl/Cmd + click для множественного выбора</div>

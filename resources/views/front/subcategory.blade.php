@@ -1,4 +1,4 @@
-{{-- @include('front.head') --}}
+﻿{{-- @include('front.head') --}}
 <x-front.head title="{{ $subcategory->title }}" description="{{ $subcategory->description }}"></x-front.head>
 
 <body class="p-index">
@@ -995,7 +995,7 @@
                         )
                         .then(response => response.json())
                         .then(data => {
-                            const basePrice = data.price * counterForDouble || "Цена по запросу ";
+                            const basePrice = data.price || "Цена по запросу ";
                             const discount = element.getAttribute('data-discount')
                             if (discount > 0) {
                                 const discountedPrice = basePrice * (1 - discount / 100);
@@ -1309,3 +1309,4 @@
 
 
 <script></script>
+

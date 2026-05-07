@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Services\ProductMinPriceCalculator;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class ProductMinPriceCalculatorTest extends TestCase
@@ -35,5 +36,51 @@ class ProductMinPriceCalculatorTest extends TestCase
 
         $this->assertNull($result['price']);
         $this->assertSame(ProductMinPriceCalculator::ERROR_SHEET_NOT_FOUND, $result['error']);
+    }
+
+    public function test_applies_double_multiplier_when_product_title_contains_double_keyword(): void
+    {
+        $calculator = new ProductMinPriceCalculator();
+        Cache::put('sheet_Дерево, бамбук 25 мм', [['A' => 'stub']]);
+
+        $base = $calculator->calculate([
+            'model' => 'Дерево, бамбук 25 мм',
+            'modelId' => 68,
+            'prodTitle' => 'Мини 25',
+            'cloth' => '1 категория',
+            'width' => 1000,
+            'height' => 1000,
+        ]);
+
+        $double = $calculator->calculate([
+            'model' => 'Дерево, бамбук 25 мм',
+            'modelId' => 68,
+            'prodTitle' => 'Дабл люкс 25',
+            'cloth' => '1 категория',
+            'width' => 1000,
+            'height' => 1000,
+        ]);
+
+        $this->assertSame(10788, $base['price']);
+        $this->assertSame(21576, $double['price']);
+        $this->assertNull($double['error']);
+    }
+
+    public function test_does_not_apply_double_multiplier_when_price_not_found(): void
+    {
+        $calculator = new ProductMinPriceCalculator();
+        Cache::put('sheet_Дерево, бамбук 25 мм', [['A' => 'stub']]);
+
+        $result = $calculator->calculate([
+            'model' => 'Дерево, бамбук 25 мм',
+            'modelId' => 68,
+            'prodTitle' => 'Дабл люкс',
+            'cloth' => '1 категория',
+            'width' => 1000,
+            'height' => 1000,
+        ]);
+
+        $this->assertNull($result['price']);
+        $this->assertSame(ProductMinPriceCalculator::ERROR_PRICE_NOT_FOUND, $result['error']);
     }
 }

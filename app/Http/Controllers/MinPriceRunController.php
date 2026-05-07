@@ -23,7 +23,7 @@ class MinPriceRunController extends Controller
     {
         $categories = Category::query()->orderBy('titleh1')->get(['id', 'titleh1']);
         $subcategories = Subcategory::query()->orderBy('titleh1')->get(['id', 'category_id', 'titleh1']);
-        $models = ProdModel::query()->orderBy('title')->get(['id', 'title']);
+        $models = ProdModel::query()->orderBy('title')->get(['id', 'h1', 'title']);
         $activeRun = $this->service->getActiveRun();
 
         return view('admin.min-price-generator', compact('categories', 'subcategories', 'models', 'activeRun'));
