@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Product;
+use App\Models\ProdModel;
 
 class PreviewCardData
 {
@@ -12,6 +13,8 @@ class PreviewCardData
      */
     public static function fromProduct(Product $product, array $extra = []): array
     {
+        $model = self::resolveProductModel($product);
+
         return array_merge([
             'id' => $product->id,
             'slug' => $product->slug,
@@ -31,12 +34,23 @@ class PreviewCardData
             'min_price' => $product->min_price !== null ? (int) $product->min_price : null,
             'min_width' => $product->min_width !== null ? (int) $product->min_width : null,
             'min_height' => $product->min_height !== null ? (int) $product->min_height : null,
-            'model' => $product->model?->title,
+            'model' => $model?->title,
             'modelid' => $product->model_id,
+            'model_title' => $model?->title,
+            'model_id' => $product->model_id,
             'cloth' => $product->cloth,
             'fabric_photo' => self::encodeAssetPath($product->fabric_photo),
             'fabric_thumb_path' => self::encodeAssetPath($product->fabric_thumb_path),
         ], $extra);
+    }
+
+    protected static function resolveProductModel(Product $product): ?ProdModel
+    {
+        if ($product->relationLoaded('model')) {
+            return $product->getRelation('model');
+        }
+
+        return $product->model_id ? ProdModel::find($product->model_id) : null;
     }
 
     protected static function encodeAssetPath(?string $path): ?string

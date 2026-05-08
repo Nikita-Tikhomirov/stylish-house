@@ -34,10 +34,7 @@ class HomeController extends Controller
 
     protected function serializePreviewProduct(Product $product): array
     {
-        return PreviewCardData::fromProduct($product, [
-            'model_title' => $product->model?->title,
-            'model_id' => $product->model_id,
-        ]);
+        return PreviewCardData::fromProduct($product);
     }
 
     /**
