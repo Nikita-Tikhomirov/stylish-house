@@ -1,6 +1,7 @@
 @foreach ($filterProduts as $prod)
     <div class="bigProdCard card" data-color="{{ $prod->color }}" id="prod{{ $prod->id }}" data-modelid="{{ $prod->model_id ?? '' }}"
-        data-model="{{ $prod->model_title }}" data-cloth="{{ $prod->cloth }}" data-discount="{{ $prod->discount }}" data-width="{{ $prod->min_width }}">
+        data-model="{{ $prod->model_title }}" data-cloth="{{ $prod->cloth }}" data-discount="{{ $prod->discount }}"
+        data-width="{{ $prod->min_width }}" data-min-width="{{ $prod->min_width }}" data-min-height="{{ $prod->min_height }}">
         <div class="bigProdCard__wrap">
             <div class="bigProdCard__img-wrap">
                 <div class="bigProdCard__imgCustomWrap">
@@ -39,6 +40,20 @@
                     href="{{ route('subcategory.show', ['category_slug' => $prod->category->slug, 'subcategory_slug' => $prod->subcategory->slug]) }}">{{ $prod->category->titleh1 }}</a><a
                     class="bigProdCard__title"
                     href="{{ route('product.show', ['category_slug' => $prod->category->slug, 'subcategory_slug' => $prod->subcategory->slug, 'product_slug' => $prod->slug]) }}/">{{ $prod->h1 }}</a>
+                @if ($prod->min_width || $prod->min_height)
+                    <div class="bigProdCard__meta">
+                        От
+                        @if ($prod->min_width)
+                            {{ $prod->min_width }} мм
+                        @endif
+                        @if ($prod->min_width && $prod->min_height)
+                            x
+                        @endif
+                        @if ($prod->min_height)
+                            {{ $prod->min_height }} мм
+                        @endif
+                    </div>
+                @endif
                 <div class="bigProdCard__priceWrap">
                     @if ($prod->discount)
                         <span class="normalPrice">1000₽</span>

@@ -261,6 +261,13 @@
                                 object-fit: cover;
                                 border-radius: 5px;
                             }
+
+                            .bigProdCard__meta {
+                                margin-top: 6px;
+                                font-size: 13px;
+                                line-height: 1.35;
+                                color: #666;
+                            }
                         </style>
 
 
@@ -1014,6 +1021,22 @@
                 });
 
             }
+
+            function buildCardMinDimensions(product) {
+                const minWidth = parseInt(product.min_width, 10) || 0;
+                const minHeight = parseInt(product.min_height, 10) || 0;
+
+                if (!minWidth && !minHeight) {
+                    return '';
+                }
+
+                const widthText = minWidth ? `${minWidth} мм` : '';
+                const heightText = minHeight ? `${minHeight} мм` : '';
+                const separator = widthText && heightText ? ' x ' : '';
+
+                return `<div class="bigProdCard__meta">От ${widthText}${separator}${heightText}</div>`;
+            }
+
             rebuilCardsPrice()
 
             // Пагинация
@@ -1093,7 +1116,7 @@
                             let fabricImageSrc = normalizeImagePath(fabricImage);
 
                             return `
-            <div class="bigProdCard card" id="prod${product.id}" data-modelId="${product.modelid}" data-model="${product.model}" data-cloth="${product.cloth}" data-discount="">
+            <div class="bigProdCard card" id="prod${product.id}" data-modelId="${product.modelid}" data-model="${product.model}" data-cloth="${product.cloth}" data-discount="" data-min-width="${product.min_width ?? ''}" data-min-height="${product.min_height ?? ''}">
                 <div class="bigProdCard__wrap">
                     <div class="bigProdCard__img-wrap">
                         <div class="bigProdCard__imgCustomWrap">
@@ -1115,6 +1138,7 @@
                     <div class="bigProdCard__info">
                         <a class="bigProdCard__category" href="${product.category ? '/' + product.category.slug : '#'}">${product.category ? product.category.titleh1 : 'Без категории'}</a>
                         <a class="bigProdCard__title" href="${product.slug ? '/' + product.category.slug + '/' + product.subcategory.slug + '/' + product.slug : '#'}">${product.h1}</a>
+                        ${buildCardMinDimensions(product)}
                         <div class="bigProdCard__priceWrap">
                             <span class="normalPrice" style="text-decoration: line-through;">${product.price}₽</span>
                             <span class="discount">${product.old_price}₽</span>
