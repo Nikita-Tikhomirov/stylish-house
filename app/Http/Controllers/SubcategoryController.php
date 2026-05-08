@@ -36,6 +36,52 @@ class SubcategoryController extends Controller
     protected const TEMPLATE_MIN_VARIANT = 1;
     protected const TEMPLATE_MAX_VARIANT = 2;
 
+    protected function encodeAssetPath(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        if (filter_var($path, FILTER_VALIDATE_URL)) {
+            return $path;
+        }
+
+        $cleanPath = ltrim($path, '/');
+        $dir = dirname($cleanPath);
+        $file = basename($cleanPath);
+
+        return asset(($dir !== '.' ? $dir . '/' : '') . rawurlencode($file));
+    }
+
+    protected function serializePreviewProduct(Product $product): array
+    {
+        return [
+            'id' => $product->id,
+            'slug' => $product->slug,
+            'h1' => $product->h1,
+            'image_path' => $product->image_path,
+            'image_thumb_path' => $product->image_thumb_path,
+            'category' => [
+                'slug' => $product->category?->slug,
+                'titleh1' => $product->category?->titleh1,
+            ],
+            'subcategory' => [
+                'slug' => $product->subcategory?->slug,
+            ],
+            'price' => $product->price,
+            'old_price' => $product->old_price,
+            'discount' => $product->discount,
+            'min_price' => $product->min_price,
+            'min_width' => $product->min_width,
+            'min_height' => $product->min_height,
+            'model' => $product->model?->title,
+            'modelid' => $product->model_id,
+            'cloth' => $product->cloth,
+            'fabric_photo' => $this->encodeAssetPath($product->fabric_photo),
+            'fabric_thumb_path' => $this->encodeAssetPath($product->fabric_thumb_path),
+        ];
+    }
+
     protected function resolveTemplateVariant(Subcategory $subcategory): int
     {
         $variant = (int) ($subcategory->template_variant ?? self::TEMPLATE_MIN_VARIANT);
@@ -606,7 +652,7 @@ class SubcategoryController extends Controller
         $targetSubcategoryId = $subcategory->clone_subcategory_id ?: $subcategory->id;
 
         // Запрос товаров
-        $query = Product::with(['category', 'subcategory'])
+        $query = Product::with(['category', 'subcategory', 'model'])
             ->where('subcategory_id', $targetSubcategoryId);
 
         if (!empty($models)) {
@@ -623,46 +669,7 @@ class SubcategoryController extends Controller
 
         // Пагинация
         $products = $query->paginate(12, ['*'], 'page', $page);
-
-        // Преобразование
-        $encodePath = function ($path) {
-            if (!$path)
-                return null;
-            // Если уже полный URL, возвращаем без изменений
-            if (filter_var($path, FILTER_VALIDATE_URL)) {
-                return $path;
-            }
-            // Иначе считаем, что это относительный путь, и формируем полный URL через asset()
-            return asset(dirname($path) . '/' . rawurlencode(basename($path)));
-        };
-
-
-
-        $productsData = $products->getCollection()->map(function ($product) use ($encodePath) {
-            $prodModel = ProdModel::find($product->model_id);
-            $prodModelName = $prodModel?->title;
-
-            return [
-                'id' => $product->id,
-                'slug' => $product->slug,
-                'h1' => $product->h1,
-                'image_path' => $product->image_path,
-                'category' => [
-                    'slug' => $product->category->slug,
-                    'titleh1' => $product->category->titleh1,
-                ],
-                'subcategory' => [
-                    'slug' => $product->subcategory->slug,
-                ],
-                'price' => $product->price,
-                'old_price' => $product->old_price,
-                'model' => $prodModelName,
-                'modelid' => $product->model_id,
-                'cloth' => $product->cloth,
-                'discount' => $product->discount,
-                'fabric_photo' => $encodePath($product->fabric_photo),
-            ];
-        });
+        $productsData = $products->getCollection()->map(fn (Product $product) => $this->serializePreviewProduct($product));
 
 
         return response()->json([
@@ -674,4 +681,3 @@ class SubcategoryController extends Controller
 
 
 }
-

@@ -28,6 +28,52 @@ class CategoryController extends Controller
 
     protected $cartService;
 
+    protected function encodeAssetPath(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        if (filter_var($path, FILTER_VALIDATE_URL)) {
+            return $path;
+        }
+
+        $cleanPath = ltrim($path, '/');
+        $dir = dirname($cleanPath);
+        $file = basename($cleanPath);
+
+        return asset(($dir !== '.' ? $dir . '/' : '') . rawurlencode($file));
+    }
+
+    protected function serializePreviewProduct(Product $product): array
+    {
+        return [
+            'id' => $product->id,
+            'slug' => $product->slug,
+            'h1' => $product->h1,
+            'image_path' => $product->image_path,
+            'image_thumb_path' => $product->image_thumb_path,
+            'category' => [
+                'slug' => $product->category?->slug,
+                'titleh1' => $product->category?->titleh1,
+            ],
+            'subcategory' => [
+                'slug' => $product->subcategory?->slug,
+            ],
+            'price' => $product->price,
+            'old_price' => $product->old_price,
+            'discount' => $product->discount,
+            'min_price' => $product->min_price,
+            'min_width' => $product->min_width,
+            'min_height' => $product->min_height,
+            'model' => $product->model?->title,
+            'modelid' => $product->model_id,
+            'cloth' => $product->cloth,
+            'fabric_photo' => $this->encodeAssetPath($product->fabric_photo),
+            'fabric_thumb_path' => $this->encodeAssetPath($product->fabric_thumb_path),
+        ];
+    }
+
     public function show(Request $request, string $slug, $subcategorySlug = null)
     {
         $category = Category::where('slug', $slug)->firstOrFail();
@@ -384,7 +430,7 @@ class CategoryController extends Controller
         $materials = $request->input('materials', []);
         $page = $request->input('page', 1);
 
-        $query = Product::with(['category', 'subcategory'])
+        $query = Product::with(['category', 'subcategory', 'model'])
             ->where('category_id', $id);
 
         if (!empty($subcategories)) {
@@ -405,40 +451,7 @@ class CategoryController extends Controller
 
         $products = $query->paginate(12, ['*'], 'page', $page);
 
-        $encodePath = function (?string $path) {
-            if (!$path)
-                return null;
-            $cleanPath = ltrim($path, '/');
-            $dir = dirname($cleanPath);
-            $file = basename($cleanPath);
-            return asset(($dir !== '.' ? $dir . '/' : '') . rawurlencode($file));
-        };
-
-        $productsData = $products->getCollection()->map(function ($product) use ($encodePath) {
-            $prodModel = ProdModel::find($product->model_id);
-            $prodModelName = $prodModel->title;
-
-            return [
-                'id' => $product->id,
-                'slug' => $product->slug,
-                'h1' => $product->h1,
-                'image_path' => $product->image_path,
-                'category' => [
-                    'slug' => $product->category->slug,
-                    'titleh1' => $product->category->titleh1,
-                ],
-                'subcategory' => [
-                    'slug' => $product->subcategory->slug,
-                ],
-                'price' => $product->price,
-                'old_price' => $product->old_price,
-                'model' => $prodModelName,
-                'modelid' => $product->model_id,
-                'cloth' => $product->cloth,
-                'discount' => $product->discount,
-                'fabric_photo' => $encodePath($product->fabric_photo),
-            ];
-        });
+        $productsData = $products->getCollection()->map(fn (Product $product) => $this->serializePreviewProduct($product));
 
         return response()->json([
             'products' => $productsData,
