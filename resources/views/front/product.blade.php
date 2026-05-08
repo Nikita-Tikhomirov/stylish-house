@@ -1,4 +1,4 @@
-﻿{{-- @include('front.head') --}}
+{{-- @include('front.head') --}}
 <x-front.head title="{{ $product->title }}" description="{{ $product->description }}"></x-front.head>
 @vite('resources/css/prod.css')
 
@@ -496,12 +496,35 @@
                                                 href="{{ route('product.show', [$relatedProduct->category->slug, $relatedProduct->subcategory->slug, $relatedProduct->slug]) }}/">
                                                 {{ $relatedProduct->h1 }}
                                             </a>
+                                            @if ($relatedProduct->min_width || $relatedProduct->min_height)
+                                                <div class="bigProdCard__meta">
+                                                    От
+                                                    @if ($relatedProduct->min_width)
+                                                        {{ $relatedProduct->min_width }} мм
+                                                    @endif
+                                                    @if ($relatedProduct->min_width && $relatedProduct->min_height)
+                                                        x
+                                                    @endif
+                                                    @if ($relatedProduct->min_height)
+                                                        {{ $relatedProduct->min_height }} мм
+                                                    @endif
+                                                </div>
+                                            @endif
                                             <div class="bigProdCard__priceWrap">
-                                                @if ($relatedProduct->discount)
-                                                    <span class="normalPrice">1000₽</span>
-                                                @endif
+                                                @php
+                                                    $relatedMinPrice = (float) ($relatedProduct->min_price ?? 0);
+                                                    $relatedDiscount = (float) ($relatedProduct->discount ?? 0);
+                                                    $relatedDiscountedPrice = floor($relatedMinPrice * (1 - $relatedDiscount / 100));
+                                                @endphp
 
-                                                <span class="discount">500₽</span>
+                                                @if ($relatedMinPrice > 0 && $relatedDiscount > 0)
+                                                    <span class="normalPrice">{{ number_format($relatedMinPrice, 0, '', ' ') }}₽</span>
+                                                    <span class="discount">{{ number_format($relatedDiscountedPrice, 0, '', ' ') }}₽</span>
+                                                @elseif ($relatedMinPrice > 0)
+                                                    <span class="discount">{{ number_format($relatedMinPrice, 0, '', ' ') }}₽</span>
+                                                @else
+                                                    <span class="discount">Цена по запросу</span>
+                                                @endif
                                             </div>
                                         </div>
                                     </div>
@@ -577,12 +600,35 @@
                                                 href="{{ route('product.show', [$altProduct->category->slug, $altProduct->subcategory->slug, $altProduct->slug]) }}/">
                                                 {{ $altProduct->h1 }}
                                             </a>
+                                            @if ($altProduct->min_width || $altProduct->min_height)
+                                                <div class="bigProdCard__meta">
+                                                    От
+                                                    @if ($altProduct->min_width)
+                                                        {{ $altProduct->min_width }} мм
+                                                    @endif
+                                                    @if ($altProduct->min_width && $altProduct->min_height)
+                                                        x
+                                                    @endif
+                                                    @if ($altProduct->min_height)
+                                                        {{ $altProduct->min_height }} мм
+                                                    @endif
+                                                </div>
+                                            @endif
                                             <div class="bigProdCard__priceWrap">
-                                                @if ($altProduct->discount)
-                                                    <span class="normalPrice">1000₽</span>
-                                                @endif
+                                                @php
+                                                    $altMinPrice = (float) ($altProduct->min_price ?? 0);
+                                                    $altDiscount = (float) ($altProduct->discount ?? 0);
+                                                    $altDiscountedPrice = floor($altMinPrice * (1 - $altDiscount / 100));
+                                                @endphp
 
-                                                <span class="discount">500₽</span>
+                                                @if ($altMinPrice > 0 && $altDiscount > 0)
+                                                    <span class="normalPrice">{{ number_format($altMinPrice, 0, '', ' ') }}₽</span>
+                                                    <span class="discount">{{ number_format($altDiscountedPrice, 0, '', ' ') }}₽</span>
+                                                @elseif ($altMinPrice > 0)
+                                                    <span class="discount">{{ number_format($altMinPrice, 0, '', ' ') }}₽</span>
+                                                @else
+                                                    <span class="discount">Цена по запросу</span>
+                                                @endif
                                             </div>
                                         </div>
                                     </div>

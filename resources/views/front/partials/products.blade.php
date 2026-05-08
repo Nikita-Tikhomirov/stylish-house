@@ -55,14 +55,20 @@
                     </div>
                 @endif
                 <div class="bigProdCard__priceWrap">
-                    @if ($prod->discount)
-                        <span class="normalPrice">1000₽</span>
-                        
+                    @php
+                        $minPrice = (float) ($prod->min_price ?? 0);
+                        $discount = (float) ($prod->discount ?? 0);
+                        $discountedPrice = floor($minPrice * (1 - $discount / 100));
+                    @endphp
+
+                    @if ($minPrice > 0 && $discount > 0)
+                        <span class="normalPrice">{{ number_format($minPrice, 0, '', ' ') }}₽</span>
+                        <span class="discount">{{ number_format($discountedPrice, 0, '', ' ') }}₽</span>
+                    @elseif ($minPrice > 0)
+                        <span class="discount">{{ number_format($minPrice, 0, '', ' ') }}₽</span>
+                    @else
+                        <span class="discount">Цена по запросу</span>
                     @endif
-                        <span class="normalPrice">1000₽</span>
-
-
-                    <span class="discount">500₽</span>
                 </div>
             </div>
         </div>

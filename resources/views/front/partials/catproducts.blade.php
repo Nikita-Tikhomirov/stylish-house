@@ -36,12 +36,35 @@
                     href="{{ route('subcategory.show', ['category_slug' => $prod->category->slug, 'subcategory_slug' => $prod->subcategory->slug]) }}">{{ $prod->category->titleh1 }}</a><a
                     class="bigProdCard__title"
                     href="{{ route('product.show', ['category_slug' => $prod->category->slug, 'subcategory_slug' => $prod->subcategory->slug, 'product_slug' => $prod->slug]) }}/">{{ $prod->h1 }}</a>
+                @if ($prod->min_width || $prod->min_height)
+                    <div class="bigProdCard__meta">
+                        От
+                        @if ($prod->min_width)
+                            {{ $prod->min_width }} мм
+                        @endif
+                        @if ($prod->min_width && $prod->min_height)
+                            x
+                        @endif
+                        @if ($prod->min_height)
+                            {{ $prod->min_height }} мм
+                        @endif
+                    </div>
+                @endif
                 <div class="bigProdCard__priceWrap">
-                    @if ($prod->discount)
-                        <span class="normalPrice">1000₽</span>
-                    @endif
+                    @php
+                        $minPrice = (float) ($prod->min_price ?? 0);
+                        $discount = (float) ($prod->discount ?? 0);
+                        $discountedPrice = floor($minPrice * (1 - $discount / 100));
+                    @endphp
 
-                    <span class="discount">500₽</span>
+                    @if ($minPrice > 0 && $discount > 0)
+                        <span class="normalPrice">{{ number_format($minPrice, 0, '', ' ') }}₽</span>
+                        <span class="discount">{{ number_format($discountedPrice, 0, '', ' ') }}₽</span>
+                    @elseif ($minPrice > 0)
+                        <span class="discount">{{ number_format($minPrice, 0, '', ' ') }}₽</span>
+                    @else
+                        <span class="discount">Цена по запросу</span>
+                    @endif
                 </div>
             </div>
         </div>
