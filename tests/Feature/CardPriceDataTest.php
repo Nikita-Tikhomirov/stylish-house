@@ -51,6 +51,54 @@ class CardPriceDataTest extends TestCase
         $this->assertNormalizedPreviewPayload($response->json('products.0'), $entities);
     }
 
+    public function test_category_filter_applies_min_price_range_and_keeps_pagination_server_side(): void
+    {
+        $entities = $this->createPreviewCardEntities([
+            'min_price' => 5000,
+        ]);
+
+        $this->createSiblingProduct($entities, 'low-price', ['min_price' => 1000]);
+        $this->createSiblingProduct($entities, 'no-price', ['min_price' => null]);
+        $this->createSiblingProduct($entities, 'zero-price', ['min_price' => 0]);
+
+        $response = $this->postJson('/filter-cat-products/' . $entities['category']->id, [
+            'subcategories' => [],
+            'models' => [],
+            'colors' => [],
+            'materials' => [],
+            'price_filter_active' => true,
+            'min_price' => 2000,
+            'max_price' => 8000,
+            'page' => 1,
+        ]);
+
+        $response->assertOk();
+
+        $this->assertSame([$entities['product']->id], collect($response->json('products'))->pluck('id')->all());
+        $this->assertIsString($response->json('pagination'));
+    }
+
+    public function test_subcategory_filter_without_price_filter_keeps_products_without_min_price(): void
+    {
+        $entities = $this->createPreviewCardEntities([
+            'min_price' => 5000,
+        ]);
+        $noPriceProduct = $this->createSiblingProduct($entities, 'no-price', ['min_price' => null]);
+
+        $response = $this->postJson('/filter-subcat-products/' . $entities['subcategory']->id, [
+            'models' => [],
+            'colors' => [],
+            'materials' => [],
+            'page' => 1,
+        ]);
+
+        $response->assertOk();
+
+        $productIds = collect($response->json('products'))->pluck('id')->all();
+        $this->assertContains($entities['product']->id, $productIds);
+        $this->assertContains($noPriceProduct->id, $productIds);
+    }
+
     public function test_home_products_endpoint_returns_normalized_fields_and_legacy_model_aliases(): void
     {
         $entities = $this->createPreviewCardEntities([
@@ -112,6 +160,26 @@ class CardPriceDataTest extends TestCase
         ], $productOverrides));
 
         return compact('category', 'subcategory', 'model', 'product');
+    }
+
+    /**
+     * @param array{category: Category, subcategory: Subcategory, model: ProdModel, product: Product} $entities
+     * @param array<string, mixed> $overrides
+     */
+    protected function createSiblingProduct(array $entities, string $slugSuffix, array $overrides = []): Product
+    {
+        $baseProduct = $entities['product'];
+        $productData = $baseProduct->replicate([
+            'id',
+            'created_at',
+            'updated_at',
+        ])->toArray();
+
+        return Product::create(array_merge($productData, [
+            'title' => $baseProduct->title . ' ' . $slugSuffix,
+            'slug' => $baseProduct->slug . '-' . $slugSuffix,
+            'h1' => $baseProduct->h1 . ' ' . $slugSuffix,
+        ], $overrides));
     }
 
     /**

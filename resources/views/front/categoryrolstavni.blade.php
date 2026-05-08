@@ -455,6 +455,17 @@ function fetchProducts(url) {
                 });
             });
 
+            function getPriceFilterPayload() {
+                const activeInput = document.getElementById('price-filter-active');
+                const minInput = document.getElementById('min-price');
+                const maxInput = document.getElementById('max-price');
+
+                return {
+                    active: activeInput ? activeInput.value === '1' : false,
+                    min: minInput ? Number(minInput.value) || 0 : null,
+                    max: maxInput ? Number(maxInput.value) || null : null,
+                };
+            }
             function fetchFilteredProducts(page) {
                 let selectedModels = Array.from(document.querySelectorAll(
                         '.modelLabel input[type="checkbox"]:checked'))
@@ -463,6 +474,8 @@ function fetchProducts(url) {
                     .map(el => el.value);
                 let selectedMaterials = Array.from(document.querySelectorAll('input[name="material[]"]:checked'))
                     .map(el => el.value);
+
+                const priceFilterPayload = getPriceFilterPayload();
 
                 fetch('/filter-cat-products/{{ $category->id }}', {
                         method: 'POST',
@@ -475,6 +488,9 @@ function fetchProducts(url) {
                             colors: selectedColors,
                             materials: selectedMaterials,
                             page: page, // Передаем страницу в запрос
+                        price_filter_active: priceFilterPayload.active,
+                        min_price: priceFilterPayload.min,
+                        max_price: priceFilterPayload.max,
                         })
                     })
                     .then(response => response.json())

@@ -48,24 +48,7 @@
                 <aside class="sidebarFilter">
 
 
-                    {{-- <div class="price-filter">
-                        <div class="sidebarFilter__priceTitle">Цена</div>
-                        <div class="custom-range-slider">
-                            <div class="track"></div>
-                            <div class="range"></div>
-                            <div class="thumb left-thumb"></div>
-                            <div class="thumb right-thumb"></div>
-                        </div>
-                        <div class="price-values">
-                            <span>От </span>
-                            <span id="min-price-display">0</span> ₽ -
-                            <span> До</span>
-
-                            <span id="max-price-display">15000</span> ₽
-                        </div>
-                        <input id="min-price" type="hidden" value="0">
-                        <input id="max-price" type="hidden" value="15000">
-                    </div> --}}
+                    @include('front.partials.price-filter')
 
 
                     <style>
@@ -974,6 +957,8 @@ function fetchProducts(url) {
                 let selectedMaterials = Array.from(document.querySelectorAll('input[name="material[]"]:checked'))
                     .map(el => el.value);
 
+                const priceFilterPayload = getPriceFilterPayload();
+
                 fetch('/filter-cat-products/{{ $category->id }}', {
                         method: 'POST',
                         headers: {
@@ -985,6 +970,9 @@ function fetchProducts(url) {
                             colors: selectedColors,
                             materials: selectedMaterials,
                             page: page, // Передаем страницу в запрос
+                        price_filter_active: priceFilterPayload.active,
+                        min_price: priceFilterPayload.min,
+                        max_price: priceFilterPayload.max,
                         })
                     })
                     .then(response => response.json())
@@ -1049,9 +1037,29 @@ function fetchProducts(url) {
             }
 
 
+            function getPriceFilterPayload() {
+                const activeInput = document.getElementById('price-filter-active');
+                const minInput = document.getElementById('min-price');
+                const maxInput = document.getElementById('max-price');
+
+                return {
+                    active: activeInput ? activeInput.value === '1' : false,
+                    min: minInput ? Number(minInput.value) || 0 : null,
+                    max: maxInput ? Number(maxInput.value) || null : null,
+                };
+            }
+
             function initPricefilter() {
-                const slider = document.querySelector('.custom-range-slider');
-                const track = slider.querySelector('.track');
+                const filter = document.querySelector('[data-price-filter]');
+                if (!filter) {
+                    return;
+                }
+
+                const slider = filter.querySelector('.custom-range-slider');
+                if (!slider) {
+                    return;
+                }
+
                 const range = slider.querySelector('.range');
                 const leftThumb = slider.querySelector('.left-thumb');
                 const rightThumb = slider.querySelector('.right-thumb');
@@ -1059,74 +1067,82 @@ function fetchProducts(url) {
                 const maxPriceDisplay = document.getElementById('max-price-display');
                 const minPriceInput = document.getElementById('min-price');
                 const maxPriceInput = document.getElementById('max-price');
-                const productCards = document.querySelectorAll('.card'); // Карточки товаров
+                const activeInput = document.getElementById('price-filter-active');
 
-                let min = 0,
-                    max = 15000;
-                let currentMin = min,
-                    currentMax = max;
-
-                // Функция обновления положения ползунков
-                function updateThumbPosition(thumb, value) {
-                    const percent = ((value - min) / (max - min)) * 100;
-                    thumb.style.left = `${percent}%`;
+                if (!range || !leftThumb || !rightThumb || !minPriceInput || !maxPriceInput) {
+                    return;
                 }
 
-                // Функция обновления диапазона
+                const min = Number(filter.dataset.defaultMin) || 0;
+                const max = Number(filter.dataset.defaultMax) || 0;
+                if (max <= min) {
+                    return;
+                }
+
+                let currentMin = Number(minPriceInput.value) || min;
+                let currentMax = Number(maxPriceInput.value) || max;
+                let requestTimer = null;
+
+                function formatPrice(value) {
+                    return Number(value).toLocaleString('ru-RU');
+                }
+
+                function updateThumbPosition(thumb, value) {
+                    const percent = ((value - min) / (max - min)) * 100;
+                    thumb.style.left = `${Math.min(Math.max(percent, 0), 100)}%`;
+                }
+
                 function updateRange() {
                     const minPercent = ((currentMin - min) / (max - min)) * 100;
                     const maxPercent = ((currentMax - min) / (max - min)) * 100;
-                    range.style.left = `${minPercent}%`;
-                    range.style.width = `${maxPercent - minPercent}%`;
+                    range.style.left = `${Math.min(Math.max(minPercent, 0), 100)}%`;
+                    range.style.width = `${Math.max(maxPercent - minPercent, 0)}%`;
                 }
 
-                // Функция фильтрации товаров
-                function filterProducts() {
-                    productCards.forEach(card => {
-                        const discountSpan = card.querySelector('.discount');
-                        const price = parseFloat(discountSpan?.textContent.replace('₽', '').trim()) || 0;
+                function requestFilteredProducts() {
+                    if (activeInput) {
+                        activeInput.value = '1';
+                    }
 
-                        if (price >= currentMin && price <= currentMax) {
-                            card.style.display = ''; // Показываем карточку
-                        } else {
-                            card.style.display = 'none'; // Скрываем карточку
-                        }
-                    });
+                    clearTimeout(requestTimer);
+                    requestTimer = setTimeout(() => fetchFilteredProducts(1), 250);
                 }
 
-                // Функция перемещения ползунка
                 function moveThumb(thumb, event) {
                     const rect = slider.getBoundingClientRect();
-                    const offsetX = event.touches ? event.touches[0].clientX - rect.left : event.clientX - rect
-                        .left;
+                    const pointer = event.touches ? event.touches[0] : event;
+                    const offsetX = pointer.clientX - rect.left;
                     const percent = Math.min(Math.max((offsetX / rect.width) * 100, 0), 100);
                     const value = Math.round(min + ((max - min) * percent) / 100);
 
                     if (thumb === leftThumb && value < currentMax) {
                         currentMin = value;
-                        minPriceDisplay.textContent = value;
                         minPriceInput.value = value;
+                        if (minPriceDisplay) {
+                            minPriceDisplay.textContent = formatPrice(value);
+                        }
                     } else if (thumb === rightThumb && value > currentMin) {
                         currentMax = value;
-                        maxPriceDisplay.textContent = value;
                         maxPriceInput.value = value;
+                        if (maxPriceDisplay) {
+                            maxPriceDisplay.textContent = formatPrice(value);
+                        }
                     }
 
-                    updateThumbPosition(thumb, value);
+                    updateThumbPosition(leftThumb, currentMin);
+                    updateThumbPosition(rightThumb, currentMax);
                     updateRange();
-                    filterProducts(); // Фильтруем товары сразу после перемещения
+                    requestFilteredProducts();
                 }
 
-                // Обработчики событий для перемещения ползунков
                 [leftThumb, rightThumb].forEach((thumb) => {
                     thumb.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
                         const moveHandler = (event) => moveThumb(thumb, event);
                         document.addEventListener('mousemove', moveHandler);
                         document.addEventListener('mouseup', () => {
                             document.removeEventListener('mousemove', moveHandler);
-                        }, {
-                            once: true
-                        });
+                        }, { once: true });
                     });
 
                     thumb.addEventListener('touchstart', (e) => {
@@ -1134,17 +1150,13 @@ function fetchProducts(url) {
                         document.addEventListener('touchmove', moveHandler);
                         document.addEventListener('touchend', () => {
                             document.removeEventListener('touchmove', moveHandler);
-                        }, {
-                            once: true
-                        });
+                        }, { once: true });
                     });
                 });
 
-                // Инициализация
                 updateThumbPosition(leftThumb, currentMin);
                 updateThumbPosition(rightThumb, currentMax);
                 updateRange();
-                filterProducts();
             }
 
             initPricefilter()

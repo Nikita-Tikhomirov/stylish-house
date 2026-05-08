@@ -122,6 +122,11 @@ class CategoryController extends Controller
             ->with(['category', 'subcategory'])
             ->paginate(12);
 
+        $maxFilterPrice = (int) Product::where('category_id', $category->id)
+            ->whereNotNull('min_price')
+            ->where('min_price', '>', 0)
+            ->max('min_price');
+
         if ($request->ajax()) {
             return response()->json([
                 'filterProduts' => view('front.partials.catproducts', compact('filterProduts'))->render(),
@@ -186,9 +191,9 @@ class CategoryController extends Controller
         $relatedSubcategories = $relatedItems['subcategories'];
 
         if ($category->id === 16) {
-            return view('front.categoryrolstavni', compact('category', 'reviews', 'homePageFields', 'iconCards', 'categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'subcatsForSlider', 'subcategoriesWithProducts', 'faqs', 'videoReviews', 'workExamples', 'filterProduts', 'models', 'filterColors', 'cart', 'firstProduct', 'sameModelProducts', 'materials', 'headerInfo', 'curtainSubcats', 'blindSubcats', 'relatedCategories', 'relatedSubcategories'));
+            return view('front.categoryrolstavni', compact('category', 'reviews', 'homePageFields', 'iconCards', 'categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'subcatsForSlider', 'subcategoriesWithProducts', 'faqs', 'videoReviews', 'workExamples', 'filterProduts', 'models', 'filterColors', 'cart', 'firstProduct', 'sameModelProducts', 'materials', 'headerInfo', 'curtainSubcats', 'blindSubcats', 'relatedCategories', 'relatedSubcategories', 'maxFilterPrice'));
         } else {
-            return view('front.category', compact('category', 'reviews', 'homePageFields', 'iconCards', 'categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'subcatsForSlider', 'subcategoriesWithProducts', 'faqs', 'videoReviews', 'workExamples', 'filterProduts', 'models', 'filterColors', 'cart', 'firstProduct', 'sameModelProducts', 'materials', 'headerInfo', 'curtainSubcats', 'blindSubcats', 'relatedCategories', 'relatedSubcategories'));
+            return view('front.category', compact('category', 'reviews', 'homePageFields', 'iconCards', 'categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'subcatsForSlider', 'subcategoriesWithProducts', 'faqs', 'videoReviews', 'workExamples', 'filterProduts', 'models', 'filterColors', 'cart', 'firstProduct', 'sameModelProducts', 'materials', 'headerInfo', 'curtainSubcats', 'blindSubcats', 'relatedCategories', 'relatedSubcategories', 'maxFilterPrice'));
         }
         
 
@@ -389,6 +394,7 @@ class CategoryController extends Controller
         $colors = $request->input('colors', []);
         $materials = $request->input('materials', []);
         $page = $request->input('page', 1);
+        $priceFilter = $this->normalizePriceFilter($request);
 
         $query = Product::with(['category', 'subcategory', 'model'])
             ->where('category_id', $id);
@@ -409,6 +415,8 @@ class CategoryController extends Controller
             $query->whereIn('material', $materials);
         }
 
+        $this->applyMinPriceFilter($query, $priceFilter);
+
         $products = $query->paginate(12, ['*'], 'page', $page);
 
         $productsData = $products->getCollection()->map(fn (Product $product) => $this->serializePreviewProduct($product));
@@ -417,6 +425,52 @@ class CategoryController extends Controller
             'products' => $productsData,
             'pagination' => (string) $products->links(),
         ]);
+    }
+
+    /**
+     * @return array{active: bool, min: int|null, max: int|null}
+     */
+    protected function normalizePriceFilter(Request $request): array
+    {
+        $active = filter_var($request->input('price_filter_active', false), FILTER_VALIDATE_BOOLEAN);
+        $minPrice = $request->input('min_price');
+        $maxPrice = $request->input('max_price');
+
+        $minPrice = is_numeric($minPrice) ? max(0, (int) $minPrice) : null;
+        $maxPrice = is_numeric($maxPrice) ? max(0, (int) $maxPrice) : null;
+
+        if ($minPrice !== null && $maxPrice !== null && $minPrice > $maxPrice) {
+            [$minPrice, $maxPrice] = [$maxPrice, $minPrice];
+        }
+
+        return [
+            'active' => $active,
+            'min' => $minPrice,
+            'max' => $maxPrice,
+        ];
+    }
+
+    /**
+     * Products without min_price stay visible until the user touches the price filter.
+     *
+     * @param array{active: bool, min: int|null, max: int|null} $priceFilter
+     */
+    protected function applyMinPriceFilter($query, array $priceFilter): void
+    {
+        if (!$priceFilter['active']) {
+            return;
+        }
+
+        $query->whereNotNull('min_price')
+            ->where('min_price', '>', 0);
+
+        if ($priceFilter['min'] !== null) {
+            $query->where('min_price', '>=', $priceFilter['min']);
+        }
+
+        if ($priceFilter['max'] !== null) {
+            $query->where('min_price', '<=', $priceFilter['max']);
+        }
     }
 
 
