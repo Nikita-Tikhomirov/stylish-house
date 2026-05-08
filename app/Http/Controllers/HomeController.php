@@ -16,6 +16,7 @@ use App\Services\CartService;
 use App\Models\ThrouElement;
 use App\Models\Slider;
 use App\Models\Subcategory;
+use App\Support\PreviewCardData;
 
 
 class HomeController extends Controller
@@ -31,50 +32,12 @@ class HomeController extends Controller
     }
     protected $cartService;
 
-    protected function encodeAssetPath(?string $path): ?string
-    {
-        if (!$path) {
-            return null;
-        }
-
-        if (filter_var($path, FILTER_VALIDATE_URL)) {
-            return $path;
-        }
-
-        $cleanPath = ltrim($path, '/');
-        $dir = dirname($cleanPath);
-        $file = basename($cleanPath);
-
-        return asset(($dir !== '.' ? $dir . '/' : '') . rawurlencode($file));
-    }
-
     protected function serializePreviewProduct(Product $product): array
     {
-        return [
-            'id' => $product->id,
-            'slug' => $product->slug,
-            'h1' => $product->h1,
-            'image_path' => $product->image_path,
-            'image_thumb_path' => $product->image_thumb_path,
-            'category' => [
-                'slug' => $product->category?->slug,
-                'titleh1' => $product->category?->titleh1,
-            ],
-            'subcategory' => [
-                'slug' => $product->subcategory?->slug,
-            ],
-            'price' => $product->price,
-            'old_price' => $product->old_price,
-            'discount' => $product->discount,
-            'min_price' => $product->min_price,
-            'min_width' => $product->min_width,
-            'min_height' => $product->min_height,
-            'model' => $product->model?->title,
-            'modelid' => $product->model_id,
-            'cloth' => $product->cloth,
-            'fabric_photo' => $this->encodeAssetPath($product->fabric_photo),
-            'fabric_thumb_path' => $this->encodeAssetPath($product->fabric_thumb_path),
-        ];
+        return PreviewCardData::fromProduct($product, [
+            'model_title' => $product->model?->title,
+            'model_id' => $product->model_id,
+        ]);
     }
 
     /**
