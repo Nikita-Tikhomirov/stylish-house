@@ -688,6 +688,7 @@ class ProductController extends Controller
             'model' => $modelTitle,
             'cloth' => $product->cloth,
             'discount' => $product->discount,
+            'min_price' => $product->min_price,
             'model_id' => $product->model_id,
             'fabric_photo' => $this->encodeImagePath($product->fabric_photo),
             'min_width' => $product->min_width,

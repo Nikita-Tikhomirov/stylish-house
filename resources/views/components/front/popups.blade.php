@@ -215,7 +215,7 @@
             <div class="prodForm__howMany"> <button class="minus">-</button><input type="text" placeholder="1"
                     value="1" class="quantity-input" /><button class="plus">+</button></div>
             <div class="prodForm__priceAndAddToCart">
-                <div class="prodForm__price">Цена: 1200₽</div><button class="prodForm__addToCart"> Добавить в
+                <div class="prodForm__price" data-base-price="0">Цена по запросу</div><button class="prodForm__addToCart"> Добавить в
                     корзину </button>
             </div>
         </div>

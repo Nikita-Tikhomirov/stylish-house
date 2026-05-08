@@ -148,7 +148,7 @@
                     counterMinusBtn = removeEventListeners(counterMinusBtn, ['click']);
                     counterPlusBtn = removeEventListeners(counterPlusBtn, ['click']);
                     counterInput = removeEventListeners(counterInput, ['input']);
-                    let priceNow = 0;
+                    let currentBasePrice = parseFloat(priceElement.dataset.basePrice) || parseInt(priceElement.textContent.replace(/\D/g, ''), 10) || 0;
 
                     // Пересчет цены с учетом количества и скидки
                     function rebuildPrice(price, counterValue, discount = 0) {
@@ -193,7 +193,9 @@
                                     priceElement.textContent = basePrice;
                                 } else {
                                     basePrice = basePrice || 0;
-                                    rebuildPrice(basePrice, quantity, discount);
+                                    currentBasePrice = Number(basePrice) || 0;
+                                priceElement.dataset.basePrice = currentBasePrice;
+                                rebuildPrice(currentBasePrice, quantity, discount);
                                 }
                             })
                             .catch(error => {
@@ -213,14 +215,14 @@
                         let currentValue = parseInt(counterInput.value) || 1;
                         if (currentValue > 1) {
                             counterInput.value = currentValue - 1;
-                            fetchPrice();
+                            rebuildPrice(currentBasePrice, parseInt(counterInput.value) || 1, parseFloat(discountInput?.value) || 0);
                         }
                     });
 
                     counterPlusBtn.addEventListener('click', () => {
                         let currentValue = parseInt(counterInput.value) || 1;
                         counterInput.value = currentValue + 1;
-                        fetchPrice();
+                        rebuildPrice(currentBasePrice, parseInt(counterInput.value) || 1, parseFloat(discountInput?.value) || 0);
                     });
 
                     // Для ввода вручную
@@ -229,11 +231,11 @@
                         if (isNaN(value) || value < 1) {
                             counterInput.value = 1;
                         }
-                        fetchPrice();
+                        rebuildPrice(currentBasePrice, parseInt(counterInput.value) || 1, parseFloat(discountInput?.value) || 0);
                     });
 
                     // Изначальный расчет при загрузке
-                    fetchPrice();
+                    rebuildPrice(currentBasePrice, parseInt(counterInput.value) || 1, parseFloat(discountInput?.value) || 0);
 
                     // Обновление цены при изменении ширины, высоты или других параметров
                     widthInput.addEventListener('input', fetchPrice);
@@ -342,6 +344,19 @@
 
                                 let discountInput = prodWrap.querySelector('.discount');
                                 discountInput.value = product.discount;
+
+                                const popupPriceElement = prodWrap.querySelector('.prodForm__price');
+                                const popupBasePrice = Number(product.min_price) || 0;
+                                const popupDiscount = Number(product.discount) || 0;
+                                if (popupPriceElement) {
+                                    popupPriceElement.dataset.basePrice = popupBasePrice;
+                                    if (popupBasePrice > 0) {
+                                        const popupDisplayPrice = Math.floor(popupBasePrice * (1 - popupDiscount / 100));
+                                        popupPriceElement.textContent = `Цена: ${popupDisplayPrice}₽`;
+                                    } else {
+                                        popupPriceElement.textContent = 'Цена по запросу';
+                                    }
+                                }
 
                                 let widthInput = prodWrap.querySelector('.width-input');
                                 let heightInput = prodWrap.querySelector('.height-input');
@@ -627,7 +642,3 @@ function fetchProducts(url) {
 </body>
 
 </html>
-
-
-
-
