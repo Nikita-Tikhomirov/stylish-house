@@ -588,7 +588,44 @@
 
             loadPopupsContent()
 
-            tabs.forEach(tab => {
+
+            function renderStaticCardPrice(product) {
+                const minPrice = Number(product.min_price) || 0;
+                const discount = Number(product.discount) || 0;
+
+                if (minPrice <= 0) {
+                    return '<span class="discount">Цена по запросу</span>';
+                }
+
+                if (discount > 0) {
+                    const discountedPrice = Math.floor(minPrice * (1 - discount / 100));
+
+                    return `
+                            <span class="normalPrice" style="text-decoration: line-through;">${minPrice}₽</span>
+                            <span class="discount">${discountedPrice}₽</span>
+                    `;
+                }
+
+                return `<span class="discount">${minPrice}₽</span>`;
+            }
+
+            function buildCardMinDimensions(product) {
+                const minWidth = parseInt(product.min_width, 10) || 0;
+                const minHeight = parseInt(product.min_height, 10) || 0;
+
+                if (!minWidth && !minHeight) {
+                    return '';
+                }
+
+                const widthText = minWidth ? `${minWidth} мм` : '';
+                const heightText = minHeight ? `${minHeight} мм` : '';
+                const separator = widthText && heightText ? ' x ' : '';
+
+                return `<div class="bigProdCard__meta">От ${widthText}${separator}${heightText}</div>`;
+            }
+
+
+tabs.forEach(tab => {
                 tab.addEventListener('click', function() {
                     // Убираем активный класс у всех вкладок
                     tabs.forEach(t => t.classList.remove('active'));
@@ -650,9 +687,9 @@
                                                     <div class="bigProdCard__info">
                                                         <a class="bigProdCard__category" href="${categorySlug ? '/' + categorySlug : '#'}">${product.category ? product.category.titleh1 : 'Без категории'}</a>
                                                         <a class="bigProdCard__title" href="${productSlug ? '/' + categorySlug + '/' + subcategorySlug + '/' + productSlug : '#'}">${product.h1}</a>
+                        ${buildCardMinDimensions(product)}
                                                         <div class="bigProdCard__priceWrap">
-                                                                             <span class="normalPrice" style="text-decoration: line-through;">${product.price}₽</span>
-                            <span class="discount">${product.old_price}₽</span>
+                                                                             ${renderStaticCardPrice(product)}
                                                             </div>
                                                     </div>
                                                 </div>
@@ -663,7 +700,6 @@
                             });
                             setTimeout(() => {
                                 loadPopupsContent()
-                                rebuldPrice()
                             }, 50);
 
                         });
@@ -671,43 +707,6 @@
             });
         });
 
-        function rebuldPrice() {
-            let allCards = document.querySelectorAll('.card')
-
-            allCards.forEach(element => {
-                let width = 500;
-                let height = 500;
-                let model = element.getAttribute('data-model');
-                let control = false;
-                let cloth = element.getAttribute('data-cloth');
-                let priceElement = element.querySelector('.discount');
-                let normalPriceElement = element.querySelector('.normalPrice');
-
-                fetch(
-                        `/sheet-names?width=${width}&height=${height}&model=${model}&control=${control}&cloth=${cloth}`
-                    )
-                    .then(response => response.json())
-                    .then(data => {
-                        const basePrice = data.price || 0;
-                        const discount = element.getAttribute('data-discount')
-                        if (discount > 0) {
-                            const discountedPrice = basePrice * (1 - discount / 100);
-                            // Преобразуем цену в целое число без копеек
-                            const priceNow = Math.floor(discountedPrice);
-                            priceElement.innerText = `${priceNow}₽`;
-                            normalPriceElement.innerText = `${basePrice}₽`;
-
-                            normalPriceElement.style.textDecoration = "line-through";
-                        } else {
-                            priceElement.innerText = `${basePrice}₽`;
-                            normalPriceElement.innerText = ""; // Очищаем старую цену
-                        }
-                    })
-                    .catch(error => console.error('Ошибка при получении цены:', error));
-            });
-        }
-
-        rebuldPrice()
     </script>
 
 

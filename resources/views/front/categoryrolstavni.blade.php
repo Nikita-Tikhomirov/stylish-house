@@ -368,131 +368,44 @@
 
             loadPopupsContent()
 
-            function rebuilCardsPrice(params) {
-                let allCards = document.querySelectorAll('.card')
 
-                allCards.forEach(element => {
-                    let width, height;
-                    let model = element.getAttribute('data-model');
-                    let control = false;
-                    let cloth = element.getAttribute('data-cloth');
-                    let priceElement = element.querySelector('.discount');
-                    let normalPriceElement = element.querySelector('.normalPrice');
-                    let counterForDouble = 1
-                    let prodTitle = element.querySelector('.bigProdCard__title').innerText.trim();
-                    if (prodTitle.includes("Стандарт")) {
-                        width = 500;
-                        height = 500;
-                    } else if (prodTitle.includes("Спринг")) {
-                        width = 700;
-                        height = 500;
-                    } else if (prodTitle.includes("Гранд")) {
-                        width = 700;
-                        height = 500;
-                    } else if (prodTitle.includes("Кватро классик")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Кватро люкс")) {
-                        width = 700;
-                        height = 500;
-                    } else if (prodTitle.includes("Классик премиум")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Дабл классик")) {
-                        width = 400;
-                        height = 500;
-                        counterForDouble = 2
-                    } else if (prodTitle.includes("Люкс премиум")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Дабл люкс")) {
-                        width = 400;
-                        height = 500;
-                        counterForDouble = 2
-                    } else if (prodTitle.includes("Мини")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Мини нью")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Уни-1")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Уни-2")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Уни-1 ламинация")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Уни-2 ламинация")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Комбо мини нью")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Комбо уни-1")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Комбо уни-2")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Комбо уни-2 ламинация")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Комбо в-52 стандарт")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Комбо Классик")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Комбо в-52 люкс")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Комбо дабл классик")) {
-                        width = 400;
-                        height = 500;
-                        counterForDouble = 2
-                    } else if (prodTitle.includes("Комбо дабл люкс")) {
-                        width = 400;
-                        height = 500;
-                        counterForDouble = 2
-                    } else if (prodTitle.includes("Комбо кватро классик")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Комбо кватро люкс")) {
-                        width = 400;
-                        height = 500;
-                    } else {
-                        width = 700;
-                        height = 700; // Значение по умолчанию
-                    }
-                    fetch(
-                            `/sheet-names?width=${width}&height=${height}&model=${model}&control=${control}&cloth=${cloth}`
-                        )
-                        .then(response => response.json())
-                        .then(data => {
-                            const basePrice = data.price || "Цена по запросу";
-                            const discount = element.getAttribute('data-discount')
-                            if (discount > 0) {
-                                const discountedPrice = basePrice * (1 - discount / 100);
-                                // Преобразуем цену в целое число без копеек
-                                const priceNow = Math.floor(discountedPrice);
-                                priceElement.innerText = `${priceNow}₽`;
-                                normalPriceElement.innerText = `${basePrice}₽`;
+            function renderStaticCardPrice(product) {
+                const minPrice = Number(product.min_price) || 0;
+                const discount = Number(product.discount) || 0;
 
-                                normalPriceElement.style.textDecoration = "line-through";
-                            } else {
-                                priceElement.innerText = `${basePrice}₽`;
-                                normalPriceElement.innerText = ""; // Очищаем старую цену
-                            }
-                        })
-                        .catch(error => console.error('Ошибка при получении цены:', error));
-                });
+                if (minPrice <= 0) {
+                    return '<span class="discount">Цена по запросу</span>';
+                }
 
+                if (discount > 0) {
+                    const discountedPrice = Math.floor(minPrice * (1 - discount / 100));
+
+                    return `
+                            <span class="normalPrice" style="text-decoration: line-through;">${minPrice}₽</span>
+                            <span class="discount">${discountedPrice}₽</span>
+                    `;
+                }
+
+                return `<span class="discount">${minPrice}₽</span>`;
             }
-            rebuilCardsPrice()
 
-            function fetchProducts(url) {
+            function buildCardMinDimensions(product) {
+                const minWidth = parseInt(product.min_width, 10) || 0;
+                const minHeight = parseInt(product.min_height, 10) || 0;
+
+                if (!minWidth && !minHeight) {
+                    return '';
+                }
+
+                const widthText = minWidth ? `${minWidth} мм` : '';
+                const heightText = minHeight ? `${minHeight} мм` : '';
+                const separator = widthText && heightText ? ' x ' : '';
+
+                return `<div class="bigProdCard__meta">От ${widthText}${separator}${heightText}</div>`;
+            }
+
+
+function fetchProducts(url) {
                 let categoryId = document.querySelector('[data-category-id]').dataset.categoryId;
                 fetch(url, {
                         headers: {
@@ -523,7 +436,6 @@
             document.querySelectorAll('.sidebarFilter__label input[type="checkbox"]').forEach(function(checkbox) {
                 checkbox.addEventListener('change', function() {
                     fetchFilteredProducts(1); // При изменении фильтра загружаем первую страницу
-                    rebuilCardsPrice()
                     loadPopupsContent()
                 });
             });
@@ -585,9 +497,9 @@
                     <div class="bigProdCard__info">
                         <a class="bigProdCard__category" href="${product.category ? '/' + product.category.slug : '#'}">${product.category ? product.category.titleh1 : 'Без категории'}</a>
                         <a class="bigProdCard__title" href="${productUrl}">${product.h1}</a>
+                        ${buildCardMinDimensions(product)}
                         <div class="bigProdCard__priceWrap">
-                            <span class="normalPrice" style="text-decoration: line-through;">${product.price}₽</span>
-                            <span class="discount">${product.old_price}₽</span>
+                            ${renderStaticCardPrice(product)}
                         </div>
                     </div>
                 </div>
@@ -597,7 +509,6 @@
                         loadPopupsContent()
                         // Обновляем пагинацию
                         document.querySelector('.pagination').innerHTML = data.pagination;
-                        rebuilCardsPrice()
                     });
             }
 
@@ -706,10 +617,7 @@
                 });
             });
             
-            // Инициализируем цены и попапы для новых товаров
-            if (typeof rebuilCardsPrice === 'function') {
-                rebuilCardsPrice();
-            }
+            // Инициализируем попапы для новых товаров
             if (typeof loadPopupsContent === 'function') {
                 loadPopupsContent();
             }

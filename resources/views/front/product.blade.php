@@ -785,40 +785,6 @@
             }
 
 
-            let allCards = document.querySelectorAll('.card')
-
-            allCards.forEach(element => {
-                let width = 500;
-                let height = 500;
-                let model = element.getAttribute('data-model');
-                let control = false;
-                let cloth = element.getAttribute('data-cloth');
-                let priceElement = element.querySelector('.discount');
-                let normalPriceElement = element.querySelector('.normalPrice');
-
-                fetch(
-                        `/sheet-names?width=${width}&height=${height}&model=${model}&control=${control}&cloth=${cloth}`
-                    )
-                    .then(response => response.json())
-                    .then(data => {
-                        const basePrice = data.price || "Цена по запросу";
-                        const discount = element.getAttribute('data-discount')
-                        if (discount > 0) {
-                            const discountedPrice = basePrice * (1 - discount / 100);
-                            // Преобразуем цену в целое число без копеек
-                            const priceNow = Math.floor(discountedPrice);
-                            priceElement.innerText = `${priceNow}₽`;
-                            normalPriceElement.innerText = `${basePrice}₽`;
-
-                            normalPriceElement.style.textDecoration = "line-through";
-                        } else {
-                            priceElement.innerText = `${basePrice}₽`;
-                            normalPriceElement.innerText = ""; // Очищаем старую цену
-                        }
-                    })
-                    .catch(error => console.error('Ошибка при получении цены:', error));
-            });
-
             getPrice(slides);
 
 

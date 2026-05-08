@@ -876,150 +876,25 @@
 
             loadPopupsContent()
 
-            function rebuilCardsPrice(params) {
-                let allCards = document.querySelectorAll('.card')
 
-                allCards.forEach(element => {
+            function renderStaticCardPrice(product) {
+                const minPrice = Number(product.min_price) || 0;
+                const discount = Number(product.discount) || 0;
 
-                    // Минмальную и максимальную брать из модели
+                if (minPrice <= 0) {
+                    return '<span class="discount">Цена по запросу</span>';
+                }
 
-                    let prodTitle = element.querySelector('.bigProdCard__title').innerText.trim();
+                if (discount > 0) {
+                    const discountedPrice = Math.floor(minPrice * (1 - discount / 100));
 
-                    let width, height;
+                    return `
+                            <span class="normalPrice" style="text-decoration: line-through;">${minPrice}₽</span>
+                            <span class="discount">${discountedPrice}₽</span>
+                    `;
+                }
 
-                    let counterForDouble = 1
-
-                    if (prodTitle.includes("Стандарт")) {
-                        width = 500;
-                        height = 500;
-                    } else if (prodTitle.includes("Спринг")) {
-                        width = 700;
-                        height = 500;
-                    } else if (prodTitle.includes("Гранд")) {
-                        width = 700;
-                        height = 500;
-                    } else if (prodTitle.includes("Кватро классик")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Кватро люкс")) {
-                        width = 700;
-                        height = 500;
-                    } else if (prodTitle.includes("Классик премиум")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Дабл классик")) {
-                        width = 400;
-                        height = 500;
-                        counterForDouble = 2
-                    } else if (prodTitle.includes("Люкс премиум")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Дабл люкс")) {
-                        width = 400;
-                        height = 500;
-                        counterForDouble = 2
-                    } else if (prodTitle.includes("Мини")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Мини нью")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Уни-1")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Уни-2")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Уни-1 ламинация")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Уни-2 ламинация")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Комбо мини нью")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Комбо уни-1")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Комбо уни-2")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Комбо уни-2 ламинация")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Комбо в-52 стандарт")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Комбо Классик")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Комбо в-52 люкс")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Комбо дабл классик")) {
-                        width = 400;
-                        height = 500;
-                        counterForDouble = 2
-                    } else if (prodTitle.includes("Комбо дабл люкс")) {
-                        width = 400;
-                        height = 500;
-                        counterForDouble = 2
-                    } else if (prodTitle.includes("Комбо кватро классик")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Комбо кватро люкс")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Алюминиевые 50 мм")) {
-                        width = 400;
-                        height = 500;
-                    } else if (prodTitle.includes("Компакт Премиум")) {
-                        width = 300;
-                        height = 600;
-                    } else if (prodTitle.includes("ХL Абсолют")) {
-                        width = 300;
-                        height = 600;
-                    } else {
-                        width = 700;
-                        height = 700; // Значение по умолчанию
-                    }
-
-
-                    let model = element.getAttribute('data-model');
-                    let control = false;
-                    let cloth = element.getAttribute('data-cloth');
-                    let priceElement = element.querySelector('.discount');
-                    let normalPriceElement = element.querySelector('.normalPrice');
-                    let modelId = element.dataset.modelid;
-
-                    // console.log(prodTitle);
-
-
-
-                    fetch(
-                            `/sheet-names?width=${width}&height=${height}&model=${model}&control=${control}&cloth=${cloth}&modelId=${modelId}&prodTitle=${prodTitle}`
-                        )
-                        .then(response => response.json())
-                        .then(data => {
-                            const basePrice = data.price || "Цена по запросу ";
-                            const discount = element.getAttribute('data-discount')
-                            if (discount > 0) {
-                                const discountedPrice = basePrice * (1 - discount / 100);
-                                // Преобразуем цену в целое число без копеек
-                                const priceNow = Math.floor(discountedPrice);
-                                priceElement.innerText = `${priceNow}₽`;
-                                normalPriceElement.innerText = `${basePrice}₽`;
-
-                                normalPriceElement.style.textDecoration = "line-through";
-                            } else {
-                                priceElement.innerText = `${basePrice}₽`;
-                                normalPriceElement.innerText = ""; // Очищаем старую цену
-                            }
-                        })
-                        .catch(error => console.error('Ошибка при получении цены:', error));
-                });
-
+                return `<span class="discount">${minPrice}₽</span>`;
             }
 
             function buildCardMinDimensions(product) {
@@ -1037,9 +912,8 @@
                 return `<div class="bigProdCard__meta">От ${widthText}${separator}${heightText}</div>`;
             }
 
-            rebuilCardsPrice()
 
-            // Пагинация
+// Пагинация
 
 
             function fetchProducts(url) {
@@ -1072,7 +946,6 @@
             document.querySelectorAll('.sidebarFilter__label input[type="checkbox"]').forEach(function(checkbox) {
                 checkbox.addEventListener('change', function() {
                     fetchFilteredProducts(1); // При изменении фильтра загружаем первую страницу
-                    rebuilCardsPrice()
                     loadPopupsContent()
                 });
             });
@@ -1140,8 +1013,7 @@
                         <a class="bigProdCard__title" href="${product.slug ? '/' + product.category.slug + '/' + product.subcategory.slug + '/' + product.slug : '#'}">${product.h1}</a>
                         ${buildCardMinDimensions(product)}
                         <div class="bigProdCard__priceWrap">
-                            <span class="normalPrice" style="text-decoration: line-through;">${product.price}₽</span>
-                            <span class="discount">${product.old_price}₽</span>
+                            ${renderStaticCardPrice(product)}
                         </div>
                     </div>
                 </div>
@@ -1151,7 +1023,6 @@
 
                         // Обновляем пагинацию
                         document.querySelector('.pagination').innerHTML = data.pagination;
-                        rebuilCardsPrice()
                         loadPopupsContent()
                     });
             }
