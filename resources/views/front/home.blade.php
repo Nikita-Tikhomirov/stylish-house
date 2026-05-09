@@ -684,7 +684,7 @@ tabs.forEach(tab => {
                                 let mainImageSrc = normalizeImagePath(mainImage);
                                 let fabricImageSrc = normalizeImagePath(fabricImage);
                                 const productHTML = `
-                                        <div class="s-populars__slide swiper-slide card" id="prod${product.id}" data-modelid="${product.model_id}"  data-model="${product.model_title}" data-cloth="${product.cloth}"  data-discount="">
+                                        <div class="s-populars__slide swiper-slide card" id="prod${product.id}" data-modelid="${product.model_id}"  data-model="${product.model_title}" data-cloth="${product.cloth}"  data-discount="${product.discount ?? ''}" data-min-width="${product.min_width ?? ''}" data-min-height="${product.min_height ?? ''}">
                                             <div class="bigProdCard">
                                                 <div class="bigProdCard__wrap">
                                                     <div class="bigProdCard__img-wrap">

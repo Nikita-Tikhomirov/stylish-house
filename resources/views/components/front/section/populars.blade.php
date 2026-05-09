@@ -22,7 +22,7 @@
         <div class="s-populars__swiper swiper">
             <div class="swiper-wrapper" id="products-container">
                 @foreach ($homePopulars as $product)
-                    <div class="s-populars__slide swiper-slide card" id="prod{{ $product->id }}" data-modelid="{{ $product->model_id ?? '' }}"  data-model="{{ $product->model_title }}" data-cloth="{{ $product->cloth }}"  data-discount="{{ $product->discount }}">
+                    <div class="s-populars__slide swiper-slide card" id="prod{{ $product->id }}" data-modelid="{{ $product->model_id ?? '' }}"  data-model="{{ $product->model_title }}" data-cloth="{{ $product->cloth }}"  data-discount="{{ $product->discount }}" data-min-width="{{ $product->min_width ?? '' }}" data-min-height="{{ $product->min_height ?? '' }}">
                         <div class="bigProdCard">
                             <div class="bigProdCard__wrap">
                                 <div class="bigProdCard__img-wrap">
@@ -61,12 +61,36 @@
                                         class="bigProdCard__title"
                                         href="{{ route('product.show', ['category_slug' => $product->category->slug, 'subcategory_slug' => $product->subcategory->slug, 'product_slug' => $product->slug]) }}/">{{ $product->h1 }}</a>
 
-                                        <div class="bigProdCard__priceWrap">
-                                            @if ($product->discount)
-                                                <span class="normalPrice">1000₽</span>
-                                            @endif
+                                        @if ($product->min_width || $product->min_height)
+                                            <div class="bigProdCard__meta">
+                                                От
+                                                @if ($product->min_width)
+                                                    {{ $product->min_width }} мм
+                                                @endif
+                                                @if ($product->min_width && $product->min_height)
+                                                    x
+                                                @endif
+                                                @if ($product->min_height)
+                                                    {{ $product->min_height }} мм
+                                                @endif
+                                            </div>
+                                        @endif
 
-                                            <span class="discount">500₽</span>
+                                        <div class="bigProdCard__priceWrap">
+                                            @php
+                                                $minPrice = (float) ($product->min_price ?? 0);
+                                                $discount = (float) ($product->discount ?? 0);
+                                                $discountedPrice = floor($minPrice * (1 - $discount / 100));
+                                            @endphp
+
+                                            @if ($minPrice > 0 && $discount > 0)
+                                                <span class="normalPrice">{{ number_format($minPrice, 0, '', ' ') }}₽</span>
+                                                <span class="discount">{{ number_format($discountedPrice, 0, '', ' ') }}₽</span>
+                                            @elseif ($minPrice > 0)
+                                                <span class="discount">{{ number_format($minPrice, 0, '', ' ') }}₽</span>
+                                            @else
+                                                <span class="discount">Цена по запросу</span>
+                                            @endif
                                         </div>
 
 
