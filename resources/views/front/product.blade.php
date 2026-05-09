@@ -215,8 +215,8 @@
                     <div class="prodForm__galleryWrap">
                         <div class="prodForm__imgWrap">
                             @php
-                                $productMainImage = $product->image_thumb_path ?: $product->image_path;
-                                $productFabricImage = $product->fabric_thumb_path ?: $product->fabric_photo;
+                                $productMainImage = $product->image_path ?: $product->image_thumb_path;
+                                $productFabricImage = $product->fabric_photo ?: $product->fabric_thumb_path;
                             @endphp
                             @if ($productMainImage)
                                 <img src="{{ asset($productMainImage) }}" alt="{{ $product->h1 }}" />
@@ -233,8 +233,8 @@
                         <div class="prodForm__bar">
                             @foreach ($sameModelProducts as $sameProduct)
                                 @php
-                                    $sameMainImage = $sameProduct->image_thumb_path ?: $sameProduct->image_path;
-                                    $sameFabricImage = $sameProduct->fabric_thumb_path ?: $sameProduct->fabric_photo;
+                                    $sameMainImage = $sameProduct->image_path ?: $sameProduct->image_thumb_path;
+                                    $sameFabricImage = $sameProduct->fabric_photo ?: $sameProduct->fabric_thumb_path;
                                 @endphp
                                 @if ($sameMainImage)
                                     <img src="{{ asset($sameMainImage) }}"
