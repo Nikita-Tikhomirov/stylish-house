@@ -121,6 +121,7 @@ Route::middleware(['role:admin'])->group(function () {
     Route::get('/admin/categories/{category_slug}/{subcategory_slug}/edit', [SubcategoryController::class, 'edit'])->name('subcategories.edit');
     Route::put('/admin/categories/{category_slug}/{subcategory_slug}', [SubcategoryController::class, 'update'])->name('subcategories.update');
     Route::delete('/admin/categories/{category_slug}/{subcategory_slug}', [SubcategoryController::class, 'destroy'])->name('subcategories.destroy');
+    Route::post('/admin/subcategory-seo/upload-image', [SubcategoryController::class, 'uploadSeoImage'])->name('subcategory.seo.upload_image');
     Route::post('/admin/categories/{category_slug}/{subcategory_slug}/edit-seo', [SubcategoryController::class, 'updateSeoSection'])->name('subcategory.update.seo');
     Route::post('/admin/categories/{category_slug}/{subcategory_slug}/edit-faq', [SubcategoryController::class, 'updateFaqSection'])->name('subcategory.update.faq');
     Route::post('/admin/categories/{category_slug}/{subcategory_slug}/installation-types', [SubcategoryController::class, 'storeInstallationType'])->name('subcategory.installation_types.store');

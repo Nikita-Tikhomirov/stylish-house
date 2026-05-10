@@ -439,6 +439,19 @@ class SubcategoryController extends Controller
         return response()->json(['message' => 'Контент успешно обновлен!'], 200);
     }
 
+    public function uploadSeoImage(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:4096',
+        ]);
+
+        $path = $request->file('image')->store('subcategory-seo', 'public');
+
+        return response()->json([
+            'url' => Storage::url($path),
+        ]);
+    }
+
     public function updateFaqSection(Request $request, $category_slug, $subcategory_slug)
     {
         // Find the subcategory by both category and subcategory slug

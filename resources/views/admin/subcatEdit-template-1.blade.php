@@ -937,8 +937,57 @@
 </script>
 
 {{-- Сео текст --}}
+<style>
+    #editor-container .ql-editor img {
+        display: block;
+        max-width: min(100%, 520px);
+        height: auto;
+        margin: 14px auto;
+        cursor: pointer;
+    }
+
+    #editor-container .ql-editor img.seo-editor-image-selected {
+        outline: 3px solid #5969ff;
+        outline-offset: 3px;
+    }
+
+    .seo-image-tools {
+        display: none;
+        gap: 10px;
+        align-items: end;
+        flex-wrap: wrap;
+        margin-top: 12px;
+        padding: 12px;
+        border: 1px solid #d8dbe8;
+        border-radius: 6px;
+        background: #f8f9ff;
+    }
+
+    .seo-image-tools.is-visible {
+        display: flex;
+    }
+
+    .seo-image-tools label {
+        margin-bottom: 0;
+        font-size: 12px;
+        color: #525f7f;
+    }
+
+    .seo-image-tools .seo-image-field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .seo-image-tools input {
+        min-width: 160px;
+    }
+</style>
+
 <script>
     document.addEventListener("DOMContentLoaded", function() {
+        const seoImageUploadUrl = "{{ route('subcategory.seo.upload_image') }}";
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         const toolbarOptions = [
             ['bold', 'italic', 'underline', 'strike'],
             ['blockquote', 'code-block'],
@@ -994,6 +1043,8 @@
             },
             theme: 'snow'
         });
+        const toolbar = quill.getModule('toolbar');
+        toolbar.addHandler('image', selectAndUploadSeoImage);
 
         let toggleButton = document.getElementById("toggle-editor");
         let htmlEditor = document.createElement("textarea");
@@ -1001,12 +1052,144 @@
         htmlEditor.style.display = "none";
         htmlEditor.style.width = "100%";
         htmlEditor.style.height = "300px";
+        htmlEditor.style.fontFamily = "Consolas, Monaco, monospace";
+        htmlEditor.style.fontSize = "13px";
+        htmlEditor.setAttribute("wrap", "soft");
+
+        let selectedSeoImage = null;
+        let imageTools = document.createElement("div");
+        imageTools.className = "seo-image-tools";
+        imageTools.innerHTML = `
+            <div class="seo-image-field">
+                <label for="seo-image-alt">Alt</label>
+                <input id="seo-image-alt" type="text" class="form-control" placeholder="Описание изображения">
+            </div>
+            <div class="seo-image-field">
+                <label for="seo-image-width">Ширина, px</label>
+                <input id="seo-image-width" type="number" min="120" max="1200" step="10" class="form-control" placeholder="Авто">
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" id="seo-image-apply">Применить</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="seo-image-reset">Авторазмер</button>
+            <button type="button" class="btn btn-danger btn-sm" id="seo-image-remove">Удалить</button>
+        `;
 
         // Вставим textarea сразу после редактора
         document.getElementById("editor-container").appendChild(htmlEditor);
+        document.getElementById("editor-container").appendChild(imageTools);
 
         let quillContainer = document.querySelector(".ql-container");
         let isHtmlMode = false;
+        const imageAltInput = document.getElementById("seo-image-alt");
+        const imageWidthInput = document.getElementById("seo-image-width");
+
+        function selectAndUploadSeoImage() {
+            const input = document.createElement('input');
+            input.setAttribute('type', 'file');
+            input.setAttribute('accept', 'image/jpeg,image/png,image/gif,image/webp');
+            input.click();
+
+            input.addEventListener('change', function() {
+                const file = input.files && input.files[0];
+                if (!file) {
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('image', file);
+
+                fetch(seoImageUploadUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': csrfToken
+                        },
+                        body: formData
+                    })
+                    .then(response => response.ok ? response.json() : response.json().then(data => Promise.reject(data)))
+                    .then(data => {
+                        if (!data.url) {
+                            throw new Error('Image URL is missing');
+                        }
+
+                        const range = quill.getSelection(true);
+                        quill.insertEmbed(range.index, 'image', data.url, 'user');
+                        quill.setSelection(range.index + 1, 0, 'silent');
+                        const image = Array.from(quill.root.querySelectorAll('img'))
+                            .find(item => item.getAttribute('src') === data.url);
+                        if (image) {
+                            image.setAttribute('alt', '');
+                            image.style.maxWidth = '100%';
+                            image.style.height = 'auto';
+                            selectSeoImage(image);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('SEO image upload failed:', error);
+                        alert('Не удалось загрузить изображение. Проверьте формат и размер файла.');
+                    });
+            });
+        }
+
+        function selectSeoImage(image) {
+            clearSeoImageSelection();
+            selectedSeoImage = image;
+            selectedSeoImage.classList.add('seo-editor-image-selected');
+            imageAltInput.value = selectedSeoImage.getAttribute('alt') || '';
+            imageWidthInput.value = parseInt(selectedSeoImage.getAttribute('width') || selectedSeoImage.style.width, 10) || '';
+            imageTools.classList.add('is-visible');
+        }
+
+        function clearSeoImageSelection() {
+            if (selectedSeoImage) {
+                selectedSeoImage.classList.remove('seo-editor-image-selected');
+            }
+            selectedSeoImage = null;
+            imageTools.classList.remove('is-visible');
+        }
+
+        function applySeoImageSettings() {
+            if (!selectedSeoImage) {
+                return;
+            }
+
+            selectedSeoImage.setAttribute('alt', imageAltInput.value.trim());
+            const width = parseInt(imageWidthInput.value, 10);
+            if (width > 0) {
+                selectedSeoImage.setAttribute('width', width);
+                selectedSeoImage.style.width = `${width}px`;
+                selectedSeoImage.style.maxWidth = '100%';
+                selectedSeoImage.style.height = 'auto';
+            }
+        }
+
+        quill.root.addEventListener('click', function(event) {
+            if (event.target && event.target.tagName === 'IMG') {
+                selectSeoImage(event.target);
+                return;
+            }
+
+            clearSeoImageSelection();
+        });
+
+        document.getElementById('seo-image-apply').addEventListener('click', applySeoImageSettings);
+        document.getElementById('seo-image-reset').addEventListener('click', function() {
+            if (!selectedSeoImage) {
+                return;
+            }
+
+            selectedSeoImage.removeAttribute('width');
+            selectedSeoImage.style.width = '';
+            selectedSeoImage.style.maxWidth = '100%';
+            selectedSeoImage.style.height = 'auto';
+            imageWidthInput.value = '';
+        });
+        document.getElementById('seo-image-remove').addEventListener('click', function() {
+            if (!selectedSeoImage) {
+                return;
+            }
+
+            selectedSeoImage.remove();
+            clearSeoImageSelection();
+        });
 
         toggleButton.addEventListener("click", function() {
             if (!isHtmlMode) {
@@ -1014,12 +1197,14 @@
                 htmlEditor.value = quill.root.innerHTML;
                 htmlEditor.style.display = "block";
                 quillContainer.style.display = "none";
+                imageTools.classList.remove('is-visible');
                 toggleButton.textContent = "Редактировать в Quill";
             } else {
                 // Переключение обратно в Quill
                 quill.root.innerHTML = htmlEditor.value;
                 htmlEditor.style.display = "none";
                 quillContainer.style.display = "block";
+                clearSeoImageSelection();
                 toggleButton.textContent = "Редактировать HTML";
             }
             isHtmlMode = !isHtmlMode;
@@ -1037,8 +1222,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')
-                            .getAttribute('content')
+                        'X-CSRF-TOKEN': csrfToken
                     },
                     body: JSON.stringify({
                         seo: content
