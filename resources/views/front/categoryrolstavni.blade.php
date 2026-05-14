@@ -43,7 +43,7 @@
 
        <x-front.section.rollets-calculator />
 
-       <x-front.section.rollets-installation />
+       <x-front.section.rollets-installation :installationTypes="$installationTypes" />
 
        <x-front.section.rollets-systems />
 

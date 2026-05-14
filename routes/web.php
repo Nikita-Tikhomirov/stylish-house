@@ -127,6 +127,12 @@ Route::middleware(['role:admin'])->group(function () {
     Route::post('/admin/categories/{category_slug}/{subcategory_slug}/installation-types', [SubcategoryController::class, 'storeInstallationType'])->name('subcategory.installation_types.store');
     Route::post('/admin/categories/{category_slug}/{subcategory_slug}/installation-types/{id}', [SubcategoryController::class, 'updateInstallationType'])->name('subcategory.installation_types.update');
     Route::delete('/admin/categories/{category_slug}/{subcategory_slug}/installation-types/{id}', [SubcategoryController::class, 'destroyInstallationType'])->name('subcategory.installation_types.destroy');
+
+    // CRUD типов установки для категорий (рольставни и др.)
+    Route::get('/admin/categories/{slug}/installation-types', [CategoryController::class, 'installationTypes'])->name('category.installation_types.index');
+    Route::post('/admin/categories/{slug}/installation-types', [CategoryController::class, 'storeInstallationType'])->name('category.installation_types.store');
+    Route::post('/admin/categories/{slug}/installation-types/{id}', [CategoryController::class, 'updateInstallationType'])->name('category.installation_types.update');
+    Route::delete('/admin/categories/{slug}/installation-types/{id}', [CategoryController::class, 'destroyInstallationType'])->name('category.installation_types.destroy');
     Route::get('/admin/categories/{category_slug}/{subcategory_slug}/work-examples', [SubcategoryController::class, 'getWorkExamples'])->name('subcategory.work-examples.get');
 
     Route::post('/admin/categories/{category_slug}/{subcategory_slug}/update-visibility', [SubcategoryController::class, 'updateVisibility'])->name('subcategory.update.visibility');

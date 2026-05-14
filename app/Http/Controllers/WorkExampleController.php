@@ -53,6 +53,17 @@ class WorkExampleController extends Controller
         return response()->json(['success' => true, 'workExample' => $workExample]);
     }
 
+    // Метод для получения примеров работ категории
+    public function edit($slug)
+    {
+        $category = \App\Models\Category::where('slug', $slug)->firstOrFail();
+        $workExamples = WorkExample::where('category_id', $category->id)
+            ->whereNull('subcategory_id')
+            ->get();
+
+        return response()->json(['workExamples' => $workExamples]);
+    }
+
     // Метод для удаления изображения
     public function destroy($id)
     {

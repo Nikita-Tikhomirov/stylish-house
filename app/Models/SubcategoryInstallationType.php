@@ -11,15 +11,22 @@ class SubcategoryInstallationType extends Model
 
     protected $fillable = [
         'subcategory_id',
+        'category_id',
         'title',
         'description',
         'image',
+        'detail_image',
         'sort_order',
     ];
 
     public function subcategory()
     {
         return $this->belongsTo(Subcategory::class);
+    }
+
+    public function category()
+    {
+        return $this->belongsTo(Category::class);
     }
 }
 

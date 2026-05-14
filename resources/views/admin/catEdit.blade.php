@@ -175,6 +175,60 @@
     </div>
 </div>
 
+@if ($category->id === 16)
+{{-- Типы установки рольставней (только для категории id=16) --}}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <h5 class="card-header">Виды монтажа рольставней</h5>
+            <div class="card-body installation-types" data-category-slug="{{ $category->slug }}">
+                <button class="btn btn-primary add-installation-type mb-3">Добавить тип монтажа</button>
+                <div class="installation-types-container">
+                    @foreach ($installationTypes as $type)
+                        <form class="installation-type-card card mb-3 p-3" data-id="{{ $type->id }}">
+                            <div class="row">
+                                <div class="col-md-2">
+                                    <label>Иконка (50x50)</label>
+                                    <input name="image" type="file" class="form-control-file">
+                                    @if ($type->image)
+                                        <img src="{{ Storage::url($type->image) }}" style="max-width:50px; margin-top:5px;">
+                                    @endif
+                                </div>
+                                <div class="col-md-3">
+                                    <label>Большое фото</label>
+                                    <input name="detail_image" type="file" class="form-control-file">
+                                    @if ($type->detail_image)
+                                        <img src="{{ Storage::url($type->detail_image) }}" style="max-width:100px; margin-top:5px;">
+                                    @endif
+                                </div>
+                                <div class="col-md-3">
+                                    <label>Заголовок</label>
+                                    <input name="title" type="text" class="form-control" value="{{ $type->title }}">
+                                </div>
+                                <div class="col-md-1">
+                                    <label>Порядок</label>
+                                    <input name="sort_order" type="number" class="form-control" value="{{ $type->sort_order }}">
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end gap-2">
+                                    <button class="btn btn-primary save-installation-type" type="button">Сохранить</button>
+                                    <button class="btn btn-danger delete-installation-type" type="button">Удалить</button>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-12">
+                                    <label>Описание (HTML)</label>
+                                    <textarea name="description" class="form-control" rows="5">{{ $type->description }}</textarea>
+                                </div>
+                            </div>
+                        </form>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
 {{-- Вопросы и ответы --}}
 <div class="row">
     <div class="col-12">
@@ -318,15 +372,36 @@
                     'X-Requested-With': 'XMLHttpRequest',
                 }
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok && response.status === 422) {
+                    // Ошибка валидации — парсим и показываем
+                    return response.json().then(data => {
+                        const errors = data.errors || {};
+                        const messages = Object.values(errors).flat().join('\n');
+                        alert('Ошибки валидации:\n' + (messages || data.message || 'Неизвестная ошибка'));
+                        throw new Error('VALIDATION_FAILED');
+                    });
+                }
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        console.error('Сервер ответил ошибкой:', text);
+                        alert('Ошибка сервера (' + response.status + '). Попробуйте позже.');
+                        throw new Error('SERVER_ERROR');
+                    });
+                }
+                return response.json();
+            })
             .then(data => {
-                if (data.success) {
+                if (data && data.success) {
                     alert(data.success);
-                } else {
-                    alert('Произошла ошибка при обновлении категории.');
                 }
             })
-            .catch(error => console.error('Ошибка:', error));
+            .catch(error => {
+                if (error.message !== 'VALIDATION_FAILED' && error.message !== 'SERVER_ERROR') {
+                    console.error('Ошибка:', error);
+                    alert('Произошла ошибка при обновлении категории.');
+                }
+            });
     });
 </script>
 
@@ -901,5 +976,110 @@
 
 
 
+
+{{-- CRUD: Типы установки --}}
+@if ($category->id === 16)
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.querySelector('.installation-types-container');
+    const slug = document.querySelector('.installation-types').dataset.categorySlug;
+    const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    function saveCard(card) {
+        const id = card.dataset.id;
+        const formData = new FormData(card);
+        const url = id
+            ? `/admin/categories/${slug}/installation-types/${id}`
+            : `/admin/categories/${slug}/installation-types`;
+
+        fetch(url, {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert(id ? 'Тип обновлён' : 'Тип создан');
+                if (!id && data.type) {
+                    card.dataset.id = data.type.id;
+                }
+            } else {
+                alert('Ошибка сохранения');
+            }
+        })
+        .catch(e => console.error('Ошибка:', e));
+    }
+
+    function deleteCard(card) {
+        const id = card.dataset.id;
+        if (!id) { card.remove(); return; }
+        if (!confirm('Удалить тип монтажа?')) return;
+
+        fetch(`/admin/categories/${slug}/installation-types/${id}`, {
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': token, 'Content-Type': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                card.remove();
+                alert('Удалено');
+            } else {
+                alert('Ошибка удаления');
+            }
+        })
+        .catch(e => console.error('Ошибка:', e));
+    }
+
+    function addNewCard() {
+        const card = document.createElement('form');
+        card.className = 'installation-type-card card mb-3 p-3';
+        card.innerHTML = `
+            <div class="row">
+                <div class="col-md-2">
+                    <label>Иконка (50x50)</label>
+                    <input name="image" type="file" class="form-control-file">
+                </div>
+                <div class="col-md-3">
+                    <label>Большое фото</label>
+                    <input name="detail_image" type="file" class="form-control-file">
+                </div>
+                <div class="col-md-3">
+                    <label>Заголовок</label>
+                    <input name="title" type="text" class="form-control">
+                </div>
+                <div class="col-md-1">
+                    <label>Порядок</label>
+                    <input name="sort_order" type="number" class="form-control" value="0">
+                </div>
+                <div class="col-md-3 d-flex align-items-end gap-2">
+                    <button class="btn btn-primary save-installation-type" type="button">Сохранить</button>
+                    <button class="btn btn-danger delete-installation-type" type="button">Удалить</button>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-12">
+                    <label>Описание (HTML)</label>
+                    <textarea name="description" class="form-control" rows="5"></textarea>
+                </div>
+            </div>`;
+        container.appendChild(card);
+    }
+
+    container.addEventListener('click', function(e) {
+        const card = e.target.closest('.installation-type-card');
+        if (!card) return;
+        if (e.target.classList.contains('save-installation-type')) {
+            saveCard(card);
+        } else if (e.target.classList.contains('delete-installation-type')) {
+            deleteCard(card);
+        }
+    });
+
+    document.querySelector('.add-installation-type').addEventListener('click', addNewCard);
+});
+</script>
+@endif
 
 <x-admin.footer></x-admin.footer>

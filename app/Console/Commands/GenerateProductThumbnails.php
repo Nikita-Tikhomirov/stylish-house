@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Product;
 use App\Services\ProductImageThumbnailService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Schema;
 
 class GenerateProductThumbnails extends Command
 {
@@ -12,17 +13,23 @@ class GenerateProductThumbnails extends Command
         {--category-id=* : Process only these category IDs}
         {--subcategory-id=* : Process only these subcategory IDs}
         {--product-id=* : Process only these product IDs}
-        {--width=600 : Thumbnail width}
-        {--height=600 : Thumbnail height}
+        {--start-id=0 : Process products with ID greater than this value}
+        {--width=400 : Thumbnail width}
+        {--height=400 : Thumbnail height}
         {--quality=82 : WebP quality (1-100)}
-        {--chunk=200 : Chunk size}
+        {--chunk=50 : Chunk size}
         {--limit=0 : Max products to process}
-        {--only-missing : Skip products if thumbnail already exists}
-        {--force : Regenerate existing thumbnails}
+        {--sleep=50 : Milliseconds to sleep after each product}
+        {--max-seconds=0 : Stop gracefully after this many seconds}
+        {--only-missing : Skip products if thumbnail columns are already filled}
+        {--force : Regenerate existing thumbnail files}
+        {--skip-main : Do not process main product photos}
+        {--skip-fabric : Do not process fabric/material photos}
+        {--no-lock : Allow concurrent runs}
         {--dry-run : Do not write files, only show what would happen}
         {--report= : Save JSON report to storage/app/<path>.json}';
 
-    protected $description = 'Generate thumbnails for existing product images';
+    protected $description = 'Generate thumbnails for product main and material images';
 
     public function handle(ProductImageThumbnailService $thumbnailService): int
     {
@@ -31,17 +38,79 @@ class GenerateProductThumbnails extends Command
         $quality = min(100, max(1, (int)$this->option('quality')));
         $chunk = max(1, (int)$this->option('chunk'));
         $limit = max(0, (int)$this->option('limit'));
+        $sleepMs = max(0, (int)$this->option('sleep'));
+        $maxSeconds = max(0, (int)$this->option('max-seconds'));
+        $startId = max(0, (int)$this->option('start-id'));
         $onlyMissing = (bool)$this->option('only-missing');
         $force = (bool)$this->option('force');
         $dryRun = (bool)$this->option('dry-run');
+        $includeMain = !(bool)$this->option('skip-main');
+        $includeFabric = !(bool)$this->option('skip-fabric');
+        $canStoreThumbColumns = $this->canStoreThumbColumns();
 
+        if (!$includeMain && !$includeFabric) {
+            $this->error('Nothing selected: both --skip-main and --skip-fabric are enabled.');
+            return self::FAILURE;
+        }
+
+        $lockHandle = null;
+        if (!(bool)$this->option('no-lock')) {
+            $lockHandle = $this->acquireLock();
+            if (!$lockHandle) {
+                $this->error('Another thumbnail generation process is already running.');
+                return self::FAILURE;
+            }
+        }
+
+        try {
+            return $this->runGeneration(
+                $thumbnailService,
+                $width,
+                $height,
+                $quality,
+                $chunk,
+                $limit,
+                $sleepMs,
+                $maxSeconds,
+                $startId,
+                $onlyMissing,
+                $force,
+                $dryRun,
+                $includeMain,
+                $includeFabric,
+                $canStoreThumbColumns
+            );
+        } finally {
+            if ($lockHandle) {
+                flock($lockHandle, LOCK_UN);
+                fclose($lockHandle);
+            }
+        }
+    }
+
+    private function runGeneration(
+        ProductImageThumbnailService $thumbnailService,
+        int $width,
+        int $height,
+        int $quality,
+        int $chunk,
+        int $limit,
+        int $sleepMs,
+        int $maxSeconds,
+        int $startId,
+        bool $onlyMissing,
+        bool $force,
+        bool $dryRun,
+        bool $includeMain,
+        bool $includeFabric,
+        bool $canStoreThumbColumns
+    ): int {
+        $startedAt = microtime(true);
         $categoryIds = $this->sanitizeIds((array)$this->option('category-id'));
         $subcategoryIds = $this->sanitizeIds((array)$this->option('subcategory-id'));
         $productIds = $this->sanitizeIds((array)$this->option('product-id'));
 
-        $query = Product::query()
-            ->whereNotNull('image_path')
-            ->where('image_path', '<>', '');
+        $query = Product::query()->where('id', '>', $startId);
 
         if (!empty($categoryIds)) {
             $query->whereIn('category_id', $categoryIds);
@@ -55,6 +124,33 @@ class GenerateProductThumbnails extends Command
             $query->whereIn('id', $productIds);
         }
 
+        $query->where(function ($q) use ($includeMain, $includeFabric, $onlyMissing, $force, $canStoreThumbColumns) {
+            if ($includeMain) {
+                $q->where(function ($q2) use ($onlyMissing, $force, $canStoreThumbColumns) {
+                    $q2->whereNotNull('image_path')->where('image_path', '<>', '');
+
+                    if ($onlyMissing && !$force && $canStoreThumbColumns) {
+                        $q2->where(function ($q3) {
+                            $q3->whereNull('image_thumb_path')->orWhere('image_thumb_path', '');
+                        });
+                    }
+                });
+            }
+
+            if ($includeFabric) {
+                $method = $includeMain ? 'orWhere' : 'where';
+                $q->{$method}(function ($q2) use ($onlyMissing, $force, $canStoreThumbColumns) {
+                    $q2->whereNotNull('fabric_photo')->where('fabric_photo', '<>', '');
+
+                    if ($onlyMissing && !$force && $canStoreThumbColumns) {
+                        $q2->where(function ($q3) {
+                            $q3->whereNull('fabric_thumb_path')->orWhere('fabric_thumb_path', '');
+                        });
+                    }
+                });
+            }
+        });
+
         $totalAvailable = (clone $query)->count();
         $targetTotal = $limit > 0 ? min($limit, $totalAvailable) : $totalAvailable;
 
@@ -65,16 +161,28 @@ class GenerateProductThumbnails extends Command
 
         $this->info("Matched products: {$targetTotal}");
         $this->line('Settings: '
-            . "width={$width}, height={$height}, quality={$quality}, chunk={$chunk}, "
+            . "width={$width}, height={$height}, quality={$quality}, chunk={$chunk}, sleep_ms={$sleepMs}, "
+            . "start_id={$startId}, max_seconds={$maxSeconds}, "
+            . "main=" . ($includeMain ? 'yes' : 'no') . ', '
+            . "fabric=" . ($includeFabric ? 'yes' : 'no') . ', '
             . "only_missing=" . ($onlyMissing ? 'yes' : 'no') . ', '
             . "force=" . ($force ? 'yes' : 'no') . ', '
             . "dry_run=" . ($dryRun ? 'yes' : 'no'));
 
-        $processed = 0;
-        $generated = 0;
-        $skipped = 0;
-        $missingSource = 0;
-        $errors = 0;
+        $stats = [
+            'processed_products' => 0,
+            'last_product_id' => $startId,
+            'generated_main' => 0,
+            'generated_fabric' => 0,
+            'skipped_main' => 0,
+            'skipped_fabric' => 0,
+            'missing_source_main' => 0,
+            'missing_source_fabric' => 0,
+            'errors_main' => 0,
+            'errors_fabric' => 0,
+            'updated_db' => 0,
+            'stopped_by_time_limit' => false,
+        ];
         $errorItems = [];
 
         $bar = $this->output->createProgressBar($targetTotal);
@@ -85,57 +193,79 @@ class GenerateProductThumbnails extends Command
             $width,
             $height,
             $quality,
-            $onlyMissing,
             $force,
             $dryRun,
+            $sleepMs,
+            $maxSeconds,
+            $startedAt,
             $targetTotal,
-            &$processed,
-            &$generated,
-            &$skipped,
-            &$missingSource,
-            &$errors,
+            $includeMain,
+            $includeFabric,
+            $canStoreThumbColumns,
+            &$stats,
             &$errorItems,
             $bar
         ) {
             foreach ($products as $product) {
-                if ($processed >= $targetTotal) {
+                if ($stats['processed_products'] >= $targetTotal) {
                     return false;
                 }
 
-                if ($onlyMissing && !$force && $thumbnailService->hasThumbnailForPath($product->image_path)) {
-                    $processed++;
-                    $skipped++;
-                    $bar->advance();
-                    continue;
+                if ($maxSeconds > 0 && (microtime(true) - $startedAt) >= $maxSeconds) {
+                    $stats['stopped_by_time_limit'] = true;
+                    return false;
                 }
 
-                $result = $thumbnailService->generateForProduct($product, [
-                    'width' => $width,
-                    'height' => $height,
-                    'quality' => $quality,
-                    'force' => $force,
-                    'dry_run' => $dryRun,
-                ]);
+                $changed = false;
+                $stats['last_product_id'] = (int)$product->id;
 
-                $status = $result['status'] ?? 'unknown';
-
-                if ($status === 'generated' || $status === 'dry_run') {
-                    $generated++;
-                } elseif ($status === 'missing_source') {
-                    $missingSource++;
-                } elseif ($status === 'error') {
-                    $errors++;
-                    $errorItems[] = [
-                        'product_id' => $product->id,
-                        'image_path' => $product->image_path,
-                        'reason' => $result['reason'] ?? 'unknown_error',
-                    ];
-                } else {
-                    $skipped++;
+                if ($includeMain && !empty($product->image_path)) {
+                    $changed = $this->processImage(
+                        $thumbnailService,
+                        $product,
+                        'main',
+                        $product->image_path,
+                        'image_thumb_path',
+                        $width,
+                        $height,
+                        $quality,
+                        $force,
+                        $dryRun,
+                        $canStoreThumbColumns,
+                        $stats,
+                        $errorItems
+                    ) || $changed;
                 }
 
-                $processed++;
+                if ($includeFabric && !empty($product->fabric_photo)) {
+                    $changed = $this->processImage(
+                        $thumbnailService,
+                        $product,
+                        'fabric',
+                        $product->fabric_photo,
+                        'fabric_thumb_path',
+                        $width,
+                        $height,
+                        $quality,
+                        $force,
+                        $dryRun,
+                        $canStoreThumbColumns,
+                        $stats,
+                        $errorItems
+                    ) || $changed;
+                }
+
+                if ($changed && !$dryRun) {
+                    $product->save();
+                    $stats['updated_db']++;
+                }
+
+                $stats['processed_products']++;
                 $bar->advance();
+
+                if ($sleepMs > 0) {
+                    usleep($sleepMs * 1000);
+                }
             }
         });
 
@@ -145,22 +275,25 @@ class GenerateProductThumbnails extends Command
         $this->table(
             ['Metric', 'Value'],
             [
-                ['Processed', $processed],
-                ['Generated', $generated],
-                ['Skipped', $skipped],
-                ['Missing source', $missingSource],
-                ['Errors', $errors],
+                ['Processed products', $stats['processed_products']],
+                ['Last product ID', $stats['last_product_id']],
+                ['Generated main', $stats['generated_main']],
+                ['Generated fabric', $stats['generated_fabric']],
+                ['Skipped main', $stats['skipped_main']],
+                ['Skipped fabric', $stats['skipped_fabric']],
+                ['Missing source main', $stats['missing_source_main']],
+                ['Missing source fabric', $stats['missing_source_fabric']],
+                ['Errors main', $stats['errors_main']],
+                ['Errors fabric', $stats['errors_fabric']],
+                ['Updated DB rows', $stats['updated_db']],
+                ['Stopped by time limit', $stats['stopped_by_time_limit'] ? 'yes' : 'no'],
             ]
         );
 
         $reportPath = $this->option('report');
         if (is_string($reportPath) && $reportPath !== '') {
             $this->writeReport($reportPath, [
-                'processed' => $processed,
-                'generated' => $generated,
-                'skipped' => $skipped,
-                'missing_source' => $missingSource,
-                'errors' => $errors,
+                'stats' => $stats,
                 'filters' => [
                     'category_id' => $categoryIds,
                     'subcategory_id' => $subcategoryIds,
@@ -172,15 +305,111 @@ class GenerateProductThumbnails extends Command
                     'quality' => $quality,
                     'chunk' => $chunk,
                     'limit' => $limit,
+                    'sleep_ms' => $sleepMs,
+                    'max_seconds' => $maxSeconds,
+                    'start_id' => $startId,
                     'only_missing' => $onlyMissing,
                     'force' => $force,
                     'dry_run' => $dryRun,
+                    'include_main' => $includeMain,
+                    'include_fabric' => $includeFabric,
                 ],
                 'error_items' => $errorItems,
             ]);
         }
 
+        if ($stats['stopped_by_time_limit']) {
+            $this->warn('Stopped by time limit. Resume with --start-id=' . $stats['last_product_id']);
+        }
+
         return self::SUCCESS;
+    }
+
+    private function processImage(
+        ProductImageThumbnailService $thumbnailService,
+        Product $product,
+        string $type,
+        string $sourcePath,
+        string $thumbColumn,
+        int $width,
+        int $height,
+        int $quality,
+        bool $force,
+        bool $dryRun,
+        bool $canStoreThumbColumns,
+        array &$stats,
+        array &$errorItems
+    ): bool {
+        $result = $thumbnailService->generateFromPath($sourcePath, [
+            'width' => $width,
+            'height' => $height,
+            'quality' => $quality,
+            'force' => $force,
+            'dry_run' => $dryRun,
+        ]);
+
+        $status = $result['status'] ?? 'unknown';
+        $changed = false;
+
+        if ($status === 'generated' || $status === 'dry_run') {
+            $stats["generated_{$type}"]++;
+        } elseif ($status === 'missing_source') {
+            $stats["missing_source_{$type}"]++;
+            $errorItems[] = [
+                'product_id' => $product->id,
+                'type' => $type,
+                'source_path' => $sourcePath,
+                'reason' => $result['reason'] ?? 'source_not_found',
+            ];
+        } elseif ($status === 'error') {
+            $stats["errors_{$type}"]++;
+            $errorItems[] = [
+                'product_id' => $product->id,
+                'type' => $type,
+                'source_path' => $sourcePath,
+                'reason' => $result['reason'] ?? 'unknown_error',
+            ];
+        } else {
+            $stats["skipped_{$type}"]++;
+        }
+
+        if ($canStoreThumbColumns && !$dryRun && in_array($status, ['generated', 'skipped'], true) && !empty($result['thumbnail_public_path']) && $product->{$thumbColumn} !== $result['thumbnail_public_path']) {
+            $product->{$thumbColumn} = $result['thumbnail_public_path'];
+            $changed = true;
+        }
+
+        return $changed;
+    }
+
+    private function canStoreThumbColumns(): bool
+    {
+        return Schema::hasColumn('products', 'image_thumb_path')
+            && Schema::hasColumn('products', 'fabric_thumb_path');
+    }
+
+    private function acquireLock()
+    {
+        $lockPath = storage_path('framework/product-thumbnails.lock');
+        $dir = dirname($lockPath);
+
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+
+        $handle = fopen($lockPath, 'c');
+        if (!$handle) {
+            return null;
+        }
+
+        if (!flock($handle, LOCK_EX | LOCK_NB)) {
+            fclose($handle);
+            return null;
+        }
+
+        ftruncate($handle, 0);
+        fwrite($handle, (string)getmypid());
+
+        return $handle;
     }
 
     private function sanitizeIds(array $raw): array
@@ -220,4 +449,3 @@ class GenerateProductThumbnails extends Command
         return storage_path('app/' . ltrim($path, '/'));
     }
 }
-

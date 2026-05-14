@@ -23,6 +23,8 @@ use Illuminate\Support\Facades\Log;
 
 use Illuminate\Http\Request;
 use App\Models\WorkExample;
+use App\Models\SubcategoryInstallationType;
+use Illuminate\Support\Facades\Storage;
 
 class CategoryController extends Controller
 {
@@ -190,8 +192,12 @@ class CategoryController extends Controller
         $relatedCategories = $relatedItems['categories'];
         $relatedSubcategories = $relatedItems['subcategories'];
 
+        $installationTypes = SubcategoryInstallationType::where('category_id', $category->id)
+            ->orderBy('sort_order')
+            ->get();
+
         if ($category->id === 16) {
-            return view('front.categoryrolstavni', compact('category', 'reviews', 'homePageFields', 'iconCards', 'categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'subcatsForSlider', 'subcategoriesWithProducts', 'faqs', 'videoReviews', 'workExamples', 'filterProduts', 'models', 'filterColors', 'cart', 'firstProduct', 'sameModelProducts', 'materials', 'headerInfo', 'curtainSubcats', 'blindSubcats', 'relatedCategories', 'relatedSubcategories', 'maxFilterPrice'));
+            return view('front.categoryrolstavni', compact('category', 'reviews', 'homePageFields', 'iconCards', 'categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'subcatsForSlider', 'subcategoriesWithProducts', 'faqs', 'videoReviews', 'workExamples', 'filterProduts', 'models', 'filterColors', 'cart', 'firstProduct', 'sameModelProducts', 'materials', 'headerInfo', 'curtainSubcats', 'blindSubcats', 'relatedCategories', 'relatedSubcategories', 'maxFilterPrice', 'installationTypes'));
         } else {
             return view('front.category', compact('category', 'reviews', 'homePageFields', 'iconCards', 'categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'subcatsForSlider', 'subcategoriesWithProducts', 'faqs', 'videoReviews', 'workExamples', 'filterProduts', 'models', 'filterColors', 'cart', 'firstProduct', 'sameModelProducts', 'materials', 'headerInfo', 'curtainSubcats', 'blindSubcats', 'relatedCategories', 'relatedSubcategories', 'maxFilterPrice'));
         }
@@ -226,8 +232,11 @@ class CategoryController extends Controller
         $subcategories = Subcategory::all();
         $categories = Category::all();
         $relatedIds = $category->related_items_ids ?? []; // Получаем связанные ID
+        $installationTypes = SubcategoryInstallationType::where('category_id', $category->id)
+            ->orderBy('sort_order')
+            ->get();
 
-        return view('admin.catEdit', compact('category', 'videoReviews', 'workExamples', 'faqs', 'subcategory', 'subcategories', 'categories', 'relatedIds'));
+        return view('admin.catEdit', compact('category', 'videoReviews', 'workExamples', 'faqs', 'subcategory', 'subcategories', 'categories', 'relatedIds', 'installationTypes'));
     }
 
 
@@ -246,10 +255,10 @@ class CategoryController extends Controller
             'title' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:categories,slug',
             'description' => 'nullable|string',
-            'img' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
+            'img' => 'nullable',
             'first_screen_text' => 'required|string|max:255',
             'titleh1' => 'required|string|max:255',
-            'subcat_title' => 'string|max:255',
+            'subcat_title' => 'nullable|string|max:255',
         ]);
 
         // Создаем новую категорию с данными, кроме изображения
@@ -280,44 +289,19 @@ class CategoryController extends Controller
     // Метод обновления категории
     public function update(Request $request, $slug)
     {
-        // $request->validate([
-        //     'id' => 'required|exists:work_examples,id',
-        //     'title' => 'required|string|max:255',
-        //     'description' => 'nullable|string',
-        //     'category_id' => 'required|exists:categories,id',
-        //     'subcategory_id' => 'nullable|exists:subcategories,id',
-        // ]);
-
-        // $workExample = WorkExample::findOrFail($request->input('id'));
-
-        // // Убедитесь, что работа принадлежит текущей категории или подкатегории
-        // if (
-        //     $workExample->category_id != $request->input('category_id') ||
-        //     ($request->input('subcategory_id') && $workExample->subcategory_id != $request->input('subcategory_id'))
-        // ) {
-        //     return response()->json(['error' => 'Вы не можете обновить эту работу.'], 403);
-        // }
-
-        // $workExample->title = $request->input('title');
-        // $workExample->description = $request->input('description');
-        // $workExample->save();
-
-        // return response()->json(['success' => 'Работа успешно обновлена.']);
-
+        // Находим категорию до валидации, чтобы использовать её id в unique-правиле
+        $category = Category::where('slug', $slug)->firstOrFail();
 
         $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'slug' => 'required|string|max:255|unique:subcategories,slug,' . $slug . ',slug',
+            'slug' => 'required|string|max:255|unique:categories,slug,' . $category->id,
             'titleh1' => 'nullable|string|max:255',
             'first_screen_text' => 'nullable|string',
-            'img' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp,svg|max:2048',
-            'subcat_title' => 'string|max:255',
+            'img' => 'nullable',
+            'subcat_title' => 'nullable|string|max:255',
             'faq' => 'nullable|string',
         ]);
-
-        // Находим категорию и подкатегорию
-        $category = Category::where('slug', $slug)->firstOrFail();
 
 
         // Обновление полей подкатегории
@@ -331,8 +315,20 @@ class CategoryController extends Controller
 
         // Если загружено изображение, обработать его
         if ($request->hasFile('img')) {
-            $imagePath = $request->file('img')->store('categories', 'public');
+            $file = $request->file('img');
+            Log::info('Uploading image', [
+                'original_name' => $file->getClientOriginalName(),
+                'size' => $file->getSize(),
+                'mime' => $file->getMimeType(),
+            ]);
+            $imagePath = $file->store('categories', 'public');
             $category->img = $imagePath;
+            Log::info('Image stored', ['path' => $imagePath]);
+        } else {
+            Log::warning('No image file in request', [
+                'has_img' => $request->has('img'),
+                'all_files' => $request->allFiles(),
+            ]);
         }
 
         // Сохраняем подкатегорию
@@ -473,8 +469,104 @@ class CategoryController extends Controller
         }
     }
 
+    // ============================================================
+    // CRUD: Типы установки (installation types) для категорий
+    // ============================================================
 
+    public function installationTypes($slug)
+    {
+        $category = Category::where('slug', $slug)->firstOrFail();
+        $types = SubcategoryInstallationType::where('category_id', $category->id)
+            ->orderBy('sort_order')
+            ->get();
 
+        return response()->json(['types' => $types]);
+    }
 
+    public function storeInstallationType(Request $request, $slug)
+    {
+        $category = Category::where('slug', $slug)->firstOrFail();
+
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'image' => 'nullable|image|max:20480',
+            'detail_image' => 'nullable|image|max:20480',
+            'sort_order' => 'nullable|integer|min:0',
+        ]);
+
+        $data = [
+            'category_id' => $category->id,
+            'title' => $request->title,
+            'description' => $request->description,
+            'sort_order' => (int) ($request->sort_order ?? 0),
+        ];
+
+        if ($request->hasFile('image')) {
+            $data['image'] = $request->file('image')->store('installation_types', 'public');
+        }
+        if ($request->hasFile('detail_image')) {
+            $data['detail_image'] = $request->file('detail_image')->store('installation_types', 'public');
+        }
+
+        $type = SubcategoryInstallationType::create($data);
+
+        return response()->json(['success' => true, 'type' => $type]);
+    }
+
+    public function updateInstallationType(Request $request, $slug, $id)
+    {
+        $category = Category::where('slug', $slug)->firstOrFail();
+        $type = SubcategoryInstallationType::where('id', $id)
+            ->where('category_id', $category->id)
+            ->firstOrFail();
+
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'image' => 'nullable|image|max:20480',
+            'detail_image' => 'nullable|image|max:20480',
+            'sort_order' => 'nullable|integer|min:0',
+        ]);
+
+        $type->title = $request->title;
+        $type->description = $request->description;
+        $type->sort_order = (int) ($request->sort_order ?? 0);
+
+        if ($request->hasFile('image')) {
+            if ($type->image) {
+                Storage::disk('public')->delete($type->image);
+            }
+            $type->image = $request->file('image')->store('installation_types', 'public');
+        }
+        if ($request->hasFile('detail_image')) {
+            if ($type->detail_image) {
+                Storage::disk('public')->delete($type->detail_image);
+            }
+            $type->detail_image = $request->file('detail_image')->store('installation_types', 'public');
+        }
+
+        $type->save();
+
+        return response()->json(['success' => true, 'type' => $type]);
+    }
+
+    public function destroyInstallationType($slug, $id)
+    {
+        $category = Category::where('slug', $slug)->firstOrFail();
+        $type = SubcategoryInstallationType::where('id', $id)
+            ->where('category_id', $category->id)
+            ->firstOrFail();
+
+        if ($type->image) {
+            Storage::disk('public')->delete($type->image);
+        }
+        if ($type->detail_image) {
+            Storage::disk('public')->delete($type->detail_image);
+        }
+        $type->delete();
+
+        return response()->json(['success' => true]);
+    }
 
 }
