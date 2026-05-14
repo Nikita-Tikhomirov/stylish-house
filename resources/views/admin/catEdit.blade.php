@@ -217,7 +217,58 @@
                             <div class="row mt-2">
                                 <div class="col-12">
                                     <label>Описание (HTML)</label>
-                                    <textarea name="description" class="form-control" rows="5">{{ $type->description }}</textarea>
+                                    <div class="quill-editor installation-desc-editor" style="min-height:150px;">{!! $type->description !!}</div>
+                                    <input type="hidden" name="description" value="{{ $type->description }}">
+                                </div>
+                            </div>
+                        </form>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Системы управления рольставнями (только для категории id=16) --}}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <h5 class="card-header">Системы управления рольставнями</h5>
+            <div class="card-body roller-shutter-systems" data-category-slug="{{ $category->slug }}">
+                <button class="btn btn-primary add-roller-system mb-3">Добавить систему</button>
+                <div class="roller-systems-container">
+                    @foreach ($rollerShutterSystems as $system)
+                        <form class="roller-system-card card mb-3 p-3" data-id="{{ $system->id }}">
+                            <div class="row">
+                                <div class="col-md-2">
+                                    <label>Изображение</label>
+                                    <input name="image" type="file" class="form-control-file">
+                                    @if ($system->image)
+                                        <img src="{{ Storage::url($system->image) }}" style="max-width:100px; margin-top:5px;">
+                                    @endif
+                                </div>
+                                <div class="col-md-3">
+                                    <label>Название системы</label>
+                                    <input name="title" type="text" class="form-control" value="{{ $system->title }}">
+                                </div>
+                                <div class="col-md-1">
+                                    <label>Порядок</label>
+                                    <input name="sort_order" type="number" class="form-control" value="{{ $system->sort_order }}">
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end gap-2">
+                                    <button class="btn btn-primary save-roller-system" type="button">Сохранить</button>
+                                    <button class="btn btn-danger delete-roller-system" type="button">Удалить</button>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-md-6">
+                                    <label>Описание (HTML)</label>
+                                    <div class="quill-editor system-desc-editor" style="min-height:150px;">{!! $system->description !!}</div>
+                                    <input type="hidden" name="description" value="{{ $system->description }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label>Список компонентов (по одному на строку)</label>
+                                    <textarea name="components" class="form-control" rows="5">{{ $system->components }}</textarea>
                                 </div>
                             </div>
                         </form>
@@ -985,8 +1036,54 @@ document.addEventListener('DOMContentLoaded', function() {
     const slug = document.querySelector('.installation-types').dataset.categorySlug;
     const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
+    // Quill instances registry
+    const quillInstances = [];
+
+    function initQuillInCard(card) {
+        const editors = card.querySelectorAll('.quill-editor');
+        editors.forEach(function(editorDiv) {
+            // Skip if already initialized
+            if (editorDiv.classList.contains('ql-container')) return;
+            if (editorDiv.querySelector('.ql-editor')) return;
+
+            const hiddenInput = card.querySelector('input[type="hidden"][name="description"]');
+            const initialContent = hiddenInput ? hiddenInput.value : '';
+
+            const quill = new Quill(editorDiv, {
+                modules: {
+                    toolbar: [
+                        ['bold', 'italic', 'underline', 'strike'],
+                        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                        [{ 'header': [1, 2, 3, false] }],
+                        ['link', 'clean']
+                    ]
+                },
+                theme: 'snow'
+            });
+
+            // Set initial content from hidden input
+            if (initialContent) {
+                quill.root.innerHTML = initialContent;
+            }
+
+            quillInstances.push({ quill: quill, card: card, hiddenInput: hiddenInput });
+        });
+    }
+
+    function syncQuillToHidden(card) {
+        quillInstances.forEach(function(entry) {
+            if (entry.card === card && entry.hiddenInput) {
+                entry.hiddenInput.value = entry.quill.root.innerHTML;
+            }
+        });
+    }
+
+    // Init existing cards
+    document.querySelectorAll('.installation-type-card').forEach(initQuillInCard);
+
     function saveCard(card) {
         const id = card.dataset.id;
+        syncQuillToHidden(card);
         const formData = new FormData(card);
         const url = id
             ? `/admin/categories/${slug}/installation-types/${id}`
@@ -1061,10 +1158,12 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="row mt-2">
                 <div class="col-12">
                     <label>Описание (HTML)</label>
-                    <textarea name="description" class="form-control" rows="5"></textarea>
+                    <div class="quill-editor installation-desc-editor" style="min-height:150px;"></div>
+                    <input type="hidden" name="description" value="">
                 </div>
             </div>`;
         container.appendChild(card);
+        initQuillInCard(card);
     }
 
     container.addEventListener('click', function(e) {
@@ -1079,6 +1178,144 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.querySelector('.add-installation-type').addEventListener('click', addNewCard);
 });
+
+// CRUD: Системы управления рольставнями
+(function() {
+    const sysContainer = document.querySelector('.roller-systems-container');
+    const sysSlug = document.querySelector('.roller-shutter-systems')?.dataset.categorySlug;
+    const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    if (!sysContainer || !sysSlug) return;
+
+    // Quill instances for systems
+    const sysQuillInstances = [];
+
+    function initQuillInSystemCard(card) {
+        const editors = card.querySelectorAll('.quill-editor');
+        editors.forEach(function(editorDiv) {
+            if (editorDiv.classList.contains('ql-container')) return;
+            if (editorDiv.querySelector('.ql-editor')) return;
+
+            const hiddenInput = card.querySelector('input[type="hidden"][name="description"]');
+            const initialContent = hiddenInput ? hiddenInput.value : '';
+
+            const quill = new Quill(editorDiv, {
+                modules: {
+                    toolbar: [
+                        ['bold', 'italic', 'underline', 'strike'],
+                        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                        [{ 'header': [1, 2, 3, false] }],
+                        ['link', 'clean']
+                    ]
+                },
+                theme: 'snow'
+            });
+
+            if (initialContent) {
+                quill.root.innerHTML = initialContent;
+            }
+
+            sysQuillInstances.push({ quill: quill, card: card, hiddenInput: hiddenInput });
+        });
+    }
+
+    function syncSystemQuillToHidden(card) {
+        sysQuillInstances.forEach(function(entry) {
+            if (entry.card === card && entry.hiddenInput) {
+                entry.hiddenInput.value = entry.quill.root.innerHTML;
+            }
+        });
+    }
+
+    // Init existing system cards
+    document.querySelectorAll('.roller-system-card').forEach(initQuillInSystemCard);
+
+    function saveSystem(card) {
+        const id = card.dataset.id;
+        syncSystemQuillToHidden(card);
+        const formData = new FormData(card);
+        const url = id
+            ? `/admin/categories/${sysSlug}/roller-shutter-systems/${id}`
+            : `/admin/categories/${sysSlug}/roller-shutter-systems`;
+
+        fetch(url, {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert(id ? 'Система обновлена' : 'Система создана');
+                if (!id && data.system) card.dataset.id = data.system.id;
+            } else {
+                alert('Ошибка сохранения');
+            }
+        })
+        .catch(e => console.error('Ошибка:', e));
+    }
+
+    function deleteSystem(card) {
+        const id = card.dataset.id;
+        if (!id) { card.remove(); return; }
+        if (!confirm('Удалить систему?')) return;
+        fetch(`/admin/categories/${sysSlug}/roller-shutter-systems/${id}`, {
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': token, 'Content-Type': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) { card.remove(); alert('Удалено'); }
+            else alert('Ошибка удаления');
+        })
+        .catch(e => console.error('Ошибка:', e));
+    }
+
+    function addNewSystem() {
+        const card = document.createElement('form');
+        card.className = 'roller-system-card card mb-3 p-3';
+        card.innerHTML = `
+            <div class="row">
+                <div class="col-md-2">
+                    <label>Изображение</label>
+                    <input name="image" type="file" class="form-control-file">
+                </div>
+                <div class="col-md-3">
+                    <label>Название системы</label>
+                    <input name="title" type="text" class="form-control">
+                </div>
+                <div class="col-md-1">
+                    <label>Порядок</label>
+                    <input name="sort_order" type="number" class="form-control" value="0">
+                </div>
+                <div class="col-md-3 d-flex align-items-end gap-2">
+                    <button class="btn btn-primary save-roller-system" type="button">Сохранить</button>
+                    <button class="btn btn-danger delete-roller-system" type="button">Удалить</button>
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-md-6">
+                    <label>Описание (HTML)</label>
+                    <div class="quill-editor system-desc-editor" style="min-height:150px;"></div>
+                    <input type="hidden" name="description" value="">
+                </div>
+                <div class="col-md-6">
+                    <label>Список компонентов (по одному на строку)</label>
+                    <textarea name="components" class="form-control" rows="5"></textarea>
+                </div>
+            </div>`;
+        sysContainer.appendChild(card);
+        initQuillInSystemCard(card);
+    }
+
+    sysContainer.addEventListener('click', function(e) {
+        const card = e.target.closest('.roller-system-card');
+        if (!card) return;
+        if (e.target.classList.contains('save-roller-system')) saveSystem(card);
+        else if (e.target.classList.contains('delete-roller-system')) deleteSystem(card);
+    });
+
+    document.querySelector('.add-roller-system')?.addEventListener('click', addNewSystem);
+})();
 </script>
 @endif
 
