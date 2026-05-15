@@ -1,2 +1,6 @@
 *
 !.gitignore
+!installation_types/
+installation_types/*
+!installation_types/rolstavni/
+!installation_types/rolstavni/*.png
