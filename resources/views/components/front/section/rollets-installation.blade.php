@@ -1,6 +1,18 @@
 @props(['installationTypes' => []])
 @php
     use Illuminate\Support\Facades\Storage;
+
+    $installationImageUrl = static function (?string $path): string {
+        if (!$path) {
+            return '';
+        }
+
+        $version = Storage::disk('public')->exists($path)
+            ? '?v=' . Storage::disk('public')->lastModified($path)
+            : '';
+
+        return Storage::url($path) . $version;
+    };
 @endphp
 
 <div class="s-rollets-installation wrapper">
@@ -16,7 +28,7 @@
         <div class="accardion__title">
             <div class="accardion__title-img">
                 @if ($type->image)
-                    <img src="{{ Storage::url($type->image) }}" alt="{{ $type->title }}" />
+                    <img src="{{ $installationImageUrl($type->image) }}" alt="{{ $type->title }}" />
                 @endif
             </div>
             <div class="accardion__title-text">{{ $type->title }}</div>
@@ -24,9 +36,9 @@
         <div class="accardion__content">
             <div class="accardion__content-img">
                 @if ($type->detail_image)
-                    <img src="{{ Storage::url($type->detail_image) }}" alt="{{ $type->title }}" />
+                    <img src="{{ $installationImageUrl($type->detail_image) }}" alt="{{ $type->title }}" />
                 @elseif ($type->image)
-                    <img src="{{ Storage::url($type->image) }}" alt="{{ $type->title }}" />
+                    <img src="{{ $installationImageUrl($type->image) }}" alt="{{ $type->title }}" />
                 @endif
             </div>
             <div class="accardion__content-text">
@@ -50,6 +62,16 @@
     }
     .s-rollets-installation .accardionJs + .accardionJs{
         margin-top: 18px;
+    }
+    .s-rollets-installation .accardionJs::before{
+        top: 61px;
+        right: 28px;
+        z-index: 3;
+    }
+    .s-rollets-installation .accardionJs::after{
+        top: 53px;
+        right: 35px;
+        z-index: 3;
     }
     .s-rollets-installation .accardionJs p{
         background-color: transparent;
@@ -144,7 +166,15 @@
         .s-rollets-installation .accardion__title{
             min-height: auto;
             gap: 14px;
-            padding: 12px;
+            padding: 12px 48px 12px 12px;
+        }
+        .s-rollets-installation .accardionJs::before{
+            top: 47px;
+            right: 20px;
+        }
+        .s-rollets-installation .accardionJs::after{
+            top: 39px;
+            right: 27px;
         }
         .s-rollets-installation .accardion__title-img{
             width: 74px;
