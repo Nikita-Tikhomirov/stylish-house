@@ -4,3 +4,7 @@
 installation_types/*
 !installation_types/rolstavni/
 !installation_types/rolstavni/*.png
+!roller_shutter_systems/
+roller_shutter_systems/*
+!roller_shutter_systems/rolstavni/
+!roller_shutter_systems/rolstavni/*.png

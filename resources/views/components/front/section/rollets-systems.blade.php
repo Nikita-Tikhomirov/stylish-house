@@ -1,196 +1,131 @@
+@props(['systems' => []])
+@php
+    use Illuminate\Support\Facades\Storage;
+
+    $systemImageUrl = static function (?string $path): string {
+        if (!$path) {
+            return '';
+        }
+
+        $version = Storage::disk('public')->exists($path)
+            ? '?v=' . Storage::disk('public')->lastModified($path)
+            : '';
+
+        return Storage::url($path) . $version;
+    };
+
+    $componentLines = static function (?string $components): array {
+        if (!$components) {
+            return [];
+        }
+
+        return collect(preg_split('/\R/u', trim($components)))
+            ->map(static fn ($line) => trim(preg_replace('/^\s*\d+[\.\)]\s*/u', '', $line)))
+            ->filter()
+            ->values()
+            ->all();
+    };
+@endphp
 <div class="s-rollets-systems wrapper">
-    <h2 class="s-rollets-systems__title title"> <span>Системы управления рольставнями</span><svg width="114" height="35" viewBox="0 0 114 35" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <h2 class="s-rollets-systems__title title"> <span>Варианты управления рольставнями</span><svg width="114" height="35" viewBox="0 0 114 35" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M112 23.275C1.84952 -10.6834 -7.36586 1.48086 7.50443 32.9053" stroke="currentColor" stroke-width="4" stroke-miterlimit="3.8637" stroke-linecap="round"></path>
     </svg></h2>
 
     <div class="tabs tabsWrapJs s-seo">
+        @if ($systems->isNotEmpty())
         <div class="tabs__nav tabsNavJs">
-            <div class="tabs__link">ПИМ</div>
-            <div class="tabs__link">Ленточно-шнуровая</div>
-            <div class="tabs__link">Тросовая система</div>
-            <div class="tabs__link">Карданная система</div>
+            @foreach ($systems as $system)
+                <div class="tabs__link">{{ $system->title }}</div>
+            @endforeach
         </div>
 
         <div class="tabs__container tabsJs">
-            <div class="tabs__item">
-                <div class="tabs__content">
-                    <div class="tabs__img">
-                        <img src="img/pim-system.jpg" alt="Пружинно-инерционная система управления" />
-                    </div>
-                    <div class="tabs__text">
-                        <h3>ПИМ - Пружинно-инерционная система управления</h3>
-                        <p>Пружинно-инерционная система управления (ПИМ) является одним из самых распространенных и надежных способов управления рольставнями. Система обеспечивает плавное и равномерное движение полотна благодаря использованию пружинного механизма с инерционным элементом.</p>
-                        <ol>
-                            <li>Боковая панель короба</li>
-                            <li>Ограничительная пластина</li>
-                            <li>Подшипниковый узел</li>
-                            <li>Универсальный капсульный элемент</li>
-                            <li>Октогональный вал</li>
-                            <li>Защитный короб</li>
-                            <li>Тяговая пружина</li>
-                            <li>Механизм пружинно-инерционного типа</li>
-                            <li>Монтажная (крепёжная) пластина</li>
-                            <li>Направляющая рейка</li>
-                            <li>Торцевая заглушка</li>
-                            <li>Запорная полоса</li>
-                            <li>Краевой (концевой) профиль</li>
-                            <li>Фиксатор</li>
-                            <li>Ригельный замковый механизм</li>
-                        </ol>
+            @foreach ($systems as $system)
+                <div class="tabs__item">
+                    <div class="tabs__content">
+                        <div class="tabs__img">
+                            @if ($system->image)
+                                <img src="{{ $systemImageUrl($system->image) }}" alt="{{ $system->title }}" />
+                            @endif
+                        </div>
+                        <div class="tabs__text">
+                            <h3>{{ $system->title }}</h3>
+                            @if ($system->description)
+                                <div class="tabs__description">{!! $system->description !!}</div>
+                            @endif
+                            @php($components = $componentLines($system->components))
+                            @if (!empty($components))
+                                <ol class="tabs__components">
+                                    @foreach ($components as $component)
+                                        <li>{{ $component }}</li>
+                                    @endforeach
+                                </ol>
+                            @endif
+                        </div>
                     </div>
                 </div>
-            </div>
-
-            <div class="tabs__item">
-                <div class="tabs__content">
-                    <div class="tabs__img">
-                        <img src="img/lentochno-shnurovaya.jpg" alt="Ленточно-шнуровая система управления" />
-                    </div>
-                    <div class="tabs__text">
-                        <h3>Ленточно-шнуровая система управления</h3>
-                        <p>Ленточно-шнуровая система управления сочетает в себе удобство ленточного привода и надежность шнурового механизма. Такая система обеспечивает легкое управление рольставнями и подходит для проемов различных размеров.</p>
-                        <ol>
-                            <li>Боковая панель защитного короба</li>
-                            <li>Направляющий узел</li>
-                            <li>Подшипниковый элемент</li>
-                            <li>Универсальная капсула</li>
-                            <li>Вал восьмигранного сечения</li>
-                            <li>Корпус защитного типа</li>
-                            <li>Пружина тягового действия</li>
-                            <li>Направляющий шкив</li>
-                            <li>Передающий шкив</li>
-                            <li>Пружина защитного назначения</li>
-                            <li>Элемент направления шнура</li>
-                            <li>Направляющая рейка</li>
-                            <li>Торцевая заглушка</li>
-                            <li>Боковой замковый механизм</li>
-                            <li>Запорная планка</li>
-                            <li>Торцевой профиль</li>
-                            <li>Фиксирующий элемент</li>
-                            <li>Ригельный замок</li>
-                            <li>Направляющий элемент для ленты</li>
-                            <li>Управляющая лента</li>
-                            <li>Управляющий шнур</li>
-                            <li>Универсальный инерционный укладчик</li>
-                        </ol>
-                    </div>
-                </div>
-            </div>
-
-            <div class="tabs__item">
-                <div class="tabs__content">
-                    <div class="tabs__img">
-                        <img src="img/trosovaya-sistema.jpg" alt="Тросовая система управления с кордовым приводом" />
-                    </div>
-                    <div class="tabs__text">
-                        <h3>Тросовая система управления с кордовым приводом</h3>
-                        <p>Тросовая система с кордовым приводом представляет собой современное решение для управления рольставнями, обеспечивающее высокую надежность и долговечность. Система идеально подходит для больших и тяжелых конструкций.</p>
-                        <ol>
-                            <li>Боковая панель короба</li>
-                            <li>Направляющий механизм</li>
-                            <li>Подшипниковый узел</li>
-                            <li>Универсальный капсульный элемент</li>
-                            <li>Вал восьмигранного (октогонального) профиля</li>
-                            <li>Защитный короб</li>
-                            <li>Пружина тягового типа</li>
-                            <li>Передающий шкив</li>
-                            <li>Элемент направления корда</li>
-                            <li>Защитная трубка</li>
-                            <li>Направляющая рейка</li>
-                            <li>Торцевая заглушка</li>
-                            <li>Боковой замковый узел</li>
-                            <li>Запорная полоса</li>
-                            <li>Концевой профиль</li>
-                            <li>Фиксатор</li>
-                            <li>Ригельный замковый механизм</li>
-                            <li>Корпусной элемент</li>
-                            <li>Кордовая направляющая</li>
-                            <li>Редукторный укладчик троса</li>
-                            <li>Ручка управления</li>
-                        </ol>
-                    </div>
-                </div>
-            </div>
-
-            <div class="tabs__item">
-                <div class="tabs__content">
-                    <div class="tabs__img">
-                        <img src="img/kardannaya-sistema.jpg" alt="Карданная система управления с воротковым приводом" />
-                    </div>
-                    <div class="tabs__text">
-                        <h3>Карданная система управления с воротковым приводом</h3>
-                        <p>Карданная система с воротковым приводом является одной из самых технологичных и удобных систем управления рольставнями. Использование карданного механизма обеспечивает плавную передачу усилия и минимальное сопротивление при движении полотна.</p>
-                        <ol>
-                            <li>Боковая панель защитного короба</li>
-                            <li>Направляющий узел</li>
-                            <li>Подшипниковый элемент</li>
-                            <li>Капсульный компонент</li>
-                            <li>Вал восьмигранного сечения</li>
-                            <li>Пружина тягового действия</li>
-                            <li>Корпус защитного типа</li>
-                            <li>Вставка INS</li>
-                            <li>Редукторный механизм</li>
-                            <li>Направляющая рейка</li>
-                            <li>Торцевая заглушка</li>
-                            <li>Боковой замковый механизм</li>
-                            <li>Запорная планка</li>
-                            <li>Фиксирующий элемент</li>
-                            <li>Ригельный замок</li>
-                            <li>Торцевой профиль</li>
-                            <li>Карданный шарнир</li>
-                            <li>Пружинная клипса</li>
-                            <li>Воротковая рукоять</li>
-                        </ol>
-                    </div>
-                </div>
-            </div>
+            @endforeach
         </div>
+        @else
+            <p>Нет данных о системах управления.</p>
+        @endif
     </div>
 </div>
 
 <style>
-    /* Basic tabs styles */
-    .tabs__nav {
+    .s-rollets-systems {
+        padding-top: 60px;
+    }
+
+    .s-rollets-systems .tabs {
+        background: #fff;
+    }
+
+    .s-rollets-systems .tabs__nav {
         display: flex;
-        border-bottom: 2px solid #0989ff;
-        margin-bottom: 30px;
-        gap: 0;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 24px;
+        border-bottom: 1px solid #dfe4ea;
     }
     
-    .tabs__link {
-        padding: 15px 25px;
+    .s-rollets-systems .tabs__link {
+        min-height: 48px;
+        padding: 13px 22px;
         cursor: pointer;
         border: none;
-        background: transparent;
-        color: #555;
-        font-weight: 500;
+        border-radius: 6px 6px 0 0;
+        background: #f7f9fb;
+        color: #374151;
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.2;
         transition: all 0.3s ease;
         border-bottom: 3px solid transparent;
-        margin-bottom: -2px;
+        margin-bottom: -1px;
     }
     
-    .tabs__link:hover {
+    .s-rollets-systems .tabs__link:hover {
         color: #0989ff;
-        background: rgba(9, 136, 255, 0.1);
+        background: #eef7ff;
     }
     
-    .tabs__link.active {
+    .s-rollets-systems .tabs__link.active {
         color: #0989ff;
         border-bottom: 3px solid #0989ff;
-        background: rgba(9, 136, 255, 0.1);
-        font-weight: 600;
+        background: #eef7ff;
     }
     
-    .tabs__container {
+    .s-rollets-systems .tabs__container {
         position: relative;
     }
     
-    .tabs__item {
+    .s-rollets-systems .tabs__item {
         display: none;
         animation: fadeIn 0.3s ease;
     }
     
-    .tabs__item.active {
+    .s-rollets-systems .tabs__item.active {
         display: block;
     }
     
@@ -199,71 +134,107 @@
         to { opacity: 1; transform: translateY(0); }
     }
     
-    /* Content styles */
-    .s-rollets-systems {
-        padding-top: 60px;
-    }
     .s-rollets-systems .tabs__content {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 30px;
+        grid-template-columns: minmax(260px, 500px) minmax(0, 1fr);
+        gap: 34px;
         align-items: start;
+        padding: 28px;
+        border: 1px solid #e1e4e8;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(29, 41, 57, 0.06);
     }
     
     .s-rollets-systems .tabs__img {
         width: 100%;
+        max-width: 500px;
     }
     
     .s-rollets-systems .tabs__img img {
+        display: block;
         width: 100%;
+        max-width: 500px;
+        aspect-ratio: 1 / 1;
         height: auto;
-        border-radius: 8px;
-        object-fit: cover;
+        object-fit: contain;
+        border: 1px solid #dfe4ea;
+        border-radius: 6px;
+        background: #f5f7f9;
     }
     
     .s-rollets-systems .tabs__text h3 {
-        color: #0989ff;
-        margin-bottom: 15px;
-        font-size: 18px;
+        color: #1f2933;
+        margin-bottom: 12px;
+        font-size: 24px;
+        font-weight: 700;
+        line-height: 1.2;
     }
     
-    .s-rollets-systems .tabs__text p {
-        margin-bottom: 20px;
-        line-height: 130%;
+    .s-rollets-systems .tabs__description {
+        color: #4b5563;
+        font-size: 17px;
+        line-height: 1.5;
+        margin-bottom: 18px;
+    }
+
+    .s-rollets-systems .tabs__description p {
+        margin-bottom: 10px;
+        padding: 0;
+        background: transparent;
+        color: inherit;
     }
     
-    .s-rollets-systems .tabs__text ol {
-        list-style-position: inside;
-        padding-left: 0;
+    .s-rollets-systems .tabs__components {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 9px 22px;
+        margin: 0;
+        padding-left: 22px;
+        list-style-position: outside;
     }
     
-    .s-rollets-systems .tabs__text ol li {
-        margin-bottom: 8px;
-        line-height: 130%;
+    .s-rollets-systems .tabs__components li {
+        color: #333;
+        line-height: 1.35;
+        padding-left: 4px;
     }
     
-    @media (max-width: 768px) {
-        .tabs__nav {
-            flex-wrap: wrap;
+    @media (max-width: 900px) {
+        .s-rollets-systems .tabs__content {
+            grid-template-columns: 1fr;
+            gap: 22px;
         }
-        
-        .tabs__link {
+
+        .s-rollets-systems .tabs__img {
+            margin: 0 auto;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .s-rollets-systems .tabs__link {
             flex: 1 1 50%;
             min-width: 150px;
             text-align: center;
             font-size: 14px;
             padding: 12px 15px;
         }
-        
-        .s-rollets-systems .tabs__content {
+
+        .s-rollets-systems .tabs__components {
             grid-template-columns: 1fr;
-            gap: 20px;
         }
     }
     
     @media (max-width: 480px) {
-        .tabs__link {
+        .s-rollets-systems .tabs__link {
             flex: 1 1 100%;
+        }
+
+        .s-rollets-systems .tabs__content {
+            padding: 16px;
+        }
+
+        .s-rollets-systems .tabs__text h3 {
+            font-size: 20px;
         }
     }
 </style>
