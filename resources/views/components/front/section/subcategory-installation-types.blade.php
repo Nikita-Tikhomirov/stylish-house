@@ -1,3 +1,19 @@
+@php
+    use Illuminate\Support\Facades\Storage;
+
+    $installationImageUrl = static function (?string $path): string {
+        if (!$path) {
+            return '';
+        }
+
+        $version = Storage::disk('public')->exists($path)
+            ? '?v=' . Storage::disk('public')->lastModified($path)
+            : '';
+
+        return Storage::url($path) . $version;
+    };
+@endphp
+
 <section class="s-rollets-installation wrapper">
     <h2 style="margin-bottom: 30px;" class="s-rollets-installation__title title">
         <span>Виды монтажа</span>
@@ -11,15 +27,15 @@
             <div class="accardion__title">
                 @if ($item->image)
                     <div class="accardion__title-img">
-                        <img src="{{ Storage::url($item->image) }}" alt="{{ $item->title }}">
+                        <img src="{{ $installationImageUrl($item->image) }}" alt="{{ $item->title }}">
                     </div>
                 @endif
                 <div class="accardion__title-text">{{ $item->title }}</div>
             </div>
             <div class="accardion__content">
-                @if ($item->image)
+                @if ($item->detail_image || $item->image)
                     <div class="accardion__content-img">
-                        <img src="{{ Storage::url($item->image) }}" alt="{{ $item->title }}">
+                        <img src="{{ $installationImageUrl($item->detail_image ?: $item->image) }}" alt="{{ $item->title }}">
                     </div>
                 @endif
                 <div class="accardion__content-text">
@@ -31,37 +47,88 @@
 </section>
 
 <style>
+    .s-rollets-installation .accardionJs {
+        border: 1px solid #e1e4e8;
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 8px 24px rgba(29, 41, 57, 0.06);
+        overflow: hidden;
+    }
+    .s-rollets-installation .accardionJs + .accardionJs {
+        margin-top: 18px;
+    }
+    .s-rollets-installation .accardionJs::before {
+        top: 61px;
+        right: 28px;
+        z-index: 3;
+    }
+    .s-rollets-installation .accardionJs::after {
+        top: 53px;
+        right: 35px;
+        z-index: 3;
+    }
     .s-rollets-installation .accardionJs p {
         background-color: transparent;
         color: #333;
         padding: 0;
     }
-    .s-rollets-installation .accardionJs .accardion__content img {
+    .s-rollets-installation .accardionJs .accardion__content-img img {
         display: block;
-        margin-bottom: 20px;
-        max-width: 100%;
+        width: 100%;
+        max-width: 500px;
+        aspect-ratio: 1 / 1;
         height: auto;
+        object-fit: contain;
+        border: 1px solid #dfe4ea;
+        border-radius: 6px;
+        background: #f5f7f9;
     }
     .s-rollets-installation .accardion__title {
         display: flex;
         align-items: center;
-        gap: 20px;
+        gap: 22px;
         justify-content: flex-start;
+        min-height: 124px;
+        padding: 12px 22px;
+        background: linear-gradient(90deg, #f7f9fb 0%, #ffffff 100%);
+        cursor: pointer;
     }
     .s-rollets-installation .accardion__title-img {
-        width: 50px;
-        height: 50px;
-        max-width: 50px;
-        max-height: 50px;
+        width: 100px;
+        height: 100px;
+        max-width: 100px;
+        max-height: 100px;
+        flex: 0 0 100px;
         display: flex;
         align-items: center;
         justify-content: center;
         overflow: hidden;
+        border: 1px solid #dfe4ea;
+        border-radius: 6px;
+        background: #f5f7f9;
     }
     .s-rollets-installation .accardion__title-img img {
         width: 100%;
         height: 100%;
-        object-fit: cover;
+        object-fit: contain;
+    }
+    .s-rollets-installation .accardion__title-text {
+        color: #1f2933;
+        font-size: 24px;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .s-rollets-installation .accardion__content {
+        display: grid;
+        grid-template-columns: minmax(260px, 500px) minmax(0, 1fr);
+        gap: 34px;
+        align-items: start;
+        padding: 28px;
+        background: #fff;
+    }
+    .s-rollets-installation .accardion__content-img {
+        width: 100%;
+        max-width: 500px;
     }
 
     .s-rollets-installation .accardion__content-text {
@@ -135,6 +202,16 @@
     }
 
     @media (max-width: 991px) {
+        .s-rollets-installation .accardion__content {
+            grid-template-columns: 1fr;
+            gap: 22px;
+        }
+
+        .s-rollets-installation .accardion__content-img {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
         .s-rollets-installation .accardion__content-text {
             font-size: 15px;
         }
@@ -150,14 +227,35 @@
 
     @media (max-width: 767px) {
         .s-rollets-installation .accardion__title {
-            gap: 12px;
+            min-height: auto;
+            gap: 14px;
+            padding: 12px 48px 12px 12px;
+        }
+
+        .s-rollets-installation .accardionJs::before {
+            top: 47px;
+            right: 20px;
+        }
+
+        .s-rollets-installation .accardionJs::after {
+            top: 39px;
+            right: 27px;
         }
 
         .s-rollets-installation .accardion__title-img {
-            width: 42px;
-            height: 42px;
-            max-width: 42px;
-            max-height: 42px;
+            width: 74px;
+            height: 74px;
+            max-width: 74px;
+            max-height: 74px;
+            flex-basis: 74px;
+        }
+
+        .s-rollets-installation .accardion__title-text {
+            font-size: 18px;
+        }
+
+        .s-rollets-installation .accardion__content {
+            padding: 16px;
         }
 
         .s-rollets-installation .accardion__content-text {
