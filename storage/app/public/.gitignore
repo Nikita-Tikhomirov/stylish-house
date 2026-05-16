@@ -8,3 +8,7 @@ installation_types/*
 roller_shutter_systems/*
 !roller_shutter_systems/rolstavni/
 !roller_shutter_systems/rolstavni/*.png
+!products/
+products/*
+!products/santehprods/
+!products/santehprods/*.webp
