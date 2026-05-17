@@ -177,7 +177,11 @@
                         <path d="M112 23.275C1.84952 -10.6834 -7.36586 1.48086 7.50443 32.9053" stroke="currentColor"
                             stroke-width="4" stroke-miterlimit="3.8637" stroke-linecap="round"></path>
                     </svg></h2>
+                @php
+                    $hidePriceFilter = $subcategory->slug === 'santehnicheskie-rolleti';
+                @endphp
                 <div class="popularsWithFilter__wrap">
+                    @unless ($hidePriceFilter)
                     <aside class="sidebarFilter">
                         @include('front.partials.price-filter')
 
@@ -249,6 +253,17 @@
                             }
                         </style>
                     </aside>
+                    @endunless
+                    @if ($hidePriceFilter)
+                        <style>
+                            .popularsWithFilter__wrap{
+                                grid-template-columns: 1fr
+                            }
+                            .popularsWithFilter__cards{
+                                grid-template-columns: repeat(4, 1fr);
+                            }
+                        </style>
+                    @endif
                     <div class="popularsWithFilter__cardsWrap">
                         <div class="popularsWithFilter__cards" id="productsWrap">
                             @include('front.partials.products')
@@ -578,7 +593,7 @@
         @endif
 
         @if (!empty($workExamples) && $workExamples->isNotEmpty())
-            <x-front.section.subgallery :gallerys="$workExamples" :category='$category' title=""></x-front.section.gallery>
+            <x-front.section.subgallery :gallerys="$workExamples" :category='$category' title=""></x-front.section.subgallery>
         @endif
 
         <!-- Оплата и доставка -->
