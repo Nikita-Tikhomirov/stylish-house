@@ -176,7 +176,7 @@ class MinPriceRecalcService
             } elseif (empty($product->min_width) || empty($product->min_height)) {
                 $errorCode = ProductMinPriceCalculator::ERROR_INVALID_DIMENSIONS;
                 $errorMessage = 'Missing min dimensions';
-            } elseif ($modelTitle === '') {
+            } elseif ($modelTitle === '' && !$this->isSantehRolletsProduct($product)) {
                 $errorCode = ProductMinPriceCalculator::ERROR_SHEET_NOT_FOUND;
                 $errorMessage = 'Model title not found';
             } else {
@@ -255,6 +255,14 @@ class MinPriceRecalcService
             'current_id' => $lastProductId,
             'errors' => array_slice($errors, -20),
         ];
+    }
+
+    private function isSantehRolletsProduct(Product $product): bool
+    {
+        $title = mb_strtolower(trim((string) $product->h1 . ' ' . (string) $product->title));
+
+        return str_contains($title, 'сантехнические роллеты')
+            || str_contains($title, 'сантехнические рольставни');
     }
 
     public function getActiveRun(): ?PriceRecalcRun

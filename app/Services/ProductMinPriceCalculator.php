@@ -11,6 +11,7 @@ class ProductMinPriceCalculator
     public const ERROR_MATERIAL_NOT_FOUND = 'material_not_found';
     public const ERROR_MISSING_TITLE_PART = 'missing_title_part';
     public const ERROR_PRICE_NOT_FOUND = 'price_not_found';
+    public const SANTEH_ROLLETS_CACHE_KEY = 'santeh_rollets_price_matrix';
 
     /**
      * @param array{
@@ -36,6 +37,10 @@ class ProductMinPriceCalculator
 
         if ($width <= 0 || $height <= 0) {
             return ['price' => null, 'error' => self::ERROR_INVALID_DIMENSIONS];
+        }
+
+        if ($this->isSantehRolletsProduct($prodTitle, $modelName)) {
+            return $this->calculateSantehRolletsPrice($width, $height);
         }
 
         $sheetData = Cache::get('sheet_' . $modelName);
@@ -263,6 +268,60 @@ class ProductMinPriceCalculator
     {
         $multiplier = $this->hasDoubleKeyword($prodTitle) ? 2 : 1;
         return (int) round($basePrice * $multiplier);
+    }
+
+    private function isSantehRolletsProduct(string $prodTitle, string $modelName): bool
+    {
+        $haystack = mb_strtolower(trim($prodTitle . ' ' . $modelName));
+
+        return str_contains($haystack, 'сантехнические роллеты')
+            || str_contains($haystack, 'сантехнические рольставни');
+    }
+
+    /**
+     * Uses the сантехнические роллеты price matrix loaded by excel:load-data.
+     * Requested dimensions are priced by the nearest available larger table size.
+     *
+     * @return array{price:int|null,error:string|null}
+     */
+    private function calculateSantehRolletsPrice(float $width, float $height): array
+    {
+        $matrix = Cache::get(self::SANTEH_ROLLETS_CACHE_KEY);
+        if (!is_array($matrix)) {
+            return ['price' => null, 'error' => self::ERROR_SHEET_NOT_FOUND];
+        }
+
+        $priceWidth = $this->nearestGreaterOrEqual((array) ($matrix['widths'] ?? []), $width);
+        $priceHeight = $this->nearestGreaterOrEqual((array) ($matrix['heights'] ?? []), $height);
+
+        if ($priceWidth === null || $priceHeight === null) {
+            return ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND];
+        }
+
+        $price = $matrix['prices'][$priceHeight][$priceWidth] ?? null;
+        if ($price === null || !is_numeric($price)) {
+            return ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND];
+        }
+
+        return ['price' => (int) round((float) $price), 'error' => null];
+    }
+
+    private function nearestGreaterOrEqual(array $values, float $needle): ?int
+    {
+        $numericValues = array_values(array_filter(
+            array_map(static fn ($value) => is_numeric($value) ? (int) $value : null, $values),
+            static fn ($value) => $value !== null
+        ));
+
+        sort($numericValues, SORT_NUMERIC);
+
+        foreach ($numericValues as $value) {
+            if ($value >= $needle) {
+                return $value;
+            }
+        }
+
+        return null;
     }
 
     private function hasDoubleKeyword(string $prodTitle): bool

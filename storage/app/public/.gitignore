@@ -12,3 +12,4 @@ roller_shutter_systems/*
 products/*
 !products/santehprods/
 !products/santehprods/*.webp
+!santeh_rollets_prices.xlsx
