@@ -729,6 +729,7 @@
             const tabs = document.querySelectorAll('.s-populars__tabsNav li');
             const productsContainer = document.getElementById('products-container');
             const slides = document.querySelectorAll('.catCalculator .prodForm');
+            const useSantehPriceMatrix = @json($subcategory->slug === 'santehnicheskie-rolleti');
             // console.log(calcForm);
 
             document.querySelectorAll('.product-params-accordion .accordion-header').forEach((header) => {
@@ -932,7 +933,6 @@
                     const modelSelect = slide.querySelector('.modelSelect');
                     const modelId = medelId;
                     const prodTitleTorequest = slide.querySelector('.prodForm__formTitle').innerText
-                    console.log(prodTitleTorequest);
 
                     const controlInput = slide.querySelector('.control') || {
                         checked: false
@@ -954,6 +954,7 @@
                     counterPlusBtn = removeEventListeners(counterPlusBtn, ['click']);
                     counterInput = removeEventListeners(counterInput, ['input']);
                     let currentBasePrice = parseFloat(priceElement.dataset.basePrice) || parseInt(priceElement.textContent.replace(/\D/g, ''), 10) || 0;
+                    let currentPriceRequest = 0;
 
                     // Пересчет цены с учетом количества и скидки
                     function rebuildPrice(price, counterValue, discount = 0) {
@@ -1017,11 +1018,24 @@
                         // Опционально: индикатор загрузки, чтобы не показывало старое значение
                         priceElement.textContent = 'Расчёт...';
 
-                        fetch(
-                                `/sheet-names?width=${width}&height=${height}&model=${model}&control=${control}&cloth=${cloth}&modelId=${modelId}&prodTitle=${prodTitleTorequest}`
-                            )
+                        const requestId = ++currentPriceRequest;
+                        const params = new URLSearchParams({
+                            width,
+                            height,
+                            model: model || '',
+                            control,
+                            cloth: cloth || '',
+                            modelId: modelId || '',
+                            prodTitle: useSantehPriceMatrix ? `Сантехнические роллеты ${prodTitleTorequest}` : prodTitleTorequest,
+                        });
+
+                        fetch(`/sheet-names?${params.toString()}`)
                             .then(response => response.json())
                             .then(data => {
+                                if (requestId !== currentPriceRequest) {
+                                    return;
+                                }
+
                                 const basePrice = data.price || 0;
                                 currentBasePrice = Number(basePrice) || 0;
                                 priceElement.dataset.basePrice = currentBasePrice;
@@ -1065,7 +1079,11 @@
                     });
 
                     // Изначальный расчет при загрузке
-                    rebuildPrice(currentBasePrice, parseInt(counterInput.value) || 1, parseFloat(discountInput?.value) || 0);
+                    if (useSantehPriceMatrix) {
+                        fetchPrice();
+                    } else {
+                        rebuildPrice(currentBasePrice, parseInt(counterInput.value) || 1, parseFloat(discountInput?.value) || 0);
+                    }
 
                     // Обновление цены при изменении ширины, высоты или других параметров
                     widthInput.addEventListener('input', fetchPrice);
