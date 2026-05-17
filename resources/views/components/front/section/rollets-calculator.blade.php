@@ -1,3 +1,20 @@
+@props(['products' => collect()])
+
+@php
+    $calcProducts = collect($products)->map(function ($product) {
+        $imagePath = $product->image_thumb_path ?: $product->image_path ?: $product->fabric_thumb_path ?: $product->fabric_photo;
+        $imageUrl = $imagePath ? asset(ltrim($imagePath, '/')) : null;
+
+        return [
+            'title' => $product->h1,
+            'label' => $product->cloth ?: $product->color ?: $product->h1,
+            'image' => $imageUrl,
+        ];
+    })->filter(fn ($item) => !empty($item['image']))->values();
+
+    $activeCalcProduct = $calcProducts->first();
+@endphp
+
 <!-- Калькулятор рольставен -->
 <section class="s-rolletsCalc wrapper">
     <h2 class="s-subcats__title title"> <span>Рассчитать стоимость рольставен</span><svg width="114" height="35" viewBox="0 0 114 35" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -28,42 +45,12 @@
             <div class="s-rolletsCalc__colorPicker">
                 <div class="s-rolletsCalc__header">Выберите цвет:</div>
                 <div class="s-rolletsCalc__colors">
-                    <div class="s-rolletsCalc__color active" data-img="/img/rollets/white-big.jpg">
-                        <img src="/img/rollets/white-mini.jpg" alt="Белый">
-                        <span>Белый</span>
-                    </div>
-                    <div class="s-rolletsCalc__color" data-img="/img/rollets/9016-big.jpg">
-                        <img src="/img/rollets/9016-mini.jpg" alt="9016">
-                        <span>RAL 9016</span>
-                    </div>
-                    <div class="s-rolletsCalc__color" data-img="/img/rollets/9006-big.jpg">
-                        <img src="/img/rollets/9006-mini.jpg" alt="9006">
-                        <span>RAL 9006</span>
-                    </div>
-                    <div class="s-rolletsCalc__color" data-img="/img/rollets/8017-big.jpg">
-                        <img src="/img/rollets/8017-mini.jpg" alt="8017">
-                        <span>RAL 8017</span>
-                    </div>
-                    <div class="s-rolletsCalc__color" data-img="/img/rollets/8014-big.jpg">
-                        <img src="/img/rollets/8014-mini.jpg" alt="8014">
-                        <span>RAL 8014</span>
-                    </div>
-                    <div class="s-rolletsCalc__color" data-img="/img/rollets/6005-big.jpg">
-                        <img src="/img/rollets/6005-mini.jpg" alt="6005">
-                        <span>RAL 6005</span>
-                    </div>
-                    <div class="s-rolletsCalc__color" data-img="/img/rollets/5010-big.jpg">
-                        <img src="/img/rollets/5010-mini.jpg" alt="5010">
-                        <span>RAL 5010</span>
-                    </div>
-                    <div class="s-rolletsCalc__color" data-img="/img/rollets/3004-big.jpg">
-                        <img src="/img/rollets/3004-mini.jpg" alt="3004">
-                        <span>RAL 3004</span>
-                    </div>
-                    <div class="s-rolletsCalc__color" data-img="/img/rollets/1015-big.jpg">
-                        <img src="/img/rollets/1015-mini.jpg" alt="1015">
-                        <span>RAL 1015</span>
-                    </div>
+                    @foreach ($calcProducts as $calcProduct)
+                        <button type="button" class="s-rolletsCalc__color {{ $loop->first ? 'active' : '' }}" data-img="{{ $calcProduct['image'] }}">
+                            <img src="{{ $calcProduct['image'] }}" alt="{{ $calcProduct['title'] }}">
+                            <span>{{ $calcProduct['label'] }}</span>
+                        </button>
+                    @endforeach
                 </div>
             </div>
 
@@ -113,9 +100,9 @@
         <!-- Правая панель -->
         <div class="s-rolletsCalc__right">
             <div class="s-rolletsCalc__preview">
-                <img class="s-rolletsCalc__previewImg" src="/img/rollets/white-big.jpg" alt="Фотография заказываемых рольставен">
-
-
+                @if ($activeCalcProduct)
+                    <img class="s-rolletsCalc__previewImg" src="{{ $activeCalcProduct['image'] }}" alt="{{ $activeCalcProduct['title'] }}">
+                @endif
             </div>
         </div>
     </div>
@@ -227,6 +214,8 @@
     transition: all 0.3s;
     border: 2px solid transparent;
     cursor: pointer;
+    background: transparent;
+    font: inherit;
 }
 
 .s-rolletsCalc__color:hover {
@@ -239,8 +228,8 @@
 }
 
 .s-rolletsCalc__color img {
-    width: 100%;
-    height: 100%;
+    width: 84px;
+    height: 84px;
     object-fit: cover;
     border-radius: 4px;
 }
@@ -398,7 +387,8 @@
 
 .s-rolletsCalc__previewImg {
     max-width: 100%;
-    max-height: 250px;
+    width: 100%;
+    max-height: 360px;
     object-fit: contain;
 }
 

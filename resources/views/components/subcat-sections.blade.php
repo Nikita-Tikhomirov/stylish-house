@@ -10,6 +10,15 @@
                     <div class="s-subcatSections__swiper swiper">
                         <div class="swiper-wrapper">
                             @foreach ($subcatData['products'] as $product)
+                                @php
+                                    $mainImagePath = $product->image_thumb_path ?: $product->image_path;
+                                    $fabricImagePath = $product->fabric_thumb_path ?: $product->fabric_photo;
+                                    $mainImageUrl = $mainImagePath ? asset(ltrim($mainImagePath, '/')) : null;
+                                    $fabricImageUrl = $fabricImagePath ? asset(ltrim($fabricImagePath, '/')) : null;
+                                    $minPrice = (float) ($product->min_price ?? 0);
+                                    $discount = (float) ($product->discount ?? 0);
+                                    $discountedPrice = $minPrice > 0 ? (int) floor($minPrice * (1 - $discount / 100)) : null;
+                                @endphp
                                 <div class="s-subcatSections__slide swiper-slide card" 
                                      id="prod{{ $product->id }}" 
                                      data-modelid="{{ $product->model_id ?? '' }}"  
@@ -20,13 +29,13 @@
                                         <div class="bigProdCard__wrap">
                                             <div class="bigProdCard__img-wrap">
                                                 <div class="bigProdCard__imgCustomWrap">
-                                                    @isset($product->image_path)
-                                                        <img src="{{ Storage::url($product->image_path) }}" alt="{{ $product->h1 }}" />
-                                                    @endisset
+                                                    @if ($mainImageUrl)
+                                                        <img src="{{ $mainImageUrl }}" alt="{{ $product->h1 }}" />
+                                                    @endif
 
-                                                    @isset($product->fabric_photo)
-                                                        <img src="{{ Storage::url($product->fabric_photo) }}" alt="{{ $product->h1 }}" />
-                                                    @endisset
+                                                    @if ($fabricImageUrl)
+                                                        <img src="{{ $fabricImageUrl }}" alt="{{ $product->h1 }}" />
+                                                    @endif
                                                 </div>
 
                                                 <div class="bigProdCard__controls">
@@ -56,11 +65,13 @@
                                                 </a>
 
                                                 <div class="bigProdCard__priceWrap">
-                                                    @if ($product->discount > 0)
-                                                        <span class="normalPrice">{{ $product->old_price ?? $product->price }}₽</span>
-                                                        <span class="discount">{{ $product->price }}₽</span>
+                                                    @if ($minPrice > 0 && $discount > 0)
+                                                        <span class="normalPrice">{{ number_format($minPrice, 0, '', ' ') }}₽</span>
+                                                        <span class="discount">{{ number_format($discountedPrice, 0, '', ' ') }}₽</span>
+                                                    @elseif ($minPrice > 0)
+                                                        <span class="discount">{{ number_format($minPrice, 0, '', ' ') }}₽</span>
                                                     @else
-                                                        <span class="discount">{{ $product->price }}₽</span>
+                                                        <span class="discount">Цена по запросу</span>
                                                     @endif
                                                 </div>
                                             </div>

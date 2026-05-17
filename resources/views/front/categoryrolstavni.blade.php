@@ -41,7 +41,12 @@
     :subcategoriesWithProducts="$subcategoriesWithProducts"
     :headerInfo="$headerInfo"/>
 
-       <x-front.section.rollets-calculator />
+       @php
+           $santehRolletData = $subcategoriesWithProducts->firstWhere('subcategory.slug', 'santehnicheskie-rolleti');
+           $santehRolletProducts = $santehRolletData['products'] ?? collect();
+       @endphp
+
+       <x-front.section.rollets-calculator :products="$santehRolletProducts" />
 
        <x-front.section.rollets-installation :installationTypes="$installationTypes" />
 
