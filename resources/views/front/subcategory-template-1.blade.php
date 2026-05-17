@@ -777,6 +777,114 @@
             }
 
 
+            function renderSantehPopupForm(product, prodWrap, prodId) {
+                if (!useSantehPriceMatrix) {
+                    return;
+                }
+
+                const calcWrap = prodWrap.querySelector('.prodForm__calcFormWrap');
+                const sizeWrap = prodWrap.querySelector('.prodForm__sizeWrap');
+                if (!calcWrap || !sizeWrap) {
+                    return;
+                }
+
+                calcWrap.querySelectorAll('.calcWidhType, .side, .sidebarFilter, .product-params-accordion, .popup-santeh-fields')
+                    .forEach((element) => element.remove());
+
+                const price = (value, fallback = 0) => Number(value ?? fallback) || 0;
+                const checked = (actual, expected, fallback = false) => actual === expected || (!actual && fallback) ? 'checked' : '';
+                const boolChecked = (value) => value ? 'checked' : '';
+                const fields = document.createElement('div');
+                fields.className = 'popup-santeh-fields';
+                fields.innerHTML = `
+                    <div class="calcWidhType">
+                        <div class="cartForm__optionsList">
+                            <div class="cartForm__listTitle">Тип монтажа</div>
+                            <ul>
+                                <li><label><input class="widthType" type="radio" name="popup-widhType${prodId}" value="Ширина по ткани" checked><span>Короб внутри (скрытый)</span></label></li>
+                                <li><label><input class="widthType" type="radio" name="popup-widhType${prodId}" value="Ширина по габариту"><span>Короб снаружи</span></label></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="calcWidhType">
+                        <div class="cartForm__optionsList">
+                            <div class="cartForm__listTitle">Тип запорного устройства</div>
+                            <ul>
+                                <li><label><input class="widthType" type="radio" name="popup-lock-type" value="sliders" data-price="0" checked><span>Задвижки +0р</span></label></li>
+                                <li><label><input class="widthType" type="radio" name="popup-lock-type" value="lock" data-price="1600"><span>Замок +1600р</span></label></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="product-params-accordion" style="margin-top: 30px;">
+                        <div class="cartForm__optionsList">
+                            <div class="cartForm__listTitle">Характеристики товара</div>
+                            <div class="accordion-item">
+                                <div class="accordion-header"><h4>Вид монтажа</h4><span class="accordion-arrow">▼</span></div>
+                                <div class="accordion-content">
+                                    <div class="installation-options">
+                                        <label class="option-label"><input type="radio" name="popup-installation-type" value="overhead" data-price="${price(product.overhead_price)}" ${checked(product.installation_type, 'overhead', true)}><span class="option-name">Накладной монтаж</span><span class="option-price">+${price(product.overhead_price)}₽</span></label>
+                                        <div class="option-description">При выборе накладного монтажа необходимо к размерам проема добавьте 110мм по ширине и 250мм по высоте.</div>
+                                        <label class="option-label"><input type="radio" name="popup-installation-type" value="built-in" data-price="${price(product.builtin_price)}" ${checked(product.installation_type, 'built-in')}><span class="option-name">Встроенный монтаж</span><span class="option-price">+${price(product.builtin_price)}₽</span></label>
+                                        <div class="option-description">При выборе встроенного монтажа рекомендуется от размеров проема отнять по ширине и высоте 5 мм.</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <div class="accordion-header"><h4>Тип управления рольставни</h4><span class="accordion-arrow">▼</span></div>
+                                <div class="accordion-content">
+                                    <div class="control-options">
+                                        <label class="option-label"><input type="radio" name="popup-control-type" value="strap" data-price="${price(product.strap_price)}" ${checked(product.control_type, 'strap', true)}><span class="option-name">Ленточный или шнуровой инерционный привод</span><span class="option-price">+${price(product.strap_price)}₽</span></label>
+                                        <div class="option-description">Грузоподъемность до 15 кг. Ручное управление.</div>
+                                        <label class="option-label"><input type="radio" name="popup-control-type" value="cardan" data-price="${price(product.cardan_price)}" ${checked(product.control_type, 'cardan')}><span class="option-name">Воротковый привод (кардан)</span><span class="option-price">+${price(product.cardan_price)}₽</span></label>
+                                        <div class="option-description">Грузоподъемность до 35 кг. Ручное управление.</div>
+                                        <label class="option-label"><input type="radio" name="popup-control-type" value="pim" data-price="${price(product.pim_price)}" ${checked(product.control_type, 'pim')}><span class="option-name">Пружинно-инерционный механизм (ПИМ)</span><span class="option-price">+${price(product.pim_price)}₽</span></label>
+                                        <div class="option-description">Грузоподъемность от 6 до 80 кг. Ручное управление.</div>
+                                        <label class="option-label"><input type="radio" name="popup-control-type" value="electric" data-price="${price(product.electric_price, 6793)}" ${checked(product.control_type, 'electric')}><span class="option-name">Автоматическое управление (электропривод)</span><span class="option-price">+${price(product.electric_price, 6793)}₽</span></label>
+                                        <div class="option-description">Тип управление: выключатель настенный или мини пульт.</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <div class="accordion-header"><h4>Блокирующие устройства</h4><span class="accordion-arrow">▼</span></div>
+                                <div class="accordion-content">
+                                    <div class="lock-options">
+                                        <label class="option-label"><input type="radio" name="popup-lock-device" value="rigel" data-price="${price(product.rigel_price, 1575)}" ${checked(product.lock_device, 'rigel')}><span class="option-name">Ригельный замок (с ключом)</span><span class="option-price">+${price(product.rigel_price, 1575)}₽</span></label>
+                                        <div class="option-description">Используется при ручном управлении. Рольставни запираются на замок. Не рекомендуется использовать при электроприводе.</div>
+                                        <label class="option-label"><input type="radio" name="popup-lock-device" value="shchyolka" data-price="${price(product.shchyolka_price, 171)}" ${checked(product.lock_device, 'shchyolka')}><span class="option-name">Ручной ригель (щеколда)</span><span class="option-price">+${price(product.shchyolka_price, 171)}₽</span></label>
+                                        <div class="option-description">Используется при ручном управлении. Любой желающий сможет открыть роллету. Не рекомендуется использовать при электроприводе.</div>
+                                        <label class="option-label"><input type="radio" name="popup-lock-device" value="upper" data-price="${price(product.upper_price, 2358)}" ${checked(product.lock_device, 'upper')}><span class="option-name">Верхний ригель (верхние замки)</span><span class="option-price">+${price(product.upper_price, 2358)}₽</span></label>
+                                        <div class="option-description">Используется при управлении воротковый привод или автоматическом управлении для ограничения ручного подъема полотна.</div>
+                                        <label class="option-label"><input type="radio" name="popup-lock-device" value="none" data-price="0" ${checked(product.lock_device, 'none', true)}><span class="option-name">Без блокировки</span><span class="option-price">+0₽</span></label>
+                                        <div class="option-description">Применяется в основном при изделии для сантехнических проемов.</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="accordion-item">
+                                <div class="accordion-header"><h4>Дополнительные опции</h4><span class="accordion-arrow">▼</span></div>
+                                <div class="accordion-content">
+                                    <div class="additional-options">
+                                        <label class="option-label"><input type="checkbox" name="popup-ral-paint" value="ral-paint" data-price="${price(product.ral_price, 8010)}" ${boolChecked(product.ral_paint)}><span class="option-name">Покраска по RAL</span><span class="option-price">+${price(product.ral_price, 8010)}₽</span></label>
+                                        <div class="option-description">Возможна покраска профиля AER44m/S или AER55m/S. Профиль с пенным заполнением покраске не подлежит!</div>
+                                        <label class="option-label"><input type="checkbox" name="popup-photo-print" value="photo-print" data-price="${price(product.photo_price, 3920)}" ${boolChecked(product.photo_print)}><span class="option-name">Нанесение фотопечати</span><span class="option-price">+${price(product.photo_price, 3920)}₽</span></label>
+                                        <div class="option-description">Возможна нанесение любого рисунка путем фотопечати на всем изделии.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                sizeWrap.insertAdjacentElement('afterend', fields);
+                fields.querySelectorAll('.product-params-accordion .accordion-header').forEach((header) => {
+                    header.addEventListener('click', () => {
+                        const item = header.closest('.accordion-item');
+                        if (item) {
+                            item.classList.toggle('active');
+                        }
+                    });
+                });
+            }
+
 
             function loadPopupsContent() {
 
@@ -789,13 +897,10 @@
 
                         const prodId = element.dataset.prod;
 
-                        console.log('prodId:', prodId);
                         if (!prodId) return;
                         setTimeout(() => {
                             wrapPopupProd();
                         }, 50);
-
-                        console.log('Запрос к /popup с prodId:', prodId);
 
                         // Получаем данные о товаре с сервера
                         fetch(`/popup/${prodId}`)
@@ -860,8 +965,6 @@
 
                                 });
 
-                                console.log(product.model);
-
                                 // Добавить id для кнопки добавить в корзину
                                 document.querySelector('#popupProd .prodForm__addToCart')
                                     .setAttribute('data-id', prodId)
@@ -869,9 +972,11 @@
                                 let controlLabel = document.querySelector(
                                     '#popupProd .sidebarFilter__label')
                                 let controlInput = document.querySelector('#popupProd .control')
-                                controlLabel.setAttribute('for', 'control' + prodId)
-                                controlInput.setAttribute('id', 'control' + prodId)
-                                controlInput.checked = false;
+                                if (controlLabel && controlInput) {
+                                    controlLabel.setAttribute('for', 'control' + prodId)
+                                    controlInput.setAttribute('id', 'control' + prodId)
+                                    controlInput.checked = false;
+                                }
 
                                 const prodWrap = document.querySelector('#popupProd');
 
@@ -908,6 +1013,8 @@
                                     heightInput.value = product.min_height;
                                 }
 
+                                renderSantehPopupForm(product, prodWrap, prodId);
+
 
 
                                 setTimeout(() => {
@@ -931,6 +1038,7 @@
                     const heightInput = slide.querySelector('.height-input');
                     const priceElement = slide.querySelector('.prodForm__price');
                     const modelSelect = slide.querySelector('.modelSelect');
+                    const modelInput = slide.querySelector('.model');
                     const modelId = medelId;
                     const prodTitleTorequest = slide.querySelector('.prodForm__formTitle').innerText
 
@@ -965,29 +1073,31 @@
                         const discountedPrice = price - (price * discount / 100);
                         let priceNow = counterValue * discountedPrice;
 
-                        const form = slide.closest('.prodForm');
+                        const form = slide.matches('.prodForm')
+                            ? slide
+                            : (slide.querySelector('.prodForm') || slide.closest('.prodForm') || slide);
 
-                        const installationType = form.querySelector('input[name="installation-type"]:checked');
+                        const installationType = form.querySelector('input[name="installation-type"]:checked, input[name="popup-installation-type"]:checked');
                         if (installationType) {
                             priceNow += (parseInt(installationType.dataset.price || 0, 10) * counterValue);
                         }
 
-                        const controlType = form.querySelector('input[name="control-type"]:checked');
+                        const controlType = form.querySelector('input[name="control-type"]:checked, input[name="popup-control-type"]:checked');
                         if (controlType) {
                             priceNow += (parseInt(controlType.dataset.price || 0, 10) * counterValue);
                         }
 
-                        const lockDevice = form.querySelector('input[name="lock-device"]:checked');
+                        const lockDevice = form.querySelector('input[name="lock-device"]:checked, input[name="popup-lock-device"]:checked');
                         if (lockDevice) {
                             priceNow += (parseInt(lockDevice.dataset.price || 0, 10) * counterValue);
                         }
 
-                        const ralPaint = form.querySelector('input[name="ral-paint"]:checked');
+                        const ralPaint = form.querySelector('input[name="ral-paint"]:checked, input[name="popup-ral-paint"]:checked');
                         if (ralPaint) {
                             priceNow += (parseInt(ralPaint.dataset.price || 0, 10) * counterValue);
                         }
 
-                        const photoPrint = form.querySelector('input[name="photo-print"]:checked');
+                        const photoPrint = form.querySelector('input[name="photo-print"]:checked, input[name="popup-photo-print"]:checked');
                         if (photoPrint) {
                             priceNow += (parseInt(photoPrint.dataset.price || 0, 10) * counterValue);
                         }
@@ -1005,8 +1115,8 @@
 
                         const quantity = parseInt(counterInput.value) || 1;
 
-                        let model = modelFromRequest || modelSelect.value;
-                        let cloth = clothRequest || clothInput.value;
+                        let model = modelFromRequest || modelSelect?.value || modelInput?.value || '';
+                        let cloth = clothRequest || clothInput?.value || '';
                         const control = controlInput.checked;
                         const discount = parseFloat(discountInput?.value) || 0;
 
@@ -1093,7 +1203,7 @@
                     }
 
                     const optionInputs = slide.querySelectorAll(
-                        'input[name="installation-type"], input[name="control-type"], input[name="lock-device"], input[name="ral-paint"], input[name="photo-print"]'
+                        'input[name="installation-type"], input[name="control-type"], input[name="lock-device"], input[name="ral-paint"], input[name="photo-print"], input[name="popup-installation-type"], input[name="popup-control-type"], input[name="popup-lock-device"], input[name="popup-ral-paint"], input[name="popup-photo-print"]'
                     );
                     optionInputs.forEach((input) => {
                         input.addEventListener('change', fetchPrice);

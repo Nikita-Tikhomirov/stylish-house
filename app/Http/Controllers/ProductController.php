@@ -693,6 +693,22 @@ class ProductController extends Controller
             'fabric_photo' => $this->encodeImagePath($product->fabric_photo),
             'min_width' => $product->min_width,
             'min_height' => $product->min_height,
+            'installation_type' => $product->installation_type,
+            'overhead_price' => $product->overhead_price,
+            'builtin_price' => $product->builtin_price,
+            'control_type' => $product->control_type,
+            'strap_price' => $product->strap_price,
+            'cardan_price' => $product->cardan_price,
+            'pim_price' => $product->pim_price,
+            'electric_price' => $product->electric_price,
+            'lock_device' => $product->lock_device,
+            'rigel_price' => $product->rigel_price,
+            'shchyolka_price' => $product->shchyolka_price,
+            'upper_price' => $product->upper_price,
+            'ral_paint' => (bool) $product->ral_paint,
+            'photo_print' => (bool) $product->photo_print,
+            'ral_price' => $product->ral_price,
+            'photo_price' => $product->photo_price,
         ]);
     }
 
