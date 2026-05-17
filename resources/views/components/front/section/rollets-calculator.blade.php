@@ -35,7 +35,6 @@
                         <input type="number" min="500" max="6000" name="rl_height_mob" value="900" class="s-rolletsCalc__input">
                     </label>
                 </div>
-                <img src="/img/sizes.png" alt="Размеры" class="s-rolletsCalc__sizesImg">
             </div>
         </div>
 

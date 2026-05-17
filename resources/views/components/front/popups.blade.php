@@ -98,7 +98,7 @@
         {{-- <div class="prodForm__galleryWrap">
             <div class="prodForm__bar">
             </div>
-            <div class="prodForm__imgWrap"> <img src="img/prod.jpg" alt="" /></div>
+            <div class="prodForm__imgWrap"> <img src="/img/prod.jpg" alt="" /></div>
         </div> --}}
 
         <div class="prodForm__galleryWrapOuter">
@@ -106,8 +106,8 @@
 
 
                 <div class="prodForm__imgWrap">
-                    <img src="img/prod.jpg" alt="" />
-                    <img src="img/prod.jpg" alt="" />
+                    <img src="/img/prod.jpg" alt="" />
+                    <img src="/img/prod.jpg" alt="" />
 
                 </div>
                 <div class="prodForm__bar">
