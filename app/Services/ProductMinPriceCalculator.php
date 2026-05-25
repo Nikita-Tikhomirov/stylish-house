@@ -12,6 +12,7 @@ class ProductMinPriceCalculator
     public const ERROR_MISSING_TITLE_PART = 'missing_title_part';
     public const ERROR_PRICE_NOT_FOUND = 'price_not_found';
     public const SANTEH_ROLLETS_CACHE_KEY = 'santeh_rollets_price_matrix';
+    public const ROLLETS_OPENING_CACHE_KEY = 'rollets_opening_price_matrices';
 
     /**
      * @param array{
@@ -41,6 +42,10 @@ class ProductMinPriceCalculator
 
         if ($this->isSantehRolletsProduct($prodTitle, $modelName)) {
             return $this->calculateSantehRolletsPrice($width, $height);
+        }
+
+        if ($this->isRolletsOpeningProduct($prodTitle, $modelName)) {
+            return $this->calculateRolletsOpeningPrice($modelName, $width, $height);
         }
 
         $sheetData = Cache::get('sheet_' . $modelName);
@@ -267,7 +272,7 @@ class ProductMinPriceCalculator
     private function finalizePrice(float $basePrice, string $prodTitle): int
     {
         $multiplier = $this->hasDoubleKeyword($prodTitle) ? 2 : 1;
-        return (int) round($basePrice * $multiplier);
+        return (int) round($basePrice) * $multiplier;
     }
 
     private function isSantehRolletsProduct(string $prodTitle, string $modelName): bool
@@ -291,6 +296,50 @@ class ProductMinPriceCalculator
             return ['price' => null, 'error' => self::ERROR_SHEET_NOT_FOUND];
         }
 
+        $priceWidth = $this->nearestGreaterOrEqual((array) ($matrix['widths'] ?? []), $width);
+        $priceHeight = $this->nearestGreaterOrEqual((array) ($matrix['heights'] ?? []), $height);
+
+        if ($priceWidth === null || $priceHeight === null) {
+            return ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND];
+        }
+
+        $price = $matrix['prices'][$priceHeight][$priceWidth] ?? null;
+        if ($price === null || !is_numeric($price)) {
+            return ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND];
+        }
+
+        return ['price' => (int) round((float) $price), 'error' => null];
+    }
+
+    private function isRolletsOpeningProduct(string $prodTitle, string $modelName): bool
+    {
+        $matrices = Cache::get(self::ROLLETS_OPENING_CACHE_KEY);
+        if (!is_array($matrices) || !isset($matrices[$modelName])) {
+            return false;
+        }
+
+        $haystack = mb_strtolower(trim($prodTitle));
+
+        return str_contains($haystack, 'роллеты для проема')
+            || str_contains($haystack, 'роллеты для проёма')
+            || str_contains($haystack, 'рольставни для проема')
+            || str_contains($haystack, 'рольставни для проёма');
+    }
+
+    /**
+     * Uses the роллеты для проема price matrix loaded by excel:load-data.
+     * Requested dimensions are priced by the nearest available larger table size.
+     *
+     * @return array{price:int|null,error:string|null}
+     */
+    private function calculateRolletsOpeningPrice(string $modelName, float $width, float $height): array
+    {
+        $matrices = Cache::get(self::ROLLETS_OPENING_CACHE_KEY);
+        if (!is_array($matrices) || !isset($matrices[$modelName]) || !is_array($matrices[$modelName])) {
+            return ['price' => null, 'error' => self::ERROR_SHEET_NOT_FOUND];
+        }
+
+        $matrix = $matrices[$modelName];
         $priceWidth = $this->nearestGreaterOrEqual((array) ($matrix['widths'] ?? []), $width);
         $priceHeight = $this->nearestGreaterOrEqual((array) ($matrix['heights'] ?? []), $height);
 

@@ -10,6 +10,7 @@ class LoadExcelData extends Command
     protected $signature = 'excel:load-data';
     protected $description = 'Load Excel data and cache it';
     private const SANTEH_ROLLETS_CACHE_KEY = 'santeh_rollets_price_matrix';
+    private const ROLLETS_OPENING_CACHE_KEY = 'rollets_opening_price_matrices';
 
     public function handle()
     {
@@ -42,6 +43,7 @@ class LoadExcelData extends Command
         Cache::forever('cached_sheets', array_unique($cachedSheets)); // Обновляем кэш со списком листов
 
         $this->loadSantehRolletsPrices($cachedSheets);
+        $this->loadRolletsOpeningPrices($cachedSheets);
 
         $this->info('Excel data with calculated values loaded and cached successfully!');
     }
@@ -113,6 +115,7 @@ class LoadExcelData extends Command
             'min_price' => $minPrice,
         ]);
 
+        $cachedSheets = Cache::get('cached_sheets', $cachedSheets);
         $cachedSheets[] = self::SANTEH_ROLLETS_CACHE_KEY;
         Cache::forever('cached_sheets', array_unique($cachedSheets));
     }
@@ -150,6 +153,116 @@ class LoadExcelData extends Command
         }
 
         return $prices;
+    }
+
+    private function loadRolletsOpeningPrices(array $cachedSheets): void
+    {
+        $filePath = storage_path('app/public/rollets_opening_prices.xlsx');
+        if (!file_exists($filePath)) {
+            return;
+        }
+
+        $spreadsheet = IOFactory::load($filePath);
+        $matrices = [];
+
+        foreach ($spreadsheet->getAllSheets() as $sheet) {
+            $matrix = $this->readRolletsOpeningSheet($sheet);
+            if (!$matrix) {
+                continue;
+            }
+
+            $matrices[trim($sheet->getTitle())] = $matrix;
+        }
+
+        if (empty($matrices)) {
+            return;
+        }
+
+        Cache::forever(self::ROLLETS_OPENING_CACHE_KEY, $matrices);
+
+        $cachedSheets = Cache::get('cached_sheets', $cachedSheets);
+        $cachedSheets[] = self::ROLLETS_OPENING_CACHE_KEY;
+        Cache::forever('cached_sheets', array_unique($cachedSheets));
+    }
+
+    private function readRolletsOpeningSheet($sheet): ?array
+    {
+        $highestColumnIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($sheet->getHighestColumn());
+        $highestRow = $sheet->getHighestRow();
+        $headerRow = null;
+        $heightColumn = null;
+
+        for ($row = 1; $row <= $highestRow; $row++) {
+            for ($column = 1; $column <= $highestColumnIndex; $column++) {
+                $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($column);
+                $value = trim((string) $sheet->getCell($columnLetter . $row)->getCalculatedValue());
+                if (mb_strtolower($value) === 'в/ш') {
+                    $headerRow = $row;
+                    $heightColumn = $column;
+                    break 2;
+                }
+            }
+        }
+
+        if ($headerRow === null || $heightColumn === null) {
+            return null;
+        }
+
+        $widths = [];
+        for ($column = $heightColumn + 1; $column <= $highestColumnIndex; $column++) {
+            $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($column);
+            $value = $sheet->getCell($columnLetter . $headerRow)->getCalculatedValue();
+            if (is_numeric($value) && (int) $value > 0) {
+                $widths[$column] = (int) $value;
+            }
+        }
+
+        $heights = [];
+        $prices = [];
+        $minWidth = null;
+        $minHeight = null;
+        $minPrice = null;
+
+        for ($row = $headerRow + 1; $row <= $highestRow; $row++) {
+            $heightColumnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($heightColumn);
+            $height = $sheet->getCell($heightColumnLetter . $row)->getCalculatedValue();
+            if (!is_numeric($height) || (int) $height <= 0) {
+                continue;
+            }
+
+            $height = (int) $height;
+            $heights[$row] = $height;
+
+            foreach ($widths as $column => $width) {
+                $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($column);
+                $price = $sheet->getCell($columnLetter . $row)->getCalculatedValue();
+                if (!is_numeric($price) || (float) $price <= 0) {
+                    continue;
+                }
+
+                $price = (float) $price;
+                $prices[$height][$width] = $price;
+
+                if ($minPrice === null || $price < $minPrice) {
+                    $minPrice = $price;
+                    $minWidth = $width;
+                    $minHeight = $height;
+                }
+            }
+        }
+
+        if (empty($prices)) {
+            return null;
+        }
+
+        return [
+            'widths' => array_values($widths),
+            'heights' => array_values($heights),
+            'prices' => $prices,
+            'min_width' => $minWidth,
+            'min_height' => $minHeight,
+            'min_price' => $minPrice,
+        ];
     }
 }
 

@@ -185,11 +185,42 @@
                     <aside class="sidebarFilter">
                         @include('front.partials.price-filter')
 
+                        @if ($models->isNotEmpty())
+                            <div class="sidebarFilter__statusWrap">
+                                <div class="sidebarFilter__title">Модели</div>
+                                <div class="sidebarFilter__paramsWrap">
+                                    @foreach ($models as $model)
+                                        <label class="sidebarFilter__label modelLabel">
+                                            <input type="checkbox" id="modelid{{ $model->id }}" name="model_id_to_filter[]"
+                                                value="{{ $model->id }}" @if (in_array($model->id, $selectedModels)) checked @endif />
+                                            <span class="checkmark"><i class="fas fa-check"></i></span>
+                                            <span class="sidebarFilter__labelText">{{ $model->h1 ?: $model->title }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
+                        @if ($filterColors->filter()->isNotEmpty())
+                            <div class="sidebarFilter__statusWrap filterColors">
+                                <div class="sidebarFilter__title">Цвет</div>
+                                <div class="sidebarFilter__paramsWrap">
+                                    @foreach ($filterColors->filter() as $color)
+                                        <label class="sidebarFilter__label colorLabel">
+                                            <input type="checkbox" name="color[]" value="{{ $color }}"
+                                                class="sidebarFilter__checkbox" />
+                                            <span class="sidebarFilter__labelText colorLabel__text"
+                                                style="background-color: {{ $color }};">
+                                                <span class="colorArrow" style="color:{{ $color }} !important">✔</span>
+                                            </span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
 
                         <style>
-                            .popularsWithFilter__wrap{
-                                grid-template-columns: 1fr
-                            }
                             .popularsWithFilter__cards{
                                 grid-template-columns: repeat(4, 1fr);
                             }
@@ -744,7 +775,13 @@
             const tabs = document.querySelectorAll('.s-populars__tabsNav li');
             const productsContainer = document.getElementById('products-container');
             const slides = document.querySelectorAll('.catCalculator .prodForm');
+            @php
+                $useOpeningPriceMatrix = (int) $subcategory->id === 82
+                    || in_array($subcategory->slug, ['rolleti-dlya-proema', 'rolleti-dlya-proyema', 'rolleti-dlya-projema', 'rollety-dlya-proyoma'], true);
+            @endphp
             const useSantehPriceMatrix = @json($subcategory->slug === 'santehnicheskie-rolleti');
+            const useOpeningPriceMatrix = @json($useOpeningPriceMatrix);
+            const useDimensionPriceMatrix = useSantehPriceMatrix || useOpeningPriceMatrix;
             // console.log(calcForm);
 
             document.querySelectorAll('.product-params-accordion .accordion-header').forEach((header) => {
@@ -1204,7 +1241,7 @@
                     });
 
                     // Изначальный расчет при загрузке
-                    if (useSantehPriceMatrix) {
+                    if (useDimensionPriceMatrix) {
                         fetchPrice();
                     } else {
                         rebuildPrice(currentBasePrice, parseInt(counterInput.value) || 1, parseFloat(discountInput?.value) || 0);
