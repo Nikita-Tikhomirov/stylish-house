@@ -777,6 +777,7 @@
             const slides = document.querySelectorAll('.catCalculator .prodForm');
             @php
                 $useOpeningPriceMatrix = (int) $subcategory->id === 82
+                    || str_contains($subcategory->slug, 'na-okna')
                     || in_array($subcategory->slug, ['rolleti-dlya-proema', 'rolleti-dlya-proyema', 'rolleti-dlya-projema', 'rollety-dlya-proyoma'], true);
             @endphp
             const useSantehPriceMatrix = @json($subcategory->slug === 'santehnicheskie-rolleti');

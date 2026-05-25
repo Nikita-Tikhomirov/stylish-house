@@ -40,12 +40,12 @@ class ProductMinPriceCalculator
             return ['price' => null, 'error' => self::ERROR_INVALID_DIMENSIONS];
         }
 
-        if ($this->isSantehRolletsProduct($prodTitle, $modelName)) {
-            return $this->calculateSantehRolletsPrice($width, $height);
-        }
-
         if ($this->isRolletsOpeningProduct($prodTitle, $modelName)) {
             return $this->calculateRolletsOpeningPrice($modelName, $width, $height);
+        }
+
+        if ($this->isSantehRolletsProduct($prodTitle, $modelName)) {
+            return $this->calculateSantehRolletsPrice($width, $height);
         }
 
         $sheetData = Cache::get('sheet_' . $modelName);
@@ -322,8 +322,10 @@ class ProductMinPriceCalculator
 
         return str_contains($haystack, 'роллеты для проема')
             || str_contains($haystack, 'роллеты для проёма')
+            || str_contains($haystack, 'роллеты на окна')
             || str_contains($haystack, 'рольставни для проема')
-            || str_contains($haystack, 'рольставни для проёма');
+            || str_contains($haystack, 'рольставни для проёма')
+            || str_contains($haystack, 'рольставни на окна');
     }
 
     /**
