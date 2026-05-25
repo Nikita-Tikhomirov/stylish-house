@@ -284,17 +284,13 @@
             <x-front.section.rollets-installation />
         @endif
 
-        @if ($showRolletSystems ?? false)
+        @if ($showRolletCalculator ?? false)
             @php
-                $templateRollerShutterSystems = $rollerShutterSystems
-                    ?? \App\Models\RollerShutterSystem::where('category_id', $category->id)
-                        ->orderBy('sort_order')
-                        ->orderBy('id')
-                        ->get();
+                $templateRolletCalcProducts = method_exists($filterProduts, 'getCollection')
+                    ? $filterProduts->getCollection()
+                    : collect($filterProduts);
             @endphp
-            @if ($templateRollerShutterSystems->isNotEmpty())
-                <x-front.section.rollets-systems :systems="$templateRollerShutterSystems" />
-            @endif
+            <x-front.section.rollets-calculator :products="$templateRolletCalcProducts" />
         @endif
 
         @if ($showRolletProfilePrices ?? false)

@@ -125,30 +125,31 @@
     .s-rollets-prices__nav {
         display: flex;
         flex-wrap: wrap;
-        justify-content: center;
+        justify-content: flex-start;
         gap: 10px;
-        margin-bottom: 34px;
+        margin-bottom: 28px;
     }
 
     .s-rollets-prices__tab {
-        min-width: 120px;
-        min-height: 48px;
-        padding: 12px 26px;
-        border: 1px solid #e0e0e0;
-        border-radius: 999px;
+        min-width: 118px;
+        min-height: 52px;
+        padding: 12px 20px;
+        border: 1px solid #0989ff;
+        border-radius: 6px;
         background: #fff;
-        color: #444;
+        color: #0989ff;
         cursor: pointer;
         font-size: 16px;
+        font-weight: 700;
         line-height: 1.2;
         transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
     }
 
     .s-rollets-prices__tab:hover,
     .s-rollets-prices__tab.active {
-        border-color: #ffe4e4;
-        background: #ffecec;
-        color: #ff3f55;
+        border-color: #0989ff;
+        background: #0989ff;
+        color: #fff;
     }
 
     .s-rollets-prices__panel {
@@ -161,9 +162,10 @@
 
     .s-rollets-prices__table-wrap {
         overflow-x: auto;
-        border: 1px solid #cfcfcf;
-        border-radius: 4px;
+        border: 1px solid #d6e9ff;
+        border-radius: 6px;
         background: #fff;
+        box-shadow: 0 8px 24px rgba(9, 137, 255, 0.06);
     }
 
     .s-rollets-prices__table {
@@ -184,7 +186,7 @@
     }
 
     .s-rollets-prices__table thead th {
-        border-bottom: 2px solid #7ca800;
+        border-bottom: 2px solid #0989ff;
         color: #333;
         font-weight: 700;
     }
@@ -195,7 +197,7 @@
     }
 
     .s-rollets-prices__corner {
-        color: #7ca800 !important;
+        color: #0989ff !important;
     }
 
     .s-rollets-prices__option {
@@ -216,14 +218,31 @@
         }
 
         .s-rollets-prices__tab {
-            min-width: 96px;
-            min-height: 42px;
-            padding: 10px 18px;
+            flex: 1 1 calc(33.333% - 8px);
+            min-width: 92px;
+            min-height: 44px;
+            padding: 10px 12px;
             font-size: 14px;
         }
 
         .s-rollets-prices__note {
             font-size: 15px;
+        }
+
+        .s-rollets-prices__table {
+            min-width: 640px;
+            font-size: 13px;
+        }
+
+        .s-rollets-prices__table th,
+        .s-rollets-prices__table td {
+            padding: 7px 8px;
+        }
+    }
+
+    @media (max-width: 420px) {
+        .s-rollets-prices__tab {
+            flex-basis: calc(50% - 8px);
         }
     }
 </style>
