@@ -284,6 +284,23 @@
             <x-front.section.rollets-installation />
         @endif
 
+        @if ($showRolletSystems ?? false)
+            @php
+                $templateRollerShutterSystems = $rollerShutterSystems
+                    ?? \App\Models\RollerShutterSystem::where('category_id', $category->id)
+                        ->orderBy('sort_order')
+                        ->orderBy('id')
+                        ->get();
+            @endphp
+            @if ($templateRollerShutterSystems->isNotEmpty())
+                <x-front.section.rollets-systems :systems="$templateRollerShutterSystems" />
+            @endif
+        @endif
+
+        @if ($showRolletProfilePrices ?? false)
+            <x-front.section.rollets-profile-prices />
+        @endif
+
         <!-- Калькулятор -->
         @if (($showTemplateCalculator ?? true) && !empty($firstProduct))
             @php
@@ -687,7 +704,9 @@
         @endif
 
         <!-- СЕО ТЕКСТ -->
-        <x-front.section.seo :seoSection="$subcategory->seo"></x-front.section.seo>
+        @if ($showSeoSection ?? true)
+            <x-front.section.seo :seoSection="$subcategory->seo"></x-front.section.seo>
+        @endif
 
         <!-- Все категории -->
         <section class="s-tags wrapper">

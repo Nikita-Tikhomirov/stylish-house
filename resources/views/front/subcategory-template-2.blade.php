@@ -1,3 +1,6 @@
 @php($showTemplateCalculator = false)
-@php($showSubcatSections = true)
+@php($showSubcatSections = false)
+@php($showRolletSystems = true)
+@php($showRolletProfilePrices = true)
+@php($showSeoSection = false)
 @include('front.subcategory-template-1')
