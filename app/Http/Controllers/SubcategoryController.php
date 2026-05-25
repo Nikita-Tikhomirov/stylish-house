@@ -207,7 +207,8 @@ class SubcategoryController extends Controller
                 ->first();
 
             if ($firstProduct) {
-                $sameModelProducts = Product::where('model_id', $firstProduct->model_id)
+                $sameModelProducts = Product::where('subcategory_id', $sourceSubcategoryId)
+                    ->where('model_id', $firstProduct->model_id)
                     ->where('id', '!=', $firstProduct->id) // Исключаем первый товар из выборки
                     ->limit(3) // Ограничиваем до 3, чтобы вместе с первым было 4
                     ->get();
@@ -228,7 +229,8 @@ class SubcategoryController extends Controller
                 ->first();
 
             if ($firstProduct) {
-                $sameModelProducts = Product::where('model_id', $firstProduct->model_id)
+                $sameModelProducts = Product::where('subcategory_id', $sourceSubcategoryId)
+                    ->where('model_id', $firstProduct->model_id)
                     ->where('id', '!=', $firstProduct->id) // Исключаем первый товар из выборки
                     ->limit(3) // Ограничиваем до 3, чтобы вместе с первым было 4
                     ->get();

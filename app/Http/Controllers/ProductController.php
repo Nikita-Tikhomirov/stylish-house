@@ -160,6 +160,7 @@ class ProductController extends Controller
         $sameModelProducts = [];
         if ($product->model_id) {
             $sameModelProducts = Product::where('model_id', $product->model_id)
+                ->where('subcategory_id', $product->subcategory_id)
                 ->where('id', '!=', $product->id)
                 ->inRandomOrder()
                 ->limit(4)
@@ -169,6 +170,7 @@ class ProductController extends Controller
         $seamlesProds = [];
         if ($product->model_id) {
             $seamlesProds = Product::where('products.model_id', $product->model_id)
+                ->where('products.subcategory_id', $product->subcategory_id)
                 ->where('products.id', '!=', $product->id)
                 ->leftJoin('prod_model', 'products.model_id', '=', 'prod_model.id')
                 ->select('products.*', 'prod_model.title as model_title')
