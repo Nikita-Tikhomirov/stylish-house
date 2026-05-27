@@ -323,11 +323,15 @@
 
         @if ($showRolletCalculator ?? false)
             @php
-                $templateRolletCalcProducts = method_exists($filterProduts, 'getCollection')
-                    ? $filterProduts->getCollection()
-                    : collect($filterProduts);
+                $templateRolletCalcProducts = $rolletCalculatorProducts
+                    ?? (method_exists($filterProduts, 'getCollection')
+                        ? $filterProduts->getCollection()
+                        : collect($filterProduts));
             @endphp
-            <x-front.section.rollets-calculator :products="$templateRolletCalcProducts" />
+            <x-front.section.rollets-calculator
+                :products="$templateRolletCalcProducts"
+                :title="$rolletCalculatorTitle ?? 'Рассчитать стоимость рольставен'"
+            />
         @endif
 
         @if ($showRolletProfilePrices ?? false)
