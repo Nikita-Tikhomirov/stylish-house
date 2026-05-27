@@ -325,7 +325,10 @@ class ProductMinPriceCalculator
             || str_contains($haystack, 'роллеты на окна')
             || str_contains($haystack, 'рольставни для проема')
             || str_contains($haystack, 'рольставни для проёма')
-            || str_contains($haystack, 'рольставни на окна');
+            || str_contains($haystack, 'рольставни на окна')
+            || str_contains($haystack, 'секционные ворота')
+            || str_contains($haystack, 'секционных ворот')
+            || str_contains($haystack, 'промышленные ворота');
     }
 
     /**

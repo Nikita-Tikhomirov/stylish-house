@@ -1,1 +1,1 @@
-@include('admin.subcatEdit')
+@include('admin.subcatEdit-template-1')

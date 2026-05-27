@@ -310,8 +310,10 @@
                 <div class="form-group">
                     <label for="template_variant">Шаблон (редактирование/фронтент)</label>
                     <select class="form-control" name="template_variant" id="template_variant">
-                        <option value="1" {{ (int) ($subcategory->template_variant ?? 1) === 1 ? 'selected' : '' }}>Сантех роллеты 1</option>
-                        <option value="2" {{ (int) ($subcategory->template_variant ?? 1) === 2 ? 'selected' : '' }}>Шаблон 2</option>
+                        <option value="1" {{ (int) ($subcategory->template_variant ?? 1) === 1 ? 'selected' : '' }}>Сантех-роллеты</option>
+                        <option value="2" {{ (int) ($subcategory->template_variant ?? 1) === 2 ? 'selected' : '' }}>Роллеты для проёма/окон/ворот/витрин</option>
+                        <option value="3" {{ (int) ($subcategory->template_variant ?? 1) === 3 ? 'selected' : '' }}>Сантехнические роллеты</option>
+                        <option value="4" {{ (int) ($subcategory->template_variant ?? 1) === 4 ? 'selected' : '' }}>Секционные и промышленные ворота</option>
                     </select>
                 </div>
                 <button class="btn btn-primary" type="button" id="applyTemplateButton">Сохранить</button>

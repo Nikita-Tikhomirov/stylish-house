@@ -35,7 +35,7 @@ class SubcategoryController extends Controller
     protected const DEFAULT_EDIT_TEMPLATE = 'admin.subcatEdit';
     protected const TEMPLATE_CATEGORY_ID = 16;
     protected const TEMPLATE_MIN_VARIANT = 1;
-    protected const TEMPLATE_MAX_VARIANT = 2;
+    protected const TEMPLATE_MAX_VARIANT = 4;
 
     protected function serializePreviewProduct(Product $product): array
     {
@@ -476,7 +476,7 @@ class SubcategoryController extends Controller
     public function updateVisibility(Request $request, $category_slug, $subcategory_slug)
     {
         $request->validate([
-            'template_variant' => 'nullable|integer|min:1|max:2',
+            'template_variant' => 'nullable|integer|min:1|max:4',
         ]);
 
         $category = Category::where('slug', $category_slug)->firstOrFail();

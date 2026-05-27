@@ -306,13 +306,19 @@
                 </div>
             </section>
 
+        @if (($showWorkExamplesEarly ?? false) && !empty($workExamples) && $workExamples->isNotEmpty())
+            <x-front.section.subgallery :gallerys="$workExamples" :category='$category' title=""></x-front.section.subgallery>
+        @endif
+
         <!-- Блоки подкатегорий / виды монтажа -->
-        @if (($showSubcatSections ?? false) && !empty($subcategoriesWithProducts) && $subcategoriesWithProducts->isNotEmpty())
-            <x-subcat-sections :category="$category" :subcategoriesWithProducts="$subcategoriesWithProducts" :headerInfo="$headerInfo" />
-        @elseif (!empty($installationTypes) && $installationTypes->isNotEmpty())
-            <x-front.section.subcategory-installation-types :installationTypes="$installationTypes" />
-        @else
-            <x-front.section.rollets-installation />
+        @if ($showInstallationSection ?? true)
+            @if (($showSubcatSections ?? false) && !empty($subcategoriesWithProducts) && $subcategoriesWithProducts->isNotEmpty())
+                <x-subcat-sections :category="$category" :subcategoriesWithProducts="$subcategoriesWithProducts" :headerInfo="$headerInfo" />
+            @elseif (!empty($installationTypes) && $installationTypes->isNotEmpty())
+                <x-front.section.subcategory-installation-types :installationTypes="$installationTypes" />
+            @else
+                <x-front.section.rollets-installation />
+            @endif
         @endif
 
         @if ($showRolletCalculator ?? false)
@@ -325,16 +331,20 @@
         @endif
 
         @if ($showRolletProfilePrices ?? false)
-            <x-front.section.rollets-profile-prices />
+            <x-front.section.rollets-profile-prices
+                :title="$rolletProfilePricesTitle ?? 'Цены по видам профиля'"
+                :note="$rolletProfilePricesNote ?? 'В таблицах указаны цены на популярные размеры рольставен с ПИМ, щеколдами, самозамером и самовывозом.'"
+            />
         @endif
 
         <!-- Калькулятор -->
         @if (($showTemplateCalculator ?? true) && !empty($firstProduct))
             @php
                 $product = $firstProduct;
+                $calculatorTitle = $calculatorTitle ?? 'Рассчитать стоимость рольставен';
             @endphp
             <section class="prodMain wrapper catCalculator" style="padding-top: 40px;">
-                <h2 class="prodMain__title title"> <span>Рассчитать стоимость рольставен</span><svg width="114" height="35"
+                <h2 class="prodMain__title title"> <span>{{ $calculatorTitle }}</span><svg width="114" height="35"
                         viewBox="0 0 114 35" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M112 23.275C1.84952 -10.6834 -7.36586 1.48086 7.50443 32.9053" stroke="currentColor"
                             stroke-width="4" stroke-miterlimit="3.8637" stroke-linecap="round"></path>
@@ -636,13 +646,19 @@
             </section>
         @endif
 
-        @if (!empty($workExamples) && $workExamples->isNotEmpty())
+        @if ($showGateScheme ?? false)
+            <x-front.section.sectional-gates-scheme />
+        @endif
+
+        @if (!($showWorkExamplesEarly ?? false) && !empty($workExamples) && $workExamples->isNotEmpty())
             <x-front.section.subgallery :gallerys="$workExamples" :category='$category' title=""></x-front.section.subgallery>
         @endif
 
         <!-- Оплата и доставка -->
-        <x-front.section.delivery :title="$homePageFields->section_delivery_title" :topText="$homePageFields->section_delivery_top_text" :bottomText="$homePageFields->section_delivery_bottom_text"
-            :iconCards="$iconCards"></x-front.section.delivery>
+        @if (!($showDeliveryAfterSeo ?? false))
+            <x-front.section.delivery :title="$homePageFields->section_delivery_title" :topText="$homePageFields->section_delivery_top_text" :bottomText="$homePageFields->section_delivery_bottom_text"
+                :iconCards="$iconCards"></x-front.section.delivery>
+        @endif
 
         <!-- ВОПРОСЫ И ОТВЕТЫ -->
         @if ($subcategory->faq_html)
@@ -735,6 +751,11 @@
             <x-front.section.seo :seoSection="$subcategory->seo"></x-front.section.seo>
         @endif
 
+        @if ($showDeliveryAfterSeo ?? false)
+            <x-front.section.delivery :title="$homePageFields->section_delivery_title" :topText="$homePageFields->section_delivery_top_text" :bottomText="$homePageFields->section_delivery_bottom_text"
+                :iconCards="$iconCards"></x-front.section.delivery>
+        @endif
+
         <!-- Все категории -->
         <section class="s-tags wrapper">
             <h2 class="s-tags__title title"> <span>Все категории</span><svg width="114" height="35"
@@ -778,6 +799,8 @@
             @php
                 $useOpeningPriceMatrix = (int) $subcategory->id === 82
                     || str_contains($subcategory->slug, 'na-okna')
+                    || str_contains($subcategory->slug, 'sekcion')
+                    || str_contains($subcategory->slug, 'vorot')
                     || in_array($subcategory->slug, ['rolleti-dlya-proema', 'rolleti-dlya-proyema', 'rolleti-dlya-projema', 'rollety-dlya-proyoma'], true);
             @endphp
             const useSantehPriceMatrix = @json($subcategory->slug === 'santehnicheskie-rolleti');
