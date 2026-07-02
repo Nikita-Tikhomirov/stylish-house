@@ -303,7 +303,7 @@ class ProductMinPriceCalculator
             return ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND];
         }
 
-        $price = $matrix['prices'][$priceHeight][$priceWidth] ?? null;
+        $price = $this->findAvailableMatrixPrice($matrix, $priceWidth, $priceHeight);
         if ($price === null || !is_numeric($price)) {
             return ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND];
         }
@@ -355,12 +355,38 @@ class ProductMinPriceCalculator
             return ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND];
         }
 
-        $price = $matrix['prices'][$priceHeight][$priceWidth] ?? null;
+        $price = $this->findAvailableMatrixPrice($matrix, $priceWidth, $priceHeight);
         if ($price === null || !is_numeric($price)) {
             return ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND];
         }
 
         return ['price' => (int) round((float) $price), 'error' => null];
+    }
+
+    private function findAvailableMatrixPrice(array $matrix, int $startWidth, int $startHeight): mixed
+    {
+        $widths = array_values(array_filter(
+            array_map(static fn ($value) => is_numeric($value) ? (int) $value : null, (array) ($matrix['widths'] ?? [])),
+            static fn ($value) => $value !== null && $value >= $startWidth
+        ));
+        $heights = array_values(array_filter(
+            array_map(static fn ($value) => is_numeric($value) ? (int) $value : null, (array) ($matrix['heights'] ?? [])),
+            static fn ($value) => $value !== null && $value >= $startHeight
+        ));
+
+        sort($widths, SORT_NUMERIC);
+        sort($heights, SORT_NUMERIC);
+
+        foreach ($heights as $height) {
+            foreach ($widths as $width) {
+                $price = $matrix['prices'][$height][$width] ?? null;
+                if ($price !== null && is_numeric($price)) {
+                    return $price;
+                }
+            }
+        }
+
+        return null;
     }
 
     private function nearestGreaterOrEqual(array $values, float $needle): ?int

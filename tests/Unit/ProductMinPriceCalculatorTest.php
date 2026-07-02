@@ -83,4 +83,31 @@ class ProductMinPriceCalculatorTest extends TestCase
         $this->assertNull($result['price']);
         $this->assertSame(ProductMinPriceCalculator::ERROR_PRICE_NOT_FOUND, $result['error']);
     }
+
+    public function test_rollets_matrix_uses_next_available_price_when_nearest_cell_is_empty(): void
+    {
+        $calculator = new ProductMinPriceCalculator();
+        Cache::put(ProductMinPriceCalculator::ROLLETS_OPENING_CACHE_KEY, [
+            'RH58N' => [
+                'widths' => [500, 1000],
+                'heights' => [500],
+                'prices' => [
+                    500 => [
+                        500 => null,
+                        1000 => 14963,
+                    ],
+                ],
+            ],
+        ]);
+
+        $result = $calculator->calculate([
+            'model' => 'RH58N',
+            'prodTitle' => 'Рольворота RH58N антрацит',
+            'width' => 400,
+            'height' => 500,
+        ]);
+
+        $this->assertSame(14963, $result['price']);
+        $this->assertNull($result['error']);
+    }
 }
