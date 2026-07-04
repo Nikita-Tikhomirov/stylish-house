@@ -130,6 +130,12 @@
 </style>
 
 <body class="p-index">
+    @php
+        $renderOptionPrice = static function ($value, $fallback = 0): string {
+            $amount = (int) ($value ?? $fallback);
+            return $amount > 0 ? '<span class="option-price">+' . number_format($amount, 0, '', ' ') . '₽</span>' : '';
+        };
+    @endphp
 
     <x-front.header :categoriesInCatalogMenu="$categoriesInCatalogMenu" :categoriesInHeaderMenu="$categoriesInHeaderMenu" :cart="$cart" :headerInfo="$headerInfo"></x-front.header>
 
@@ -460,7 +466,7 @@
                                 <li>
                                     <label>
                                         <input class="widthType" type="radio" name="lock-type" value="sliders" data-price="0" checked>
-                                        <span>Задвижки +0р</span>
+                                        <span>Задвижки</span>
                                     </label>
                                 </li>
                                 <li>
@@ -488,7 +494,7 @@
                                         <label class="option-label">
                                             <input type="radio" name="installation-type" value="overhead" data-price="{{ $product->overhead_price ?? 0 }}" {{ $product->installation_type == 'overhead' ? 'checked' : '' }}>
                                             <span class="option-name">Накладной монтаж</span>
-                                            <span class="option-price">+{{ $product->overhead_price ?? 0 }}₽</span>
+                                            {!! $renderOptionPrice($product->overhead_price ?? 0) !!}
                                         </label>
                                         <div class="option-description">
                                             При выборе накладного монтажа необходимо к размерам проема добавьте 110мм по ширине и 250мм по высоте.
@@ -497,7 +503,7 @@
                                         <label class="option-label">
                                             <input type="radio" name="installation-type" value="built-in" data-price="{{ $product->builtin_price ?? 0 }}" {{ $product->installation_type == 'built-in' ? 'checked' : '' }}>
                                             <span class="option-name">Встроенный монтаж</span>
-                                            <span class="option-price">+{{ $product->builtin_price ?? 0 }}₽</span>
+                                            {!! $renderOptionPrice($product->builtin_price ?? 0) !!}
                                         </label>
                                         <div class="option-description">
                                             При выборе встроенного монтажа рекомендуется от размеров проема отнять по ширине и высоте 5 мм.
@@ -516,7 +522,7 @@
                                         <label class="option-label">
                                             <input type="radio" name="control-type" value="strap" data-price="{{ $product->strap_price ?? 0 }}" {{ $product->control_type == 'strap' ? 'checked' : '' }}>
                                             <span class="option-name">Ленточный или шнуровой инерционный привод</span>
-                                            <span class="option-price">+{{ $product->strap_price ?? 0 }}₽</span>
+                                            {!! $renderOptionPrice($product->strap_price ?? 0) !!}
                                         </label>
                                         <div class="option-description">
                                             Грузоподъемность до 15 кг. Ручное управление.
@@ -525,7 +531,7 @@
                                         <label class="option-label">
                                             <input type="radio" name="control-type" value="cardan" data-price="{{ $product->cardan_price ?? 0 }}" {{ $product->control_type == 'cardan' ? 'checked' : '' }}>
                                             <span class="option-name">Воротковый привод (кардан)</span>
-                                            <span class="option-price">+{{ $product->cardan_price ?? 0 }}₽</span>
+                                            {!! $renderOptionPrice($product->cardan_price ?? 0) !!}
                                         </label>
                                         <div class="option-description">
                                             Грузоподъемность до 35 кг. Ручное управление.
@@ -534,16 +540,16 @@
                                         <label class="option-label">
                                             <input type="radio" name="control-type" value="pim" data-price="{{ $product->pim_price ?? 0 }}" {{ $product->control_type == 'pim' ? 'checked' : '' }}>
                                             <span class="option-name">Пружинно-инерционный механизм (ПИМ)</span>
-                                            <span class="option-price">+{{ $product->pim_price ?? 0 }}₽</span>
+                                            {!! $renderOptionPrice($product->pim_price ?? 0) !!}
                                         </label>
                                         <div class="option-description">
                                             Грузоподъемность от 6 до 80 кг. Ручное управление.
                                         </div>
                                         
                                         <label class="option-label">
-                                            <input type="radio" name="control-type" value="electric" data-price="{{ $product->electric_price ?? 6793 }}" {{ $product->control_type == 'electric' ? 'checked' : '' }}>
+                                            <input type="radio" name="control-type" value="electric" data-price="{{ $product->electric_price ?? 7000 }}" {{ $product->control_type == 'electric' ? 'checked' : '' }}>
                                             <span class="option-name">Автоматическое управление (электропривод)</span>
-                                            <span class="option-price">+{{ $product->electric_price ?? 6793 }}₽</span>
+                                            {!! $renderOptionPrice($product->electric_price ?? 7000) !!}
                                         </label>
                                         <div class="option-description">
                                             Тип управление: выключатель настенный или мини пульт.
@@ -560,27 +566,27 @@
                                 <div class="accordion-content">
                                     <div class="lock-options">
                                         <label class="option-label">
-                                            <input type="radio" name="lock-device" value="rigel" data-price="{{ $product->rigel_price ?? 1575 }}" {{ $product->lock_device == 'rigel' ? 'checked' : '' }}>
+                                            <input type="radio" name="lock-device" value="rigel" data-price="{{ $product->rigel_price ?? 0 }}" {{ $product->lock_device == 'rigel' ? 'checked' : '' }}>
                                             <span class="option-name">Ригельный замок (с ключом)</span>
-                                            <span class="option-price">+{{ $product->rigel_price ?? 1575 }}₽</span>
+                                            {!! $renderOptionPrice($product->rigel_price ?? 0) !!}
                                         </label>
                                         <div class="option-description">
                                             Используется при ручном управлении. Рольставни запираются на замок. Не рекомендуется использовать при электроприводе.
                                         </div>
                                         
                                         <label class="option-label">
-                                            <input type="radio" name="lock-device" value="shchyolka" data-price="{{ $product->shchyolka_price ?? 171 }}" {{ $product->lock_device == 'shchyolka' ? 'checked' : '' }}>
+                                            <input type="radio" name="lock-device" value="shchyolka" data-price="{{ $product->shchyolka_price ?? 0 }}" {{ $product->lock_device == 'shchyolka' ? 'checked' : '' }}>
                                             <span class="option-name">Ручной ригель (щеколда)</span>
-                                            <span class="option-price">+{{ $product->shchyolka_price ?? 171 }}₽</span>
+                                            {!! $renderOptionPrice($product->shchyolka_price ?? 0) !!}
                                         </label>
                                         <div class="option-description">
                                             Используется при ручном управлении. Любой желающий сможет открыть роллету. Не рекомендуется использовать при электроприводе.
                                         </div>
                                         
                                         <label class="option-label">
-                                            <input type="radio" name="lock-device" value="upper" data-price="{{ $product->upper_price ?? 2358 }}" {{ $product->lock_device == 'upper' ? 'checked' : '' }}>
+                                            <input type="radio" name="lock-device" value="upper" data-price="{{ $product->upper_price ?? 0 }}" {{ $product->lock_device == 'upper' ? 'checked' : '' }}>
                                             <span class="option-name">Верхний ригель (верхние замки)</span>
-                                            <span class="option-price">+{{ $product->upper_price ?? 2358 }}₽</span>
+                                            {!! $renderOptionPrice($product->upper_price ?? 0) !!}
                                         </label>
                                         <div class="option-description">
                                             Используется при управлении воротковый привод или автоматическом управлении для ограничения ручного подъема полотна.
@@ -589,7 +595,6 @@
                                         <label class="option-label">
                                             <input type="radio" name="lock-device" value="none" data-price="0" {{ $product->lock_device == 'none' ? 'checked' : '' }}>
                                             <span class="option-name">Без блокировки</span>
-                                            <span class="option-price">+0₽</span>
                                         </label>
                                         <div class="option-description">
                                             Применяется в основном при изделии для сантехнических проемов.
@@ -606,18 +611,18 @@
                                 <div class="accordion-content">
                                     <div class="additional-options">
                                         <label class="option-label">
-                                            <input type="checkbox" name="ral-paint" value="ral-paint" data-price="{{ $product->ral_price ?? 8010 }}" {{ $product->ral_paint ? 'checked' : '' }}>
+                                            <input type="checkbox" name="ral-paint" value="ral-paint" data-price="{{ $product->ral_price ?? 0 }}" {{ $product->ral_paint ? 'checked' : '' }}>
                                             <span class="option-name">Покраска по RAL</span>
-                                            <span class="option-price">+{{ $product->ral_price ?? 8010 }}₽</span>
+                                            {!! $renderOptionPrice($product->ral_price ?? 0) !!}
                                         </label>
                                         <div class="option-description">
                                             Возможна покраска профиля AER44m/S или AER55m/S. Профиль с пенным заполнением покраске не подлежит!
                                         </div>
                                         
                                         <label class="option-label">
-                                            <input type="checkbox" name="photo-print" value="photo-print" data-price="{{ $product->photo_price ?? 3920 }}" {{ $product->photo_print ? 'checked' : '' }}>
+                                            <input type="checkbox" name="photo-print" value="photo-print" data-price="{{ $product->photo_price ?? 0 }}" {{ $product->photo_print ? 'checked' : '' }}>
                                             <span class="option-name">Нанесение фотопечати</span>
-                                            <span class="option-price">+{{ $product->photo_price ?? 3920 }}₽</span>
+                                            {!! $renderOptionPrice($product->photo_price ?? 0) !!}
                                         </label>
                                         <div class="option-description">
                                             Возможна нанесение любого рисунка путем фотопечати на всем изделии.
@@ -819,6 +824,22 @@
             const useDimensionPriceMatrix = useSantehPriceMatrix || useOpeningPriceMatrix;
             // console.log(calcForm);
 
+            function hideFreeOptionPrices(root = document) {
+                root.querySelectorAll('.option-price').forEach((element) => {
+                    const amount = parseInt(element.textContent.replace(/\D/g, ''), 10) || 0;
+                    if (amount <= 0) {
+                        element.remove();
+                    }
+                });
+            }
+
+            function optionPriceMarkup(value, fallback = 0) {
+                const amount = Number(value ?? fallback) || 0;
+                return amount > 0 ? `<span class="option-price">+${amount}₽</span>` : '';
+            }
+
+            hideFreeOptionPrices();
+
             document.querySelectorAll('.product-params-accordion .accordion-header').forEach((header) => {
                 header.addEventListener('click', () => {
                     const item = header.closest('.accordion-item');
@@ -897,7 +918,7 @@
                         <div class="cartForm__optionsList">
                             <div class="cartForm__listTitle">Тип запорного устройства</div>
                             <ul>
-                                <li><label><input class="widthType" type="radio" name="popup-lock-type" value="sliders" data-price="0" checked><span>Задвижки +0р</span></label></li>
+                                <li><label><input class="widthType" type="radio" name="popup-lock-type" value="sliders" data-price="0" checked><span>Задвижки</span></label></li>
                                 <li><label><input class="widthType" type="radio" name="popup-lock-type" value="lock" data-price="1600"><span>Замок +1600р</span></label></li>
                             </ul>
                         </div>
@@ -909,9 +930,9 @@
                                 <div class="accordion-header"><h4>Вид монтажа</h4><span class="accordion-arrow">▼</span></div>
                                 <div class="accordion-content">
                                     <div class="installation-options">
-                                        <label class="option-label"><input type="radio" name="popup-installation-type" value="overhead" data-price="${price(product.overhead_price)}" ${checked(product.installation_type, 'overhead', true)}><span class="option-name">Накладной монтаж</span><span class="option-price">+${price(product.overhead_price)}₽</span></label>
+                                        <label class="option-label"><input type="radio" name="popup-installation-type" value="overhead" data-price="${price(product.overhead_price)}" ${checked(product.installation_type, 'overhead', true)}><span class="option-name">Накладной монтаж</span>${optionPriceMarkup(product.overhead_price)}</label>
                                         <div class="option-description">При выборе накладного монтажа необходимо к размерам проема добавьте 110мм по ширине и 250мм по высоте.</div>
-                                        <label class="option-label"><input type="radio" name="popup-installation-type" value="built-in" data-price="${price(product.builtin_price)}" ${checked(product.installation_type, 'built-in')}><span class="option-name">Встроенный монтаж</span><span class="option-price">+${price(product.builtin_price)}₽</span></label>
+                                        <label class="option-label"><input type="radio" name="popup-installation-type" value="built-in" data-price="${price(product.builtin_price)}" ${checked(product.installation_type, 'built-in')}><span class="option-name">Встроенный монтаж</span>${optionPriceMarkup(product.builtin_price)}</label>
                                         <div class="option-description">При выборе встроенного монтажа рекомендуется от размеров проема отнять по ширине и высоте 5 мм.</div>
                                     </div>
                                 </div>
@@ -920,13 +941,13 @@
                                 <div class="accordion-header"><h4>Тип управления рольставни</h4><span class="accordion-arrow">▼</span></div>
                                 <div class="accordion-content">
                                     <div class="control-options">
-                                        <label class="option-label"><input type="radio" name="popup-control-type" value="strap" data-price="${price(product.strap_price)}" ${checked(product.control_type, 'strap', true)}><span class="option-name">Ленточный или шнуровой инерционный привод</span><span class="option-price">+${price(product.strap_price)}₽</span></label>
+                                        <label class="option-label"><input type="radio" name="popup-control-type" value="strap" data-price="${price(product.strap_price)}" ${checked(product.control_type, 'strap', true)}><span class="option-name">Ленточный или шнуровой инерционный привод</span>${optionPriceMarkup(product.strap_price)}</label>
                                         <div class="option-description">Грузоподъемность до 15 кг. Ручное управление.</div>
-                                        <label class="option-label"><input type="radio" name="popup-control-type" value="cardan" data-price="${price(product.cardan_price)}" ${checked(product.control_type, 'cardan')}><span class="option-name">Воротковый привод (кардан)</span><span class="option-price">+${price(product.cardan_price)}₽</span></label>
+                                        <label class="option-label"><input type="radio" name="popup-control-type" value="cardan" data-price="${price(product.cardan_price)}" ${checked(product.control_type, 'cardan')}><span class="option-name">Воротковый привод (кардан)</span>${optionPriceMarkup(product.cardan_price)}</label>
                                         <div class="option-description">Грузоподъемность до 35 кг. Ручное управление.</div>
-                                        <label class="option-label"><input type="radio" name="popup-control-type" value="pim" data-price="${price(product.pim_price)}" ${checked(product.control_type, 'pim')}><span class="option-name">Пружинно-инерционный механизм (ПИМ)</span><span class="option-price">+${price(product.pim_price)}₽</span></label>
+                                        <label class="option-label"><input type="radio" name="popup-control-type" value="pim" data-price="${price(product.pim_price)}" ${checked(product.control_type, 'pim')}><span class="option-name">Пружинно-инерционный механизм (ПИМ)</span>${optionPriceMarkup(product.pim_price)}</label>
                                         <div class="option-description">Грузоподъемность от 6 до 80 кг. Ручное управление.</div>
-                                        <label class="option-label"><input type="radio" name="popup-control-type" value="electric" data-price="${price(product.electric_price, 6793)}" ${checked(product.control_type, 'electric')}><span class="option-name">Автоматическое управление (электропривод)</span><span class="option-price">+${price(product.electric_price, 6793)}₽</span></label>
+                                        <label class="option-label"><input type="radio" name="popup-control-type" value="electric" data-price="${price(product.electric_price, 7000)}" ${checked(product.control_type, 'electric')}><span class="option-name">Автоматическое управление (электропривод)</span>${optionPriceMarkup(product.electric_price, 7000)}</label>
                                         <div class="option-description">Тип управление: выключатель настенный или мини пульт.</div>
                                     </div>
                                 </div>
@@ -935,13 +956,13 @@
                                 <div class="accordion-header"><h4>Блокирующие устройства</h4><span class="accordion-arrow">▼</span></div>
                                 <div class="accordion-content">
                                     <div class="lock-options">
-                                        <label class="option-label"><input type="radio" name="popup-lock-device" value="rigel" data-price="${price(product.rigel_price, 1575)}" ${checked(product.lock_device, 'rigel')}><span class="option-name">Ригельный замок (с ключом)</span><span class="option-price">+${price(product.rigel_price, 1575)}₽</span></label>
+                                        <label class="option-label"><input type="radio" name="popup-lock-device" value="rigel" data-price="${price(product.rigel_price)}" ${checked(product.lock_device, 'rigel')}><span class="option-name">Ригельный замок (с ключом)</span>${optionPriceMarkup(product.rigel_price)}</label>
                                         <div class="option-description">Используется при ручном управлении. Рольставни запираются на замок. Не рекомендуется использовать при электроприводе.</div>
-                                        <label class="option-label"><input type="radio" name="popup-lock-device" value="shchyolka" data-price="${price(product.shchyolka_price, 171)}" ${checked(product.lock_device, 'shchyolka')}><span class="option-name">Ручной ригель (щеколда)</span><span class="option-price">+${price(product.shchyolka_price, 171)}₽</span></label>
+                                        <label class="option-label"><input type="radio" name="popup-lock-device" value="shchyolka" data-price="${price(product.shchyolka_price)}" ${checked(product.lock_device, 'shchyolka')}><span class="option-name">Ручной ригель (щеколда)</span>${optionPriceMarkup(product.shchyolka_price)}</label>
                                         <div class="option-description">Используется при ручном управлении. Любой желающий сможет открыть роллету. Не рекомендуется использовать при электроприводе.</div>
-                                        <label class="option-label"><input type="radio" name="popup-lock-device" value="upper" data-price="${price(product.upper_price, 2358)}" ${checked(product.lock_device, 'upper')}><span class="option-name">Верхний ригель (верхние замки)</span><span class="option-price">+${price(product.upper_price, 2358)}₽</span></label>
+                                        <label class="option-label"><input type="radio" name="popup-lock-device" value="upper" data-price="${price(product.upper_price)}" ${checked(product.lock_device, 'upper')}><span class="option-name">Верхний ригель (верхние замки)</span>${optionPriceMarkup(product.upper_price)}</label>
                                         <div class="option-description">Используется при управлении воротковый привод или автоматическом управлении для ограничения ручного подъема полотна.</div>
-                                        <label class="option-label"><input type="radio" name="popup-lock-device" value="none" data-price="0" ${checked(product.lock_device, 'none', true)}><span class="option-name">Без блокировки</span><span class="option-price">+0₽</span></label>
+                                        <label class="option-label"><input type="radio" name="popup-lock-device" value="none" data-price="0" ${checked(product.lock_device, 'none', true)}><span class="option-name">Без блокировки</span></label>
                                         <div class="option-description">Применяется в основном при изделии для сантехнических проемов.</div>
                                     </div>
                                 </div>
@@ -950,9 +971,9 @@
                                 <div class="accordion-header"><h4>Дополнительные опции</h4><span class="accordion-arrow">▼</span></div>
                                 <div class="accordion-content">
                                     <div class="additional-options">
-                                        <label class="option-label"><input type="checkbox" name="popup-ral-paint" value="ral-paint" data-price="${price(product.ral_price, 8010)}" ${boolChecked(product.ral_paint)}><span class="option-name">Покраска по RAL</span><span class="option-price">+${price(product.ral_price, 8010)}₽</span></label>
+                                        <label class="option-label"><input type="checkbox" name="popup-ral-paint" value="ral-paint" data-price="${price(product.ral_price)}" ${boolChecked(product.ral_paint)}><span class="option-name">Покраска по RAL</span>${optionPriceMarkup(product.ral_price)}</label>
                                         <div class="option-description">Возможна покраска профиля AER44m/S или AER55m/S. Профиль с пенным заполнением покраске не подлежит!</div>
-                                        <label class="option-label"><input type="checkbox" name="popup-photo-print" value="photo-print" data-price="${price(product.photo_price, 3920)}" ${boolChecked(product.photo_print)}><span class="option-name">Нанесение фотопечати</span><span class="option-price">+${price(product.photo_price, 3920)}₽</span></label>
+                                        <label class="option-label"><input type="checkbox" name="popup-photo-print" value="photo-print" data-price="${price(product.photo_price)}" ${boolChecked(product.photo_print)}><span class="option-name">Нанесение фотопечати</span>${optionPriceMarkup(product.photo_price)}</label>
                                         <div class="option-description">Возможна нанесение любого рисунка путем фотопечати на всем изделии.</div>
                                     </div>
                                 </div>
@@ -962,6 +983,7 @@
                 `;
 
                 sizeWrap.insertAdjacentElement('afterend', fields);
+                hideFreeOptionPrices(fields);
                 fields.querySelectorAll('.product-params-accordion .accordion-header').forEach((header) => {
                     header.addEventListener('click', () => {
                         const item = header.closest('.accordion-item');
@@ -1163,6 +1185,11 @@
                         const form = slide.matches('.prodForm')
                             ? slide
                             : (slide.querySelector('.prodForm') || slide.closest('.prodForm') || slide);
+
+                        const selectedLockType = form.querySelector('input[name="lock-type"]:checked, input[name="popup-lock-type"]:checked');
+                        if (selectedLockType) {
+                            priceNow += (parseInt(selectedLockType.dataset.price || 0, 10) * counterValue);
+                        }
 
                         const installationType = form.querySelector('input[name="installation-type"]:checked, input[name="popup-installation-type"]:checked');
                         if (installationType) {
