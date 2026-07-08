@@ -181,6 +181,15 @@
     }
     @media(max-width:620px){
         .sitePortfolio__heading{font-size:23px}
+        .sitePortfolio__slider{padding-bottom:58px}
+        .sitePortfolio__slider .swiper-button-prev,
+        .sitePortfolio__slider .swiper-button-next{
+            top:auto;
+            bottom:0;
+            transform:none;
+        }
+        .sitePortfolio__slider .swiper-button-prev{left:calc(50% - 74px)}
+        .sitePortfolio__slider .swiper-button-next{right:calc(50% - 74px)}
         .sitePortfolio__work{height:240px}
         .sitePortfolio__video h3{min-height:auto}
         .siteVideoModal{padding:14px}
