@@ -17,7 +17,17 @@
                             @endphp
                             <div class="swiper-slide">
                                 <article class="sitePortfolio__video">
-                                    <a class="sitePortfolio__videoPreview" data-fslightbox="portfolioVideos" href="{{ $embedUrl }}">
+                                    <a class="sitePortfolio__videoPreview"
+                                       @if ($isExternalVideo)
+                                           data-fslightbox="portfolioVideos"
+                                           href="{{ $embedUrl }}"
+                                       @else
+                                           href="{{ $videoUrl }}"
+                                           data-video-modal
+                                           data-video-src="{{ $videoUrl }}"
+                                           data-video-poster="{{ $poster }}"
+                                           data-video-title="{{ $video->title }}"
+                                       @endif>
                                         @if ($poster)
                                             <img src="{{ $poster }}" alt="{{ $video->title }}">
                                         @elseif ($isExternalVideo)
@@ -105,10 +115,76 @@
     .sitePortfolio__slider > .swiper-pagination .swiper-pagination-bullet{
         margin:0;
     }
+    .siteVideoModal{
+        position:fixed;
+        inset:0;
+        z-index:9999;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        padding:36px;
+        background:rgba(0,0,0,.78);
+    }
+    .siteVideoModal__inner{
+        position:relative;
+        width:min(1180px,100%);
+        background:#050505;
+        border-radius:8px;
+        overflow:hidden;
+        box-shadow:0 24px 80px rgba(0,0,0,.42);
+    }
+    .siteVideoModal__video{
+        display:block;
+        width:100%;
+        max-height:82vh;
+        aspect-ratio:16/9;
+        background:#050505;
+        object-fit:contain;
+    }
+    .siteVideoModal__play{
+        position:absolute;
+        left:50%;
+        top:50%;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        width:78px;
+        height:78px;
+        border:0;
+        border-radius:50%;
+        color:#0989ff;
+        background:#fff;
+        box-shadow:0 14px 34px rgba(0,0,0,.28);
+        transform:translate(-50%,-50%);
+        cursor:pointer;
+    }
+    .siteVideoModal__play.is-hidden{
+        display:none;
+    }
+    .siteVideoModal__close{
+        position:absolute;
+        right:14px;
+        top:14px;
+        z-index:2;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        width:38px;
+        height:38px;
+        border:0;
+        border-radius:50%;
+        color:#fff;
+        background:rgba(0,0,0,.48);
+        font-size:28px;
+        line-height:1;
+        cursor:pointer;
+    }
     @media(max-width:620px){
         .sitePortfolio__heading{font-size:23px}
         .sitePortfolio__work{height:240px}
         .sitePortfolio__video h3{min-height:auto}
+        .siteVideoModal{padding:14px}
+        .siteVideoModal__play{width:62px;height:62px}
     }
 </style>
 
@@ -164,5 +240,67 @@
         if (typeof refreshFsLightbox === 'function') {
             refreshFsLightbox();
         }
+
+        document.querySelectorAll('[data-video-modal]').forEach(function (trigger) {
+            trigger.addEventListener('click', function (event) {
+                event.preventDefault();
+
+                const src = trigger.dataset.videoSrc;
+                if (!src) {
+                    return;
+                }
+
+                const poster = trigger.dataset.videoPoster || '';
+                const title = trigger.dataset.videoTitle || '';
+                const modal = document.createElement('div');
+                modal.className = 'siteVideoModal';
+                modal.innerHTML = `
+                    <div class="siteVideoModal__inner" role="dialog" aria-modal="true" aria-label="${title}">
+                        <button class="siteVideoModal__close" type="button" aria-label="Закрыть">&times;</button>
+                        <video class="siteVideoModal__video" controls preload="metadata" playsinline ${poster ? `poster="${poster}"` : ''}>
+                            <source src="${src}" type="video/mp4">
+                        </video>
+                        <button class="siteVideoModal__play" type="button" aria-label="Воспроизвести">
+                            <i class="fas fa-play"></i>
+                        </button>
+                    </div>
+                `;
+
+                const video = modal.querySelector('video');
+                const play = modal.querySelector('.siteVideoModal__play');
+                const close = function () {
+                    video.pause();
+                    modal.remove();
+                    document.body.style.overflow = '';
+                };
+
+                play.addEventListener('click', function () {
+                    video.play();
+                });
+                video.addEventListener('play', function () {
+                    play.classList.add('is-hidden');
+                });
+                video.addEventListener('pause', function () {
+                    if (!video.ended) {
+                        play.classList.remove('is-hidden');
+                    }
+                });
+                modal.querySelector('.siteVideoModal__close').addEventListener('click', close);
+                modal.addEventListener('click', function (clickEvent) {
+                    if (clickEvent.target === modal) {
+                        close();
+                    }
+                });
+                document.addEventListener('keydown', function escHandler(keyEvent) {
+                    if (keyEvent.key === 'Escape' && document.body.contains(modal)) {
+                        document.removeEventListener('keydown', escHandler);
+                        close();
+                    }
+                });
+
+                document.body.style.overflow = 'hidden';
+                document.body.appendChild(modal);
+            });
+        });
     });
 </script>
