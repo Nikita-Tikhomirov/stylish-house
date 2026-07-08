@@ -12,41 +12,33 @@ class videoReviewsController extends Controller
 {
     public function store(Request $request)
     {
-        $request->validate([
-            'cover_image' => 'required|image|max:2048',
-            'video' => 'required|mimes:mp4,mov,avi,flv|max:100000',
+        $data = $request->validate([
+            'cover_image' => 'nullable|image|max:4096',
+            'video' => 'required|mimes:mp4,mov,avi,flv,webm|max:512000',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'category_id' => [
-                'nullable',
-                'exists:categories,id',
-                function ($attribute, $value, $fail) use ($request) {
-                    if (!$request->has('subcategory_id') && !$value) {
-                        $fail('Either category_id or subcategory_id must be provided.');
-                    }
-                }
-            ],
-            'subcategory_id' => [
-                'nullable',
-                'exists:subcategories,id',
-                function ($attribute, $value, $fail) use ($request) {
-                    if ($request->has('category_id') && !$value) {
-                        $fail('subcategory_id must be provided if category_id is given.');
-                    }
-                }
-            ],
+            'category_id' => 'nullable|exists:categories,id',
+            'subcategory_id' => 'nullable|exists:subcategories,id',
         ]);
 
-        $coverImagePath = $request->file('cover_image')->store('video_reviews/covers', 'public');
+        $categoryId = $request->filled('category_id') ? $request->category_id : null;
+        $subcategoryId = $request->filled('subcategory_id') ? $request->subcategory_id : null;
+        if (!$categoryId && !$subcategoryId) {
+            return response()->json(['message' => 'Нужно выбрать категорию или подкатегорию.'], 422);
+        }
+
+        $coverImagePath = $request->hasFile('cover_image')
+            ? $request->file('cover_image')->store('video_reviews/covers', 'public')
+            : null;
         $videoPath = $request->file('video')->store('video_reviews/videos', 'public');
 
         $videoReview = VideoReviews::create([
             'cover_image' => $coverImagePath,
             'video' => $videoPath,
-            'title' => $request->title,
-            'description' => $request->description,
-            'category_id' => $request->category_id ?? null,
-            'subcategory_id' => $request->subcategory_id ?? null,
+            'title' => $data['title'],
+            'description' => $data['description'] ?? null,
+            'category_id' => $categoryId,
+            'subcategory_id' => $subcategoryId,
         ]);
 
         return response()->json(['videoReview' => $videoReview], 201);
@@ -56,6 +48,14 @@ class videoReviewsController extends Controller
     public function update(Request $request, $id)
     {
         $videoReview = VideoReviews::findOrFail($id);
+        $data = $request->validate([
+            'cover_image' => 'nullable|image|max:4096',
+            'video' => 'nullable|mimes:mp4,mov,avi,flv,webm|max:512000',
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'category_id' => 'nullable|exists:categories,id',
+            'subcategory_id' => 'nullable|exists:subcategories,id',
+        ]);
 
         if ($request->hasFile('cover_image')) {
             $coverImagePath = $request->file('cover_image')->store('video_reviews/covers', 'public');
@@ -67,10 +67,16 @@ class videoReviewsController extends Controller
             $videoReview->video = $videoPath;
         }
 
-        $videoReview->title = $request->title;
-        $videoReview->description = $request->description;
-        $videoReview->category_id = $request->category_id ?? $videoReview->category_id;
-        $videoReview->subcategory_id = $request->subcategory_id ?? $videoReview->subcategory_id;
+        $categoryId = $request->filled('category_id') ? $request->category_id : null;
+        $subcategoryId = $request->filled('subcategory_id') ? $request->subcategory_id : null;
+        if (!$categoryId && !$subcategoryId) {
+            return response()->json(['message' => 'Нужно выбрать категорию или подкатегорию.'], 422);
+        }
+
+        $videoReview->title = $data['title'];
+        $videoReview->description = $data['description'] ?? null;
+        $videoReview->category_id = $categoryId;
+        $videoReview->subcategory_id = $subcategoryId;
         $videoReview->save();
 
         return response()->json(['videoReview' => $videoReview]);

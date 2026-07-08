@@ -14,8 +14,13 @@
                         <div class="videoCard">
                             <div class="videoCard__imgWrap">
                                 <div class="videoCard__date">{{$rev->created_at}}</div>
-                                <div class="videoCard__img"> <img src="{{ Storage::url($rev->cover_image) }}" alt="" />
-                                </div>
+                                @if ($rev->cover_image)
+                                    <div class="videoCard__img"> <img src="{{ Storage::url($rev->cover_image) }}" alt="{{ $rev->title }}" /></div>
+                                @else
+                                    <video class="videoCard__video" preload="metadata" muted playsinline>
+                                        <source src="{{ Storage::url($rev->video) }}" type="video/mp4">
+                                    </video>
+                                @endif
                                 <a data-fslightbox="videoRevs" href="{{ Storage::url($rev->video) }}" class="videoCard__playBtn"> <i class="fas fa-play"></i></a>
                             </div>
                             <div class="videoCard__info">

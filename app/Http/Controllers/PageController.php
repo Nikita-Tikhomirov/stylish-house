@@ -11,6 +11,8 @@ use App\Models\Category;
 use App\Models\ThrouElement;
 use App\Models\HomePage;
 use App\Models\Subcategory;
+use App\Models\VideoReviews;
+use App\Models\WorkExample;
 
 class PageController extends Controller
 {
@@ -50,6 +52,15 @@ class PageController extends Controller
         $homePageFields = HomePage::firstOrFail();
         $curtainSubcats = Subcategory::whereIn('id', $headerInfo->curtain_subcategories ?? [])->with('category')->get();
         $blindSubcats = Subcategory::whereIn('id', $headerInfo->blind_subcategories ?? [])->with('category')->get();
+        $calculatorCategories = Category::whereIn('slug', ['jaluzi', 'story', 'rolstavni'])
+            ->with(['subcategories' => function ($query) {
+                $query->where('show_in_catalog', true)->orderBy('titleh1');
+            }])
+            ->orderBy('id')
+            ->get();
+        $portfolioWorkExamples = WorkExample::latest()->limit(48)->get();
+        $portfolioVideos = VideoReviews::latest()->get();
+
         return view('front.pages', compact(
             'page',
             'categoriesInCatalogMenu',
@@ -58,7 +69,10 @@ class PageController extends Controller
             'headerInfo',
             'homePageFields',
             'curtainSubcats',
-            'blindSubcats'
+            'blindSubcats',
+            'calculatorCategories',
+            'portfolioWorkExamples',
+            'portfolioVideos'
         ));
     }
 

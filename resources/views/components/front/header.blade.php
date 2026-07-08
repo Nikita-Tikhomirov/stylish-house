@@ -1,10 +1,10 @@
 <header class="header">
     <ul class="header__topMenu wrapper">
-        <li> <a href="/">Услуги </a></li>
-        <li> <a href="/">Рассчитать </a></li>
-        <li> <a href="/">Портфолио </a></li>
-        <li> <a href="/">Оплата и Доставка </a></li>
-        <li> <a href="/">Контакты</a></li>
+        <li> <a href="/shop-pages/uslugi">Услуги </a></li>
+        <li> <a href="/shop-pages/rasschitat">Рассчитать </a></li>
+        <li> <a href="/shop-pages/portfolio">Портфолио </a></li>
+        <li> <a href="/shop-pages/oplata-i-dostavka">Оплата и Доставка </a></li>
+        <li> <a href="/shop-pages/kontakty">Контакты</a></li>
     </ul>
     <div class="header__bottomMenu wrapper">
         <a class="header__logo" href="/">

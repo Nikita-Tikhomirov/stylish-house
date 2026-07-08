@@ -38,6 +38,12 @@
         <div class="content">
             {!! $page->content !!}
         </div>
+        @if ($page->slug === 'rasschitat')
+            <x-front.section.site-calculator :categories="$calculatorCategories" />
+        @endif
+        @if ($page->slug === 'portfolio')
+            <x-front.section.site-portfolio :workExamples="$portfolioWorkExamples" :videoReviews="$portfolioVideos" />
+        @endif
     </section>
 
     <x-front.section.how :title="$homePageFields->section_request_title"
