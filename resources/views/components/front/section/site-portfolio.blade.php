@@ -77,7 +77,7 @@
     .sitePortfolio{margin-top:34px}
     .sitePortfolio__block{margin-top:34px}
     .sitePortfolio__heading{font-size:28px;line-height:1.25;margin:0 0 22px;font-weight:700}
-    .sitePortfolio__slider{position:relative;padding-bottom:44px}
+    .sitePortfolio__slider{position:relative}
     .sitePortfolio__swiper,
     .sitePortfolio__worksSwiper{overflow:hidden}
     .sitePortfolio__video{height:100%;border:1px solid #e2e7ed;border-radius:8px;overflow:hidden;background:#fff}
@@ -92,8 +92,19 @@
     .sitePortfolio__work:hover img{transform:scale(1.03)}
     .sitePortfolio__work span{position:absolute;left:0;right:0;bottom:0;padding:18px;background:linear-gradient(transparent,rgba(0,0,0,.72));font-weight:700}
     .sitePortfolio__slider .swiper-button-prev,
-    .sitePortfolio__slider .swiper-button-next{top:calc(50% - 22px)}
-    .sitePortfolio__slider .swiper-pagination{bottom:0}
+    .sitePortfolio__slider .swiper-button-next{top:calc(50% - 34px)}
+    .sitePortfolio__slider > .swiper-pagination{
+        position:static;
+        display:flex;
+        justify-content:center;
+        gap:8px;
+        width:100%;
+        margin-top:24px;
+        transform:none;
+    }
+    .sitePortfolio__slider > .swiper-pagination .swiper-pagination-bullet{
+        margin:0;
+    }
     @media(max-width:620px){
         .sitePortfolio__heading{font-size:23px}
         .sitePortfolio__work{height:240px}
