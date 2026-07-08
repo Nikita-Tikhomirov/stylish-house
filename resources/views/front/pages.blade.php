@@ -80,31 +80,6 @@
             .pageContent li a:hover{
                 text-decoration: underline;
             }
-            .pageContactMap{
-                margin-top: 28px;
-                border: 1px solid #e5ebf2;
-                border-radius: 8px;
-                overflow: hidden;
-                background: #f6f8fb;
-            }
-            .pageContactMap__frame{
-                display: block;
-                width: 100%;
-                height: 420px;
-                border: 0;
-            }
-            .pageContactMap__link{
-                display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                margin-top: 14px;
-                color: #0989ff;
-                font-weight: 700;
-                text-decoration: none;
-            }
-            .pageContactMap__link:hover{
-                text-decoration: underline;
-            }
             @media (max-width: 768px){
                 .pageContent{
                     padding-top: 34px;
@@ -122,9 +97,6 @@
                     padding-top: 18px;
                     padding-bottom: 18px;
                 }
-                .pageContactMap__frame{
-                    height: 320px;
-                }
             }
         </style>
 
@@ -137,23 +109,6 @@
         <div class="content">
             {!! $page->content !!}
         </div>
-        @if ($page->slug === 'kontakty')
-            @php
-                $mapAddress = trim($headerInfo->address ?: 'г. Москва, ул Краснобогатырская 19а');
-                $mapQuery = urlencode($mapAddress);
-            @endphp
-            <div class="pageContactMap">
-                <iframe
-                    class="pageContactMap__frame"
-                    src="https://yandex.ru/map-widget/v1/?text={{ $mapQuery }}&z=16"
-                    loading="lazy"
-                    allowfullscreen="true"
-                    title="Карта проезда: {{ $mapAddress }}"></iframe>
-            </div>
-            <a class="pageContactMap__link" href="https://yandex.ru/maps/?text={{ $mapQuery }}" target="_blank" rel="noopener">
-                Открыть маршрут в Яндекс Картах
-            </a>
-        @endif
         @if ($page->slug === 'rasschitat')
             <x-front.section.site-calculator :categories="$calculatorCategories" />
         @endif
@@ -161,6 +116,10 @@
             <x-front.section.site-portfolio :workExamples="$portfolioWorkExamples" :videoReviews="$portfolioVideos" />
         @endif
     </section>
+
+    @if ($page->slug === 'kontakty')
+        <x-front.section.map></x-front.section.map>
+    @endif
 
     <x-front.section.how :title="$homePageFields->section_request_title"
         :subtitle="$homePageFields->section_request_subtitle"
