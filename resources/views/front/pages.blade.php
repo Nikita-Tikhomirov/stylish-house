@@ -12,20 +12,119 @@
                 padding-top: 50px;
                 padding-bottom: 50px;
             }
-            
-            .pageContent h1{ 
 
+            .pageContent .content{
+                max-width: 1180px;
+                font-size: 18px;
+                line-height: 1.65;
+                color: #111923;
             }
+
             .pageContent img{
                 max-width: 100%;
                 display: block;
                 margin-bottom: 20px;
             }
             .pageContent h2{
-                margin-bottom: 20px;
+                margin: 28px 0 16px;
+                font-size: 28px;
+                line-height: 1.25;
+                font-weight: 700;
             }
             .pageContent p, .pageContent ul, .pageContent ol{
-                margin-bottom: 10px;
+                margin-bottom: 18px;
+            }
+            .pageContent ul,
+            .pageContent ol{
+                display: grid;
+                gap: 10px;
+                max-width: 980px;
+                margin-top: 12px;
+                padding: 22px 24px 22px 34px;
+                background: #f6f8fb;
+                border: 1px solid #e5ebf2;
+                border-radius: 8px;
+                list-style-position: outside;
+            }
+            .pageContent ul{
+                list-style: none;
+                padding-left: 24px;
+            }
+            .pageContent ol{
+                list-style: decimal;
+                padding-left: 44px;
+            }
+            .pageContent li{
+                position: relative;
+                padding-left: 4px;
+            }
+            .pageContent ul li{
+                padding-left: 22px;
+            }
+            .pageContent ul li::before{
+                content: "";
+                position: absolute;
+                left: 0;
+                top: 12px;
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: #0989ff;
+                box-shadow: 0 0 0 4px rgba(9, 137, 255, .12);
+            }
+            .pageContent li a{
+                color: #0989ff;
+                font-weight: 700;
+                text-decoration: none;
+            }
+            .pageContent li a:hover{
+                text-decoration: underline;
+            }
+            .pageContactMap{
+                margin-top: 28px;
+                border: 1px solid #e5ebf2;
+                border-radius: 8px;
+                overflow: hidden;
+                background: #f6f8fb;
+            }
+            .pageContactMap__frame{
+                display: block;
+                width: 100%;
+                height: 420px;
+                border: 0;
+            }
+            .pageContactMap__link{
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                margin-top: 14px;
+                color: #0989ff;
+                font-weight: 700;
+                text-decoration: none;
+            }
+            .pageContactMap__link:hover{
+                text-decoration: underline;
+            }
+            @media (max-width: 768px){
+                .pageContent{
+                    padding-top: 34px;
+                    padding-bottom: 34px;
+                }
+                .pageContent .content{
+                    font-size: 16px;
+                    line-height: 1.55;
+                }
+                .pageContent h2{
+                    font-size: 23px;
+                }
+                .pageContent ul,
+                .pageContent ol{
+                    padding-top: 18px;
+                    padding-bottom: 18px;
+                }
+                .pageContactMap__frame{
+                    height: 320px;
+                }
             }
         </style>
 
@@ -38,6 +137,23 @@
         <div class="content">
             {!! $page->content !!}
         </div>
+        @if ($page->slug === 'kontakty')
+            @php
+                $mapAddress = trim($headerInfo->address ?: 'г. Москва, ул Краснобогатырская 19а');
+                $mapQuery = urlencode($mapAddress);
+            @endphp
+            <div class="pageContactMap">
+                <iframe
+                    class="pageContactMap__frame"
+                    src="https://yandex.ru/map-widget/v1/?text={{ $mapQuery }}&z=16"
+                    loading="lazy"
+                    allowfullscreen="true"
+                    title="Карта проезда: {{ $mapAddress }}"></iframe>
+            </div>
+            <a class="pageContactMap__link" href="https://yandex.ru/maps/?text={{ $mapQuery }}" target="_blank" rel="noopener">
+                Открыть маршрут в Яндекс Картах
+            </a>
+        @endif
         @if ($page->slug === 'rasschitat')
             <x-front.section.site-calculator :categories="$calculatorCategories" />
         @endif

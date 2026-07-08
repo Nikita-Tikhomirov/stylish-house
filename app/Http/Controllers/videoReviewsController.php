@@ -14,7 +14,8 @@ class videoReviewsController extends Controller
     {
         $data = $request->validate([
             'cover_image' => 'nullable|image|max:4096',
-            'video' => 'required|mimes:mp4,mov,avi,flv,webm|max:512000',
+            'video' => 'nullable|mimes:mp4,mov,avi,flv,webm|max:512000',
+            'video_url' => 'nullable|url|max:2048',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'category_id' => 'nullable|exists:categories,id',
@@ -26,11 +27,16 @@ class videoReviewsController extends Controller
         if (!$categoryId && !$subcategoryId) {
             return response()->json(['message' => 'Нужно выбрать категорию или подкатегорию.'], 422);
         }
+        if (!$request->hasFile('video') && empty($data['video_url'])) {
+            return response()->json(['message' => 'Нужно загрузить видео или указать ссылку на видео.'], 422);
+        }
 
         $coverImagePath = $request->hasFile('cover_image')
             ? $request->file('cover_image')->store('video_reviews/covers', 'public')
             : null;
-        $videoPath = $request->file('video')->store('video_reviews/videos', 'public');
+        $videoPath = $request->hasFile('video')
+            ? $request->file('video')->store('video_reviews/videos', 'public')
+            : $data['video_url'];
 
         $videoReview = VideoReviews::create([
             'cover_image' => $coverImagePath,
@@ -51,6 +57,7 @@ class videoReviewsController extends Controller
         $data = $request->validate([
             'cover_image' => 'nullable|image|max:4096',
             'video' => 'nullable|mimes:mp4,mov,avi,flv,webm|max:512000',
+            'video_url' => 'nullable|url|max:2048',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'category_id' => 'nullable|exists:categories,id',
@@ -65,6 +72,8 @@ class videoReviewsController extends Controller
         if ($request->hasFile('video')) {
             $videoPath = $request->file('video')->store('video_reviews/videos', 'public');
             $videoReview->video = $videoPath;
+        } elseif (!empty($data['video_url'])) {
+            $videoReview->video = $data['video_url'];
         }
 
         $categoryId = $request->filled('category_id') ? $request->category_id : null;

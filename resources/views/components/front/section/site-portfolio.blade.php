@@ -4,10 +4,22 @@
             <h2 class="sitePortfolio__heading">Видеообзоры нашей продукции</h2>
             <div class="sitePortfolio__videos">
                 @foreach ($videoReviews as $video)
+                    @php
+                        $isExternalVideo = \Illuminate\Support\Str::startsWith($video->video, ['http://', 'https://']);
+                        $videoUrl = $isExternalVideo ? $video->video : Storage::url($video->video);
+                        $embedUrl = $videoUrl;
+                        if (preg_match('~drive\.google\.com/file/d/([^/]+)~', $videoUrl, $matches)) {
+                            $embedUrl = 'https://drive.google.com/file/d/' . $matches[1] . '/preview';
+                        }
+                    @endphp
                     <article class="sitePortfolio__video">
-                        <video controls preload="metadata" @if($video->cover_image) poster="{{ Storage::url($video->cover_image) }}" @endif>
-                            <source src="{{ Storage::url($video->video) }}" type="video/mp4">
-                        </video>
+                        @if ($isExternalVideo)
+                            <iframe src="{{ $embedUrl }}" loading="lazy" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+                        @else
+                            <video controls preload="metadata" @if($video->cover_image) poster="{{ Storage::url($video->cover_image) }}" @endif>
+                                <source src="{{ $videoUrl }}" type="video/mp4">
+                            </video>
+                        @endif
                         <h3>{{ $video->title }}</h3>
                     </article>
                 @endforeach
@@ -43,7 +55,7 @@
     .sitePortfolio__heading{font-size:28px;margin:0 0 22px}
     .sitePortfolio__videos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
     .sitePortfolio__video{border:1px solid #e2e7ed;border-radius:8px;overflow:hidden;background:#fff}
-    .sitePortfolio__video video{display:block;width:100%;aspect-ratio:16/9;background:#111;object-fit:cover}
+    .sitePortfolio__video video,.sitePortfolio__video iframe{display:block;width:100%;aspect-ratio:16/9;border:0;background:#111;object-fit:cover}
     .sitePortfolio__video h3{font-size:16px;line-height:1.35;margin:0;padding:14px}
     .sitePortfolio__works{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px}
     .sitePortfolio__work{position:relative;display:block;border-radius:8px;overflow:hidden;background:#f2f4f7;min-height:210px;color:#fff}

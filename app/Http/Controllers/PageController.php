@@ -58,7 +58,17 @@ class PageController extends Controller
             }])
             ->orderBy('id')
             ->get();
-        $portfolioWorkExamples = WorkExample::latest()->limit(48)->get();
+        $portfolioWorkExamples = WorkExample::where(function ($query) {
+                $query->whereNull('title')
+                    ->orWhere(function ($query) {
+                        $query->where('title', 'not like', '%Роллеты для ворот - пример%')
+                            ->where('title', 'not like', '%Секционные ворота - пример%')
+                            ->where('title', 'not like', '%Промышленные ворота - пример%');
+                    });
+            })
+            ->latest()
+            ->limit(48)
+            ->get();
         $portfolioVideos = VideoReviews::latest()->get();
 
         return view('front.pages', compact(

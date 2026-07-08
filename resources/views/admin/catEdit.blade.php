@@ -100,10 +100,17 @@
                                     <label for="video" class="col-form-label">Видео</label>
                                     <input name="video" type="file" class="form-control">
                                     @if ($videoReview->video)
-                                        <video controls style="max-width: 200px;">
-                                            <source src="{{ Storage::url($videoReview->video) }}" type="video/mp4">
-                                        </video>
+                                        @if (\Illuminate\Support\Str::startsWith($videoReview->video, ['http://', 'https://']))
+                                            <a href="{{ $videoReview->video }}" target="_blank" rel="noopener">Открыть текущее видео</a>
+                                        @else
+                                            <video controls style="max-width: 200px;">
+                                                <source src="{{ Storage::url($videoReview->video) }}" type="video/mp4">
+                                            </video>
+                                        @endif
                                     @endif
+                                    <input name="video_url" type="url" class="form-control mt-2"
+                                        placeholder="Или ссылка на видео (Google Drive)"
+                                        value="{{ \Illuminate\Support\Str::startsWith($videoReview->video, ['http://', 'https://']) ? $videoReview->video : '' }}">
                                 </div>
                                 <div class="form-group">
                                     <label for="title" class="col-form-label">Заголовок</label>
@@ -512,6 +519,7 @@
         <div class="form-group">
             <label for="video">Видео</label>
             <input name="video" type="file" class="form-control">
+            <input name="video_url" type="url" class="form-control mt-2" placeholder="Или ссылка на видео (Google Drive)">
         </div>
         <div class="form-group">
             <label for="title">Заголовок</label>
