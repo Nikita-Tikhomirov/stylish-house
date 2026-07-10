@@ -67,8 +67,19 @@ class PageController extends Controller
                     });
             })
             ->latest()
-            ->limit(48)
             ->get();
+        $portfolioWorkExampleGroups = $portfolioWorkExamples
+            ->groupBy(fn (WorkExample $workExample) => $this->portfolioGroupName($workExample))
+            ->sortKeysUsing(function ($first, $second) {
+                if ($first === 'Примеры работ') {
+                    return 1;
+                }
+                if ($second === 'Примеры работ') {
+                    return -1;
+                }
+
+                return strnatcasecmp($first, $second);
+            });
         $portfolioVideos = VideoReviews::latest()->get();
 
         return view('front.pages', compact(
@@ -82,8 +93,20 @@ class PageController extends Controller
             'blindSubcats',
             'calculatorCategories',
             'portfolioWorkExamples',
+            'portfolioWorkExampleGroups',
             'portfolioVideos'
         ));
+    }
+
+    private function portfolioGroupName(WorkExample $workExample): string
+    {
+        $description = trim((string) $workExample->description);
+
+        if (preg_match('/^portfolio_group:(.+)$/u', $description, $matches)) {
+            return trim($matches[1]) ?: 'Примеры работ';
+        }
+
+        return 'Примеры работ';
     }
 
     public function show()

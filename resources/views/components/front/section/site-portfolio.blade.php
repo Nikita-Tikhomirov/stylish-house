@@ -1,3 +1,14 @@
+@props([
+    'workExamples' => collect(),
+    'workExampleGroups' => null,
+    'videoReviews' => collect(),
+])
+
+@php
+    $workExampleGroups = collect($workExampleGroups ?: ['Примеры работ' => $workExamples])
+        ->filter(fn ($items) => collect($items)->isNotEmpty());
+@endphp
+
 <section class="sitePortfolio">
     @if ($videoReviews->isNotEmpty())
         <div class="sitePortfolio__block blueControls">
@@ -52,20 +63,24 @@
         </div>
     @endif
 
-    @if ($workExamples->isNotEmpty())
+    @if ($workExampleGroups->isNotEmpty())
+        @foreach ($workExampleGroups as $groupTitle => $groupWorks)
+            @php
+                $galleryName = 'portfolioWorks' . $loop->index;
+            @endphp
         <div class="sitePortfolio__block blueControls">
-            <h2 class="sitePortfolio__heading">Примеры работ</h2>
+            <h2 class="sitePortfolio__heading">{{ $groupTitle }}</h2>
             <div class="sitePortfolio__slider">
                 <div class="sitePortfolio__worksSwiper swiper">
                     <div class="swiper-wrapper">
-                        @foreach ($workExamples as $work)
+                        @foreach ($groupWorks as $work)
                             @php
                                 $image = $work->thumb ?: $work->image;
                             @endphp
                             @if ($image)
                                 <div class="swiper-slide">
-                                    <a class="sitePortfolio__work" data-fslightbox="portfolioWorks" href="{{ Storage::url($work->image ?: $image) }}">
-                                        <img src="{{ Storage::url($image) }}" alt="{{ $work->title ?: 'Пример работы' }}">
+                                    <a class="sitePortfolio__work" data-fslightbox="{{ $galleryName }}" href="{{ Storage::url($work->image ?: $image) }}">
+                                        <img src="{{ Storage::url($image) }}" alt="{{ $work->title ?: $groupTitle }}" loading="lazy">
                                         @if ($work->title)
                                             <span>{{ $work->title }}</span>
                                         @endif
@@ -80,12 +95,14 @@
                 <div class="swiper-button-next"></div>
             </div>
         </div>
+        @endforeach
     @endif
 </section>
 
 <style>
     .sitePortfolio{margin-top:34px}
-    .sitePortfolio__block{margin-top:34px}
+    .sitePortfolio__block{margin-top:42px}
+    .sitePortfolio__block:first-child{margin-top:34px}
     .sitePortfolio__heading{font-size:28px;line-height:1.25;margin:0 0 22px;font-weight:700}
     .sitePortfolio__slider{position:relative}
     .sitePortfolio__swiper,

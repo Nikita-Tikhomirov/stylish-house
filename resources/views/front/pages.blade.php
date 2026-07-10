@@ -113,7 +113,11 @@
             <x-front.section.site-calculator :categories="$calculatorCategories" />
         @endif
         @if ($page->slug === 'portfolio')
-            <x-front.section.site-portfolio :workExamples="$portfolioWorkExamples" :videoReviews="$portfolioVideos" />
+            <x-front.section.site-portfolio
+                :workExamples="$portfolioWorkExamples"
+                :workExampleGroups="$portfolioWorkExampleGroups"
+                :videoReviews="$portfolioVideos"
+            />
         @endif
     </section>
 
