@@ -64,12 +64,31 @@
     @endif
 
     @if ($workExampleGroups->isNotEmpty())
-        @foreach ($workExampleGroups as $groupTitle => $groupWorks)
-            @php
-                $galleryName = 'portfolioWorks' . $loop->index;
-            @endphp
-        <div class="sitePortfolio__block blueControls">
-            <h2 class="sitePortfolio__heading">{{ $groupTitle }}</h2>
+        <div class="sitePortfolio__block sitePortfolio__worksBlock blueControls" data-portfolio-tabs>
+            <h2 class="sitePortfolio__heading">Примеры работ</h2>
+            <div class="sitePortfolio__tabs" role="tablist" aria-label="Категории примеров работ">
+                @foreach ($workExampleGroups as $groupTitle => $groupWorks)
+                    <button
+                        class="sitePortfolio__tab {{ $loop->first ? 'is-active' : '' }}"
+                        type="button"
+                        role="tab"
+                        aria-selected="{{ $loop->first ? 'true' : 'false' }}"
+                        data-portfolio-tab="{{ $loop->index }}"
+                    >
+                        <span>{{ $groupTitle }}</span>
+                        <small>{{ collect($groupWorks)->count() }}</small>
+                    </button>
+                @endforeach
+            </div>
+            @foreach ($workExampleGroups as $groupTitle => $groupWorks)
+                @php
+                    $galleryName = 'portfolioWorks' . $loop->index;
+                @endphp
+            <div class="sitePortfolio__panel {{ $loop->first ? 'is-active' : '' }}" data-portfolio-panel="{{ $loop->index }}">
+                <div class="sitePortfolio__panelHead">
+                    <h3>{{ $groupTitle }}</h3>
+                    <span>{{ collect($groupWorks)->count() }} фото</span>
+                </div>
             <div class="sitePortfolio__slider">
                 <div class="sitePortfolio__worksSwiper swiper">
                     <div class="swiper-wrapper">
@@ -94,8 +113,9 @@
                 <div class="swiper-button-prev"></div>
                 <div class="swiper-button-next"></div>
             </div>
+            </div>
+            @endforeach
         </div>
-        @endforeach
     @endif
 </section>
 
@@ -104,6 +124,76 @@
     .sitePortfolio__block{margin-top:42px}
     .sitePortfolio__block:first-child{margin-top:34px}
     .sitePortfolio__heading{font-size:28px;line-height:1.25;margin:0 0 22px;font-weight:700}
+    .sitePortfolio__tabs{
+        display:flex;
+        flex-wrap:wrap;
+        gap:10px;
+        margin:0 0 24px;
+        padding:14px;
+        border:1px solid #e2e7ed;
+        border-radius:8px;
+        background:#f6f8fb;
+    }
+    .sitePortfolio__tab{
+        display:flex;
+        align-items:center;
+        gap:8px;
+        max-width:100%;
+        min-height:42px;
+        padding:9px 14px;
+        border:1px solid #d9e3ee;
+        border-radius:6px;
+        background:#fff;
+        color:#111923;
+        font-weight:700;
+        line-height:1.25;
+        cursor:pointer;
+        transition:.2s;
+    }
+    .sitePortfolio__tab small{
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        min-width:25px;
+        height:24px;
+        padding:0 7px;
+        border-radius:999px;
+        background:#edf4ff;
+        color:#0989ff;
+        font-size:12px;
+        font-weight:700;
+    }
+    .sitePortfolio__tab:hover,
+    .sitePortfolio__tab.is-active{
+        border-color:#0989ff;
+        background:#0989ff;
+        color:#fff;
+    }
+    .sitePortfolio__tab.is-active small,
+    .sitePortfolio__tab:hover small{
+        background:#fff;
+        color:#0989ff;
+    }
+    .sitePortfolio__panel{display:none}
+    .sitePortfolio__panel.is-active{display:block}
+    .sitePortfolio__panelHead{
+        display:flex;
+        align-items:flex-end;
+        justify-content:space-between;
+        gap:18px;
+        margin:0 0 16px;
+    }
+    .sitePortfolio__panelHead h3{
+        margin:0;
+        font-size:24px;
+        line-height:1.25;
+        font-weight:700;
+    }
+    .sitePortfolio__panelHead span{
+        flex:0 0 auto;
+        color:#6b7280;
+        font-weight:700;
+    }
     .sitePortfolio__slider{position:relative}
     .sitePortfolio__swiper,
     .sitePortfolio__worksSwiper{overflow:hidden}
@@ -198,6 +288,26 @@
     }
     @media(max-width:620px){
         .sitePortfolio__heading{font-size:23px}
+        .sitePortfolio__tabs{
+            flex-wrap:nowrap;
+            overflow-x:auto;
+            padding:10px;
+            margin-bottom:18px;
+            scroll-snap-type:x proximity;
+        }
+        .sitePortfolio__tab{
+            flex:0 0 auto;
+            max-width:260px;
+            scroll-snap-align:start;
+        }
+        .sitePortfolio__panelHead{
+            display:block;
+        }
+        .sitePortfolio__panelHead h3{font-size:21px}
+        .sitePortfolio__panelHead span{
+            display:block;
+            margin-top:5px;
+        }
         .sitePortfolio__slider{padding-bottom:58px}
         .sitePortfolio__slider .swiper-button-prev,
         .sitePortfolio__slider .swiper-button-next{
@@ -251,6 +361,24 @@
             });
         }
 
+        function activatePortfolioTab(root, index) {
+            root.querySelectorAll('[data-portfolio-tab]').forEach(function (tab) {
+                const isActive = tab.dataset.portfolioTab === index;
+                tab.classList.toggle('is-active', isActive);
+                tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            });
+
+            root.querySelectorAll('[data-portfolio-panel]').forEach(function (panel) {
+                const isActive = panel.dataset.portfolioPanel === index;
+                panel.classList.toggle('is-active', isActive);
+                panel.querySelectorAll('.swiper').forEach(function (swiperElement) {
+                    if (isActive && swiperElement.swiper) {
+                        swiperElement.swiper.update();
+                    }
+                });
+            });
+        }
+
         loadSwiper(function () {
             initPortfolioSwiper('.sitePortfolio__swiper', {
                 560: { slidesPerView: 2 },
@@ -266,6 +394,14 @@
         if (typeof refreshFsLightbox === 'function') {
             refreshFsLightbox();
         }
+
+        document.querySelectorAll('[data-portfolio-tabs]').forEach(function (root) {
+            root.querySelectorAll('[data-portfolio-tab]').forEach(function (tab) {
+                tab.addEventListener('click', function () {
+                    activatePortfolioTab(root, tab.dataset.portfolioTab);
+                });
+            });
+        });
 
         document.querySelectorAll('[data-video-modal]').forEach(function (trigger) {
             trigger.addEventListener('click', function (event) {
