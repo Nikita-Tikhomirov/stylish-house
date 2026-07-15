@@ -16,6 +16,7 @@ use App\Services\CartService;
 use App\Models\ThrouElement;
 use App\Models\Slider;
 use App\Models\Subcategory;
+use App\Models\VideoReviews;
 use App\Support\PreviewCardData;
 
 
@@ -122,6 +123,9 @@ class HomeController extends Controller
         $blindSubcats = Subcategory::whereIn('id', $headerInfo->blind_subcategories ?? [])->with('category')->get();
 
         $mainSlider = Slider::all();
+        $homeVideoReviews = VideoReviews::where('description', 'home_video')
+            ->latest()
+            ->get();
 
         return view('front.home', compact(
             'seoSection',
@@ -140,7 +144,8 @@ class HomeController extends Controller
             'headerInfo',
             'curtainSubcats',
             'blindSubcats',
-            'mainSlider'
+            'mainSlider',
+            'homeVideoReviews'
         ));
     }
     // Метод для AJAX-запросов, чтобы загружать товары для выбранной категории

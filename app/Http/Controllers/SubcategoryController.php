@@ -180,11 +180,6 @@ class SubcategoryController extends Controller
         $faqs = Faq::where('subcategory_id', $subcategory->id)->get();
         $workExamples = WorkExample::where('subcategory_id', $sourceSubcategoryId)->get();
         $videoReviews = VideoReviews::where('subcategory_id', $sourceSubcategoryId)->get();
-        if ((int) $subcategory->category_id === 14 && $videoReviews->isEmpty()) {
-            $videoReviews = VideoReviews::where('category_id', $subcategory->category_id)
-                ->whereNull('subcategory_id')
-                ->get();
-        }
         $installationTypes = SubcategoryInstallationType::where('subcategory_id', $sourceSubcategoryId)
             ->orderBy('sort_order')
             ->orderBy('id')

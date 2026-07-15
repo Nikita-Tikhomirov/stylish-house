@@ -52,6 +52,14 @@
 
        <x-front.section.rollets-systems />
 
+       @if (!empty($videoReviews) && $videoReviews->isNotEmpty())
+           <x-front.section.videorevs :videoreviews="$videoReviews" :category="$category" title=""></x-front.section.videorevs>
+       @endif
+
+       @if (!empty($workExamples) && $workExamples->isNotEmpty())
+           <x-front.section.gallery :gallerys="$workExamples" :category="$category" title=""></x-front.section.gallery>
+       @endif
+
        <x-front.section.rollets-faq :category="$category" />
 
         <x-front.section.delivery :title="$homePageFields->section_delivery_title" :topText="$homePageFields->section_delivery_top_text" :bottomText="$homePageFields->section_delivery_bottom_text"

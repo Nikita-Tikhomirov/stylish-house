@@ -105,6 +105,10 @@ class CategoryController extends Controller
             ->when($subcategory, function ($query) use ($subcategory) {
                 return $query->where('subcategory_id', $subcategory->id);
             })
+            ->where(function ($query) {
+                $query->whereNull('description')
+                    ->orWhere('description', '!=', 'home_video');
+            })
             ->get();
 
         // Логика для загрузки примеров работ

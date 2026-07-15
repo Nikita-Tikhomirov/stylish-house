@@ -206,6 +206,12 @@
 
         <x-front.section.populars :homePopulars="$homePopulars" :categories="$categories"></x-front.section.populars>
 
+        @if (!empty($homeVideoReviews) && $homeVideoReviews->isNotEmpty())
+            <section class="wrapper">
+                <x-front.section.site-portfolio :videoReviews="$homeVideoReviews" />
+            </section>
+        @endif
+
         {{-- @foreach ($homePopulars as $categoryProducts)
         @if ($categoryProducts->isNotEmpty())
         <h2>{{ $categoryProducts->first()->category->titleh1 }}</h2>
