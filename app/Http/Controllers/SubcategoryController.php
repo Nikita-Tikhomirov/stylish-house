@@ -178,8 +178,8 @@ class SubcategoryController extends Controller
         $homePageFields = HomePage::firstOrFail();
         $iconCards = IconCard::all();
         $faqs = Faq::where('subcategory_id', $subcategory->id)->get();
-        $workExamples = WorkExample::where('subcategory_id', $sourceSubcategoryId)->get();
-        $videoReviews = VideoReviews::where('subcategory_id', $sourceSubcategoryId)->get();
+        $workExamples = WorkExample::where('subcategory_id', $subcategory->id)->get();
+        $videoReviews = VideoReviews::where('subcategory_id', $subcategory->id)->get();
         $installationTypes = SubcategoryInstallationType::where('subcategory_id', $sourceSubcategoryId)
             ->orderBy('sort_order')
             ->orderBy('id')
