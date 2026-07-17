@@ -120,7 +120,7 @@
 </section>
 
 <style>
-    .sitePortfolio{margin-top:34px}
+    .sitePortfolio{margin-top:34px;margin-bottom:64px}
     .sitePortfolio__block{margin-top:42px}
     .sitePortfolio__block:first-child{margin-top:34px}
     .sitePortfolio__heading{font-size:28px;line-height:1.25;margin:0 0 22px;font-weight:700}
@@ -287,6 +287,7 @@
         cursor:pointer;
     }
     @media(max-width:620px){
+        .sitePortfolio{margin-bottom:44px}
         .sitePortfolio__heading{font-size:23px}
         .sitePortfolio__tabs{
             flex-wrap:nowrap;
