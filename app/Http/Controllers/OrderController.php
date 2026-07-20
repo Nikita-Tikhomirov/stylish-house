@@ -2,130 +2,89 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\OrderCreatedMail;
+use App\Models\Category;
 use Illuminate\Http\Request;
 use App\Models\Order;
 use App\Models\User;
-use App\Models\Category;
+use App\Models\Product;
 use App\Models\Subcategory;
 use App\Models\ThrouElement;
+use App\Support\CartItemNormalizer;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-
-use App\Services\CartService;
-
+use Illuminate\Support\Str;
 
 class OrderController extends Controller
 {
-    protected $cartService;
-
-    public function create(Request $request)
+    public function create(Request $request, CartItemNormalizer $normalizer)
     {
-
-        // Валидация данных из формы
         $validatedData = $request->validate([
             'name' => 'required|string|max:255',
             'secondname' => 'required|string|max:255',
             'addres' => 'nullable|string|max:255',
             'phone' => 'required|string|max:20',
             'email' => 'required|email|max:255',
-            'comment' => 'nullable|string',
-            'items' => 'required|string' // JSON-строка с товарами
+            'comment' => 'nullable|string|max:2000',
         ]);
 
         $cart = $request->session()->get('cart', []);
-
         if (empty($cart)) {
             return response()->json(['success' => false, 'message' => 'Корзина пуста'], 400);
         }
 
+        [$user, $newCustomer, $requiresLogin] = $this->resolveCustomer($validatedData);
+        $items = $this->normalizeCart($cart, $normalizer);
+        [$deliveryMethod, $deliveryCost] = $this->deliverySnapshot($request->session()->get('delivery_cost', 0));
+        $totalPrice = array_sum(array_column($items, 'price')) + $deliveryCost;
+        $customerDetails = $this->customerSnapshot($validatedData, $user);
 
-        // Создаем или получаем пользователя на основе email
-        $user = User::firstOrCreate(
-            ['email' => $validatedData['email']],
-            [
-                'name' => $validatedData['name'],
-                'secondname' => $validatedData['secondname'],
-                'addres' => $validatedData['addres'],
-                'phone' => $validatedData['phone'],
-                'password' => bcrypt('defaultpassword'), // Вы можете изменить на рандомный или другой пароль
-                'role' => 'user'
-            ]
-        );
-
-        // Преобразуем JSON-строку с товарами в массив
-        $items = json_decode($validatedData['items'], true);
-
-        // $totalPrice = array_reduce($items, function ($total, $item) {
-        //     return $total + ($item['price'] * $item['quantity']);
-        // }, 0);
-
-        // Создаем заказ
-        // Рассчитываем общую стоимость заказа
-        $totalPrice = array_reduce($cart, function ($total, $item) {
-            return $total + $item['price'];
-        }, 0);
-
-        // Сохраняем заказ в базе данных
-        $order = Order::create([
-            'user_id' => $user->id,
-            'items' => json_encode($cart), // Сохраняем корзину в JSON-формате
-            'total_price' => $totalPrice,
-            'comment' => $validatedData['comment'] ?? null,
-        ]);
-        $request->session()->forget('cart');
-        Auth::login($user);
-        $deliveryCost = session('delivery_cost', 0); // По умолчанию 0, если не выбрана доставка
-        if ($deliveryCost == 700) {
-            // если доставка уже оплачена (700), прибавляем ещё 700
-             $totalPrice += $deliveryCost;
-        }
-        try {
-            $data = [
-                'name' => $validatedData['name'],
-                'secondname' => $validatedData['secondname'],
-                'addres' => $validatedData['addres'],
-                'phone' => $validatedData['phone'],
-                'email' => $validatedData['email'],
-                'comment' => $validatedData['comment'],
-                'cart' => $cart, // передаем массив товаров
-                'totalPrice' => $totalPrice,
-                'delivery' => $deliveryCost,
-            ];
-
-
-            Mail::send('emails.cart', $data, function ($m) {
-                $m->to('info@stylish-house.net')->subject('Заказ с сайта');
-            });
-
-            // return response()->json(['success' => true]);
-            $redirectUrl = route('profile.show', ['id' => $user->id]); // Ссылка с ID пользователя
-            return response()->json([
-                'success' => true,
-                'order_id' => $order->id,
-                'redirect_url' => $redirectUrl
+        $order = DB::transaction(function () use (
+            $user,
+            $items,
+            $totalPrice,
+            $validatedData,
+            $deliveryMethod,
+            $deliveryCost,
+            $customerDetails
+        ) {
+            return Order::create([
+                'user_id' => $user->id,
+                'items' => $items,
+                'total_price' => $totalPrice,
+                'comment' => $validatedData['comment'] ?? null,
+                'delivery_method' => $deliveryMethod,
+                'delivery_cost' => $deliveryCost,
+                'customer_details' => $customerDetails,
             ]);
+        });
 
-        } catch (\Throwable $e) {
-            \Log::error('Mail error: ' . $e->getMessage());
-            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        if ($newCustomer) {
+            Auth::login($user);
         }
 
+        $request->session()->forget(['cart', 'delivery_cost']);
+        $this->sendOrderMail($order);
 
-
-        // Перенаправляем на страницу успеха или обратно с сообщением
-
-
+        return response()->json([
+            'success' => true,
+            'order_id' => $order->id,
+            'requires_login' => $requiresLogin,
+            'redirect_url' => Auth::check() ? route('profile.account') : route('login'),
+        ]);
     }
 
-
-    public function show(Request $request, $id)
+    public function show(Request $request)
     {
-        $user = User::findOrFail($id);
-        $orders = $user->orders;
-        // Проверяем, соответствует ли пользователь текущему
-        if (Auth::id() !== $user->id) {
-            abort(403); // Ошибка доступа, если пользователь не совпадает
-        }
+        $user = $request->user();
+        $orders = $user->orders()->latest()->get();
+        $favoriteProducts = $user->favoriteProducts()
+            ->with(['category', 'subcategory'])
+            ->latest('favorites.created_at')
+            ->get();
+
         $categoriesInCatalogMenu = Category::where('show_in_catalog', true)
             ->with([
                 'subcategories' => function ($query) {
@@ -158,8 +117,129 @@ class OrderController extends Controller
         $curtainSubcats = Subcategory::whereIn('id', $headerInfo->curtain_subcategories ?? [])->with('category')->get();
         $blindSubcats = Subcategory::whereIn('id', $headerInfo->blind_subcategories ?? [])->with('category')->get();
 
-        return view('admin.user', compact('user', 'categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'orders', 'cart', 'headerInfo', 'curtainSubcats', 'blindSubcats'));
+        return view('admin.user', compact(
+            'user',
+            'categoriesInCatalogMenu',
+            'categoriesInHeaderMenu',
+            'orders',
+            'favoriteProducts',
+            'cart',
+            'headerInfo',
+            'curtainSubcats',
+            'blindSubcats'
+        ));
+    }
 
+    private function resolveCustomer(array $data): array
+    {
+        if (Auth::check()) {
+            $user = Auth::user();
+            $user->forceFill([
+                'name' => $data['name'],
+                'secondname' => $data['secondname'],
+                'addres' => $data['addres'] ?? null,
+                'phone' => $data['phone'],
+            ])->save();
 
+            return [$user, false, false];
+        }
+
+        $existingUser = User::where('email', $data['email'])->first();
+        if ($existingUser) {
+            return [$existingUser, false, true];
+        }
+
+        $user = User::create([
+            'name' => $data['name'],
+            'secondname' => $data['secondname'],
+            'addres' => $data['addres'] ?? null,
+            'phone' => $data['phone'],
+            'email' => $data['email'],
+            'password' => bcrypt(Str::random(48)),
+        ]);
+
+        return [$user, true, false];
+    }
+
+    private function normalizeCart(array $cart, CartItemNormalizer $normalizer): array
+    {
+        $productNames = Product::query()
+            ->whereIn('id', array_column($cart, 'productId'))
+            ->get()
+            ->mapWithKeys(fn (Product $product) => [
+                $product->id => $product->h1 ?: $product->title,
+            ]);
+
+        return array_values(array_map(function (array $item) use ($normalizer, $productNames) {
+            $name = $productNames[$item['productId']] ?? ($item['productName'] ?? 'Товар');
+
+            return $normalizer->normalize($item, $name);
+        }, $cart));
+    }
+
+    private function deliverySnapshot(mixed $delivery): array
+    {
+        if ((string) $delivery === '700') {
+            return ['courier_mkad', 700];
+        }
+
+        if ($delivery === 'delivery') {
+            return ['courier_outside', 0];
+        }
+
+        return ['pickup', 0];
+    }
+
+    private function customerSnapshot(array $data, User $user): array
+    {
+        return [
+            'name' => $data['name'],
+            'secondname' => $data['secondname'],
+            'addres' => $data['addres'] ?? null,
+            'phone' => $data['phone'],
+            'email' => Auth::check() ? $user->email : $data['email'],
+        ];
+    }
+
+    private function sendOrderMail(Order $order): void
+    {
+        $this->sendOrderMailTo(
+            config('mail.order_recipient'),
+            new OrderCreatedMail($order, true),
+            $order,
+            'admin'
+        );
+        $this->sendOrderMailTo(
+            data_get($order->customer_details, 'email'),
+            new OrderCreatedMail($order),
+            $order,
+            'customer'
+        );
+    }
+
+    private function sendOrderMailTo(
+        ?string $recipient,
+        OrderCreatedMail $mail,
+        Order $order,
+        string $recipientType
+    ): void {
+        if (!$recipient) {
+            Log::error('Order notification recipient is missing', [
+                'order_id' => $order->id,
+                'recipient_type' => $recipientType,
+            ]);
+
+            return;
+        }
+
+        try {
+            Mail::to($recipient)->send($mail);
+        } catch (\Throwable $exception) {
+            Log::error('Order notification failed', [
+                'order_id' => $order->id,
+                'recipient_type' => $recipientType,
+                'message' => $exception->getMessage(),
+            ]);
+        }
     }
 }

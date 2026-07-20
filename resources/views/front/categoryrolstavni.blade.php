@@ -50,7 +50,7 @@
 
        <x-front.section.rollets-installation :installationTypes="$installationTypes" />
 
-       <x-front.section.rollets-systems />
+       <x-front.section.rollets-systems :systems="$rollerShutterSystems" />
 
        @if (!empty($videoReviews) && $videoReviews->isNotEmpty())
            <x-front.section.videorevs :videoreviews="$videoReviews" :category="$category" title=""></x-front.section.videorevs>
@@ -533,9 +533,9 @@ function fetchProducts(url) {
                             <div class="bigProdCard__quckView control quickProd" data-modal="#popupProd" data-prod="${product.id}"><i class="fas fa-eye"></i>
                                 <div class="bigProdCard__toolTip">Быстрый просмотр</div>
                             </div>
-                            <div class="bigProdCard__favorites control"><i class="far fa-heart"></i>
+                            <button class="bigProdCard__favorites control" type="button" data-favorite-product="${product.id}" aria-label="Добавить в избранное"><i class="far fa-heart"></i>
                                 <div class="bigProdCard__toolTip">Добавить в избранное</div>
-                            </div>
+                            </button>
                         </div>
                     </div>
                     <div class="bigProdCard__info">
@@ -577,7 +577,7 @@ function fetchProducts(url) {
                     const formWrapper = button.parentElement.parentElement
                     const widthToCalc = formWrapper.querySelector('.width-input').value
                     const heightToCalc = formWrapper.querySelector('.height-input').value
-                    const controlCheck = formWrapper.querySelector('.control').checked
+                    const controlCheck = formWrapper.querySelector('.control')?.checked ?? null
                     const prodsCouunter = formWrapper.querySelector('.quantity-input').value
                     const prodPriceText = formWrapper.querySelector('.prodForm__price').innerText;
 
@@ -585,7 +585,7 @@ function fetchProducts(url) {
                     // const prodsCouunter = formWrapper.querySelector('.quantity-input').value
 
 
-                    const prodPrice = parseInt(prodPriceText.replace(/\D/g, ''), 10);
+                    const prodPrice = parseInt(prodPriceText.replace(/\D/g, ''), 10) || 0;
 
                     const cardCounter = document.querySelector('.header__cartCounter')
 
@@ -603,6 +603,7 @@ function fetchProducts(url) {
                                 control: controlCheck,
                                 quantity: prodsCouunter,
                                 price: prodPrice,
+                                ...(window.Shop?.collectCartOptions(formWrapper, button) || {}),
                             })
                         })
                         .then(response => response.json())

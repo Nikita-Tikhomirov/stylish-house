@@ -136,9 +136,30 @@
                             .checkoutInfo__prod {
                                 width: 100%;
                                 display: flex;
-                                align-items: center;
+                                align-items: flex-start;
                                 justify-content: space-between;
+                                gap: 20px;
                                 margin-bottom: 5px;
+                            }
+
+                            .checkoutInfo__details {
+                                display: grid;
+                                gap: 3px;
+                                margin-top: 7px;
+                                color: #687480;
+                                font-size: 13px;
+                                line-height: 1.35;
+                            }
+
+                            .checkoutInfo__details span {
+                                display: block;
+                            }
+
+                            @media (max-width: 600px) {
+                                .checkoutInfo__prod {
+                                    flex-direction: column;
+                                    gap: 8px;
+                                }
                             }
                         </style>
 
@@ -150,11 +171,17 @@
                                 @php
                                     // Ищем товар по ID из корзины
                                     $product = $products->firstWhere('id', (int) $item['productId']);
+                                    $checkoutItemDetails = app(\App\Support\CartItemNormalizer::class)->details($item);
                                 @endphp
                                 <div class="checkoutInfo__prod">
                                     <div class="checkoutInfo__infoName">
-                                        {{ $product->h1 ?? 'Название не найдено' }} <span>x
-                                            {{ $item['quantity'] }}</span>
+                                        {{ $product?->h1 ?? ($item['productName'] ?? 'Товар') }}
+                                        <div class="checkoutInfo__details">
+                                            @foreach ($checkoutItemDetails as $label => $value)
+                                                <span><strong>{{ $label }}:</strong> {{ $value }}</span>
+                                            @endforeach
+                                            <span><strong>Количество:</strong> {{ $item['quantity'] ?? 1 }}</span>
+                                        </div>
                                     </div>
                                     <div class="checkoutInfo__info checkoutProdPrice">
                                         {{ $item['price'] }} р

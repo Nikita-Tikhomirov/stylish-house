@@ -2,6 +2,20 @@
 @vite('resources/css/cart.css')
 
 <body class="p-cart">
+    <style>
+        .cartPageProd__configuration {
+            display: grid;
+            gap: 3px;
+            margin-top: 8px;
+            color: #67727e;
+            font-size: 13px;
+            line-height: 1.35;
+        }
+
+        .cartPageProd__configuration span {
+            display: block;
+        }
+    </style>
 
     <x-front.header :categoriesInCatalogMenu="$categoriesInCatalogMenu" :categoriesInHeaderMenu="$categoriesInHeaderMenu" :cart="$cart" :headerInfo="$headerInfo"></x-front.header>
     <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -52,7 +66,22 @@
 
                                     </div>
                                     <div class="cartPageProd__title">
-                                        {{ $products->firstWhere('id', $item['productId'])->h1 }}
+                                        {{ $products->firstWhere('id', $item['productId'])?->h1 ?? ($item['productName'] ?? 'Товар') }}
+                                        @php
+                                            $cartItemDetails = app(\App\Support\CartItemNormalizer::class)->details($item);
+                                            unset(
+                                                $cartItemDetails['Ширина'],
+                                                $cartItemDetails['Высота'],
+                                                $cartItemDetails['Управление']
+                                            );
+                                        @endphp
+                                        @if ($cartItemDetails)
+                                            <div class="cartPageProd__configuration">
+                                                @foreach ($cartItemDetails as $label => $value)
+                                                    <span><strong>{{ $label }}:</strong> {{ $value }}</span>
+                                                @endforeach
+                                            </div>
+                                        @endif
                                     </div>
 
 
@@ -63,7 +92,9 @@
                                     <span>x</span>
                                     <span class="height">{{ $item['height'] }}</span>
                                 </div>
-                                <div class="control">{{ $item['control'] ? 'Да' : 'Нет' }}</div>
+                                <div class="control">
+                                    {{ array_key_exists('control', $item) && $item['control'] !== null ? ($item['control'] ? 'Да' : 'Нет') : '—' }}
+                                </div>
                                 <div class="cartPageProd__counterWrap">
                                     {{-- <div class="cartPageProd__button minus">-</div>
                                     <input class="cartPageProd__input" type="text" value="" />
@@ -350,7 +381,10 @@
                             popup.querySelector('.width-input').value = item.width;
                             popup.querySelector('.height-input').value = item.height;
                             popup.querySelector('.quantity-input').value = item.quantity;
-                            popup.querySelector('.control').checked = item.control;
+                            const popupControl = popup.querySelector('.control');
+                            if (popupControl) {
+                                popupControl.checked = Boolean(item.control);
+                            }
 
                             // Тип замера по ширине из корзины
 

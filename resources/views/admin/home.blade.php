@@ -16,6 +16,30 @@
         width: 100%;
     }
 
+    .order-item-details {
+        padding: 12px 0;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .order-item-details dl {
+        margin: 8px 0 0;
+    }
+
+    .order-item-details dl div {
+        display: grid;
+        grid-template-columns: minmax(120px, .8fr) 1.2fr;
+        gap: 10px;
+        padding: 2px 0;
+    }
+
+    .order-item-details dt {
+        color: #6b7280;
+    }
+
+    .order-item-details dd {
+        margin: 0;
+    }
+
 
     .deliveryCards .card-header {
         width: 100%;
@@ -207,36 +231,30 @@
                             <div class="cardCell">{{ $order->id }}</div>
 
                             <div class="cardCell">
-                                <a href="">
-                                    {{ $order->user->name }}
-                                </a>
+                                {{ trim(
+                                    data_get($order->customer_details, 'name', $order->user->name ?? 'Покупатель')
+                                    . ' '
+                                    . data_get($order->customer_details, 'secondname', $order->user->secondname ?? '')
+                                ) }}
                             </div>
 
                             <div class="cardCell">
-                                {{ $order->user->phone }}
+                                {{ data_get($order->customer_details, 'phone', $order->user->phone ?? 'Не указан') }}
                             </div>
 
                             <div class="cardCell orderInfo">
-                                @php
-                                    $items = is_string($order->items)
-                                        ? json_decode($order->items, true)
-                                        : $order->items;
-                                @endphp
-
                                 @if (!empty($order->items))
-                                    <ul>
-                                        @foreach ($order->items as $item)
-                                            <li>
-                                                <strong>Товар:</strong> {{ $item['productName'] }}<br>
-                                                <strong>Ширина:</strong> {{ $item['width'] }} мм<br>
-                                                <strong>Высота:</strong> {{ $item['height'] }} мм<br>
-                                                <strong>Управление:</strong> {{ $item['control'] ? 'Да' : 'Нет' }}<br>
-                                                <strong>Количество:</strong> {{ $item['quantity'] }}<br>
-                                                <strong>Цена:</strong> {{ $item['price'] }} ₽
-                                            </li>
-                                        @endforeach
-                                        <strong>{{ $order->user->addres }}</strong>
-                                    </ul>
+                                    @foreach ($order->items as $item)
+                                        @include('partials.order-item-details', ['item' => $item])
+                                    @endforeach
+                                    <p><strong>Доставка:</strong> {{ $order->delivery_label }}
+                                        @if ((float) $order->delivery_cost > 0)
+                                            ({{ number_format($order->delivery_cost, 0, ',', ' ') }} ₽)
+                                        @endif
+                                    </p>
+                                    <p><strong>Адрес:</strong> {{ data_get($order->customer_details, 'addres', $order->user->addres ?? 'Не указан') }}</p>
+                                    <p><strong>Email:</strong> {{ data_get($order->customer_details, 'email', $order->user->email ?? 'Не указан') }}</p>
+                                    <p><strong>Комментарий:</strong> {{ $order->comment ?: 'Нет' }}</p>
                                 @else
                                     <p>Товары отсутствуют.</p>
                                 @endif
@@ -246,20 +264,17 @@
 
 
                             <div class="cardCell orderPrice">
-                                {{ $order->total_price }}
+                                {{ number_format($order->total_price, 0, ',', ' ') }} ₽
                             </div>
 
                             <div class="cardCell">
-                                <select name="status" id="status" class="form-control"
+                                <select name="status" class="form-control order-status"
                                     data-order-id="{{ $order->id }}">
-                                    <option value="1" {{ $order->status == 1 ? 'selected' : '' }}>Заказ
-                                        обрабатывается</option>
-                                    <option value="2" {{ $order->status == 2 ? 'selected' : '' }}>Заказ в
-                                        производстве</option>
-                                    <option value="3" {{ $order->status == 3 ? 'selected' : '' }}>Заказ на складе
-                                    </option>
-                                    <option value="4" {{ $order->status == 4 ? 'selected' : '' }}>Заказ у клиента
-                                    </option>
+                                    @foreach (\App\Models\Order::STATUSES as $status => $label)
+                                        <option value="{{ $status }}" {{ (int) $order->status === $status ? 'selected' : '' }}>
+                                            {{ $label }}
+                                        </option>
+                                    @endforeach
                                 </select>
 
                             </div>
@@ -292,9 +307,10 @@
 </div>
 
 <script>
-    document.querySelector('#status').addEventListener('change', function() {
-        const orderId = this.getAttribute('data-order-id'); // Получаем ID заказа
-        const status = this.value; // Получаем выбранный статус
+    document.querySelectorAll('.order-status').forEach((select) => {
+        select.addEventListener('change', function() {
+        const orderId = this.getAttribute('data-order-id');
+        const status = this.value;
 
         fetch(`/orders/${orderId}/status`, {
                 method: 'PUT',
@@ -316,6 +332,7 @@
                 }
             })
             .catch(error => console.error('Ошибка:', error));
+        });
     });
 
     let infoArrows = document.querySelectorAll('.orderInfoArrow')
@@ -343,9 +360,7 @@
                                 'meta[name="csrf-token"]').getAttribute(
                                 'content')
                         },
-                        body: JSON.stringify({
-                            status
-                        })
+                        body: JSON.stringify({})
                     })
                     .then(response => response.json())
                     .then(data => {

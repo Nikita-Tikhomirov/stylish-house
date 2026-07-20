@@ -26,9 +26,10 @@
                         data-prod="{{ $prod->id }}"><i class="fas fa-eye"></i>
                         <div class="bigProdCard__toolTip">Быстрый просмотр</div>
                     </div>
-                    <div class="bigProdCard__favorites control"><i class="far fa-heart"></i>
+                    <button class="bigProdCard__favorites control" type="button"
+                        data-favorite-product="{{ $prod->id }}" aria-label="Добавить в избранное"><i class="far fa-heart"></i>
                         <div class="bigProdCard__toolTip">Добавить в избранное</div>
-                    </div>
+                    </button>
                 </div>
             </div>
             <div class="bigProdCard__info">

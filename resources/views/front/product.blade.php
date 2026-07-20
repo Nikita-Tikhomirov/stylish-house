@@ -490,10 +490,11 @@
                                                         class="fas fa-eye"></i>
                                                     <div class="bigProdCard__toolTip">Быстрый просмотр</div>
                                                 </div>
-                                                <div class="bigProdCard__favorites control"><i
+                                                <button class="bigProdCard__favorites control" type="button"
+                                                    data-favorite-product="{{ $relatedProduct->id }}" aria-label="Добавить в избранное"><i
                                                         class="far fa-heart"></i>
                                                     <div class="bigProdCard__toolTip">Добавить в избранное</div>
-                                                </div>
+                                                </button>
                                             </div>
                                         </div>
                                         <div class="bigProdCard__info">
@@ -594,10 +595,11 @@
                                                         class="fas fa-eye"></i>
                                                     <div class="bigProdCard__toolTip">Быстрый просмотр</div>
                                                 </div>
-                                                <div class="bigProdCard__favorites control"><i
+                                                <button class="bigProdCard__favorites control" type="button"
+                                                    data-favorite-product="{{ $altProduct->id }}" aria-label="Добавить в избранное"><i
                                                         class="far fa-heart"></i>
                                                     <div class="bigProdCard__toolTip">Добавить в избранное</div>
-                                                </div>
+                                                </button>
                                             </div>
                                         </div>
                                         <div class="bigProdCard__info">
@@ -988,6 +990,7 @@
                                 control: controlCheck,
                                 quantity: prodsCouunter,
                                 price: prodPrice,
+                                ...(window.Shop?.collectCartOptions(formWrapper, button) || {}),
                             })
                         })
                         .then(response => response.json())

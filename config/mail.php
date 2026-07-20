@@ -112,6 +112,8 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    'order_recipient' => env('ORDER_NOTIFICATION_EMAIL', env('MAIL_FROM_ADDRESS', 'info@stylish-house.net')),
+
     /*
     |--------------------------------------------------------------------------
     | Markdown Mail Settings

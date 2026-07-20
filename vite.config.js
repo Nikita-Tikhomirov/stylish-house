@@ -28,6 +28,7 @@ export default defineConfig({
                 'resources/css/admin/flag-icon.min.css',
                 'resources/js/swiper.js',
                 'resources/js/main.js',
+                'resources/js/shop.js',
                 'resources/js/admin/jquery.js',
                 'resources/js/admin/bootstrap.js',
                 'resources/js/admin/slimscroll.js',

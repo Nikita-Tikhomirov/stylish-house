@@ -9,6 +9,7 @@ use App\Models\Subcategory;
 use App\Models\Product;
 use App\Models\ProdModel;
 use App\Models\ThrouElement;
+use App\Support\CartItemNormalizer;
 use Illuminate\Support\Facades\Log;
 
 class CartController extends Controller
@@ -24,52 +25,38 @@ class CartController extends Controller
      * Отобразить корзину.
      */
 
-    public function addToCart(Request $request)
+    public function addToCart(Request $request, CartItemNormalizer $normalizer)
     {
-        $productId = $request->input('productId');
-        $width = $request->input('width');
-        $height = $request->input('height');
-        $control = $request->input('control');
-        $quantity = (int) $request->input('quantity', 1);
-        $price = (int) $request->input('price');
-        $side = $request->input('side');
-        $widthType = $request->input('widthType');
-        $controlColor = $request->input('controlColor');
-        // Получаем товар из базы данных
-        $product = Product::find($productId);
+        $validated = $request->validate([
+            'productId' => ['required', 'integer', 'exists:products,id'],
+            'width' => ['nullable', 'numeric', 'min:0', 'max:100000'],
+            'height' => ['nullable', 'numeric', 'min:0', 'max:100000'],
+            'control' => ['nullable'],
+            'quantity' => ['nullable', 'integer', 'min:1', 'max:99'],
+            'price' => ['required', 'numeric', 'min:0'],
+            'side' => ['nullable', 'string', 'max:160'],
+            'widthType' => ['nullable', 'string', 'max:160'],
+            'controlColor' => ['nullable', 'string', 'max:160'],
+            'configuration' => ['nullable', 'array'],
+        ]);
+
+        $product = Product::find($validated['productId']);
         if (!$product) {
             return response()->json(['success' => false, 'message' => 'Товар не найден'], 404);
         }
 
-        // Генерация уникального ключа на основе параметров
-        $uniqueKey = md5(json_encode([
-            'productId' => $productId,
-            'width' => $width,
-            'height' => $height,
-            'control' => $control,
-        ]));
+        $item = $normalizer->normalize($validated, $product->h1 ?: $product->title);
+        $uniqueKey = $normalizer->key($item);
 
         // Получаем текущую корзину из сессии
         $cart = $request->session()->get('cart', []);
 
         // Проверяем, есть ли товар с таким же уникальным ключом
         if (isset($cart[$uniqueKey])) {
-            $cart[$uniqueKey]['quantity'] += $quantity;
-            $cart[$uniqueKey]['price'] += $price; // Увеличиваем общую стоимость
+            $cart[$uniqueKey]['quantity'] += $item['quantity'];
+            $cart[$uniqueKey]['price'] += $item['price'];
         } else {
-            // Если товара нет, добавляем новый элемент
-            $cart[$uniqueKey] = [
-                'productId' => $productId,
-                'productName' => $product->h1, // Добавляем название товара
-                'width' => $width,
-                'height' => $height,
-                'control' => $control,
-                'quantity' => $quantity,
-                'price' => $price,
-                'side' => $side,
-                'widthType' => $widthType,
-                'controlColor' => $controlColor,
-            ];
+            $cart[$uniqueKey] = $item;
         }
 
         // Сохраняем обновленную корзину в сессии
@@ -138,9 +125,7 @@ class CartController extends Controller
         if (isset($cart[$key])) {
             $item = $cart[$key];
             $product = Product::find($item['productId']);
-            $modelId = $product->model_id;
-            $model = ProdModel::find($modelId);
-            $modelTitle = $model->title;
+            $model = $product->model_id ? ProdModel::find($product->model_id) : null;
 
             return response()->json([
                 'title' => $product->h1,
@@ -149,13 +134,14 @@ class CartController extends Controller
                 'width' => $item['width'],
                 'height' => $item['height'],
                 'quantity' => $item['quantity'],
-                'control' => $item['control'],
-                'model' => $modelTitle,
+                'control' => $item['control'] ?? null,
+                'model' => $model?->title,
                 'cloth' => $product->cloth,
                 'discount' => $product->discount,
-                'side' => $item['side'],
-                'widthType' => $item['widthType'],
-                'controlColor' => $item['controlColor'],
+                'side' => $item['side'] ?? null,
+                'widthType' => $item['widthType'] ?? null,
+                'controlColor' => $item['controlColor'] ?? null,
+                'configuration' => $item['configuration'] ?? [],
 
             ]);
         }

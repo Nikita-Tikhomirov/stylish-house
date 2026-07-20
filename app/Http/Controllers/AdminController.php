@@ -28,19 +28,8 @@ class AdminController extends Controller
      */
     public function index()
     {
-        $orders = Order::all();
+        $orders = Order::query()->with('user')->latest()->get();
 
-        foreach ($orders as $order) {
-            $items = json_decode($order->items, true);
-            if (!empty($items)) {
-                $productIds = array_column($items, 'productId');
-                $products = Product::whereIn('id', $productIds)->pluck('title', 'id');
-                foreach ($items as &$item) {
-                    $item['productName'] = $products[$item['productId']] ?? 'Название не найдено';
-                }
-                $order->items = $items;
-            }
-        }
         return view('admin.home', compact('orders'));
 
 

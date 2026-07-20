@@ -50,77 +50,72 @@
                             stroke-width="4" stroke-miterlimit="3.8637" stroke-linecap="round"></path>
                     </svg></h2>
                 <div class="popularsWithFilter__wrap">
-                    <aside class="sidebarFilter">
-                        @include('front.partials.price-filter')
+                    <style>
+                        .popularsWithFilter__wrap{
+                            grid-template-columns: 1fr
+                        }
+                        .popularsWithFilter__cards{
+                            grid-template-columns: repeat(4, 1fr);
+                        }
+                        .filterMaterials {
+                            display: flex;
+                            flex-direction: column;
+                        }
 
+                        .filterMaterials .sidebarFilter__paramsWrap {
+                            display: flex;
+                            flex-wrap: wrap;
+                            gap: 5px;
+                        }
 
-                        <style>
-                            .popularsWithFilter__wrap{
-                                grid-template-columns: 1fr
-                            }
-                            .popularsWithFilter__cards{
-                                grid-template-columns: repeat(4, 1fr);
-                            }
-                            .filterMaterials {
-                                display: flex;
-                                flex-direction: column;
-                            }
+                        .filterMaterials .materialLabel {
+                            position: relative;
+                            display: inline-block;
+                            width: 40px;
+                            height: 40px;
+                            cursor: pointer;
+                            border: 2px solid transparent;
+                            border-radius: 5px;
+                            transition: border-color 0.3s;
+                        }
 
-                            .filterMaterials .sidebarFilter__paramsWrap {
-                                display: flex;
-                                flex-wrap: wrap;
-                                gap: 5px;
-                            }
+                        .filterMaterials .materialLabel input:checked+.materialOverlay+.materialImage {
+                            border: 2px solid #007bff;
+                        }
 
-                            .filterMaterials .materialLabel {
-                                position: relative;
-                                display: inline-block;
-                                width: 40px;
-                                height: 40px;
-                                cursor: pointer;
-                                border: 2px solid transparent;
-                                border-radius: 5px;
-                                transition: border-color 0.3s;
-                            }
+                        .filterMaterials .materialOverlay {
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            width: fit-content;
+                            height: 100%;
+                            padding: 5px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            background: rgba(0, 0, 0, 0.7);
+                            color: #fff;
+                            opacity: 0;
+                            font-size: 12px;
+                            text-align: center;
+                            border-radius: 5px;
+                            pointer-events: none;
+                            transition: opacity 0.3s;
+                            white-space: nowrap;
+                            z-index: 2;
+                        }
 
-                            .filterMaterials .materialLabel input:checked+.materialOverlay+.materialImage {
-                                border: 2px solid #007bff;
-                            }
+                        .filterMaterials .materialLabel:hover .materialOverlay {
+                            opacity: 1;
+                        }
 
-                            .filterMaterials .materialOverlay {
-                                position: absolute;
-                                top: 0;
-                                left: 0;
-                                width: fit-content;
-                                height: 100%;
-                                padding: 5px;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                background: rgba(0, 0, 0, 0.7);
-                                color: #fff;
-                                opacity: 0;
-                                font-size: 12px;
-                                text-align: center;
-                                border-radius: 5px;
-                                pointer-events: none;
-                                transition: opacity 0.3s;
-                                white-space: nowrap;
-                                z-index: 2;
-                            }
-
-                            .filterMaterials .materialLabel:hover .materialOverlay {
-                                opacity: 1;
-                            }
-
-                            .filterMaterials .materialImage {
-                                width: 100%;
-                                height: 100%;
-                                object-fit: cover;
-                                border-radius: 5px;
-                            }
-                        </style>
-                    </aside>
+                        .filterMaterials .materialImage {
+                            width: 100%;
+                            height: 100%;
+                            object-fit: cover;
+                            border-radius: 5px;
+                        }
+                    </style>
                     <div class="popularsWithFilter__cardsWrap">
                         <div class="popularsWithFilter__cards" id="productsWrap">
                             @include('front.partials.products')
@@ -133,34 +128,50 @@
             </section>
 
         <!-- Виды монтажа -->
-        <x-front.section.plumbing-installation />
+        @if ($installationTypes->isNotEmpty())
+            <x-front.section.plumbing-installation :installationTypes="$installationTypes" />
+        @else
+            <x-front.section.plumbing-installation />
+        @endif
 
         <!-- Калькулятор для рольставен -->
+        @php
+            $calcTitle = $subcategory->plumbing_calc_title ?: 'Рассчитать стоимость рольставен';
+            $calcSubtitle = $subcategory->plumbing_calc_subtitle ?: 'Рольставни';
+            $calcDescription = $subcategory->plumbing_calc_description ?: 'Профессиональные рольставни для вашего дома или офиса. Надежная защита и современный дизайн.';
+            $calcImages = $subcategory->plumbing_calc_images ?? [];
+            $calcMainImg = $calcImages[0] ?? '/img/rollets-main.jpg';
+            $calcFabricImg = $calcImages[1] ?? '/img/rollets-fabric.jpg';
+            $calcBarImg1 = $calcImages[2] ?? '/img/rollets-1.jpg';
+            $calcBarImg2 = $calcImages[3] ?? '/img/rollets-2.jpg';
+            $calcBarImg3 = $calcImages[4] ?? '/img/rollets-3.jpg';
+            $calcBarImg4 = $calcImages[5] ?? '/img/rollets-4.jpg';
+        @endphp
         <section class="prodMain wrapper" style="padding-top: 40px;">
-            <h2 class="prodMain__title title"> <span>Рассчитать стоимость рольставен</span><svg width="114" height="35" viewBox="0 0 114 35" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <h2 class="prodMain__title title"> <span>{{ $calcTitle }}</span><svg width="114" height="35" viewBox="0 0 114 35" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M112 23.275C1.84952 -10.6834 -7.36586 1.48086 7.50443 32.9053" stroke="currentColor" stroke-width="4" stroke-miterlimit="3.8637" stroke-linecap="round"></path>
             </svg></h2>
             <div class="prodForm">
                 <div class="prodForm__galleryWrapOuter">
                     <div class="prodForm__galleryWrap">
                         <div class="prodForm__imgWrap">
-                            <img src="/img/rollets-main.jpg" alt="Рольставни" />
-                            <img src="/img/rollets-fabric.jpg" alt="Рольставни материал" />
+                            <img src="{{ $calcMainImg }}" alt="{{ $calcTitle }}" />
+                            <img src="{{ $calcFabricImg }}" alt="{{ $calcTitle }} материал" />
                         </div>
                         <div class="prodForm__bar">
-                            <img src="/img/rollets-1.jpg" alt="Рольставни 1" />
-                            <img src="/img/rollets-2.jpg" alt="Рольставни 2" />
-                            <img src="/img/rollets-3.jpg" alt="Рольставни 3" />
-                            <img src="/img/rollets-4.jpg" alt="Рольставни 4" />
+                            <img src="{{ $calcBarImg1 }}" alt="{{ $calcTitle }} 1" />
+                            <img src="{{ $calcBarImg2 }}" alt="{{ $calcTitle }} 2" />
+                            <img src="{{ $calcBarImg3 }}" alt="{{ $calcTitle }} 3" />
+                            <img src="{{ $calcBarImg4 }}" alt="{{ $calcTitle }} 4" />
                         </div>
                     </div>
                 </div>
 
                 <div class="prodForm__calcFormWrap">
-                    <div class="prodForm__formSubtitle">Рольставни</div>
-                    <div class="prodForm__formTitle">Рассчитать стоимость рольставен</div>
+                    <div class="prodForm__formSubtitle">{{ $calcSubtitle }}</div>
+                    <div class="prodForm__formTitle">{{ $calcTitle }}</div>
                     <div class="prodForm__description">
-                        <p>Профессиональные рольставни для вашего дома или офиса. Надежная защита и современный дизайн.</p>
+                        <p>{{ $calcDescription }}</p>
                     </div>
 
                     <input type="hidden" name="modelSelect" class="modelSelect" value="Рольставни">
@@ -223,8 +234,8 @@
 
                     <div class="prodForm__priceAndAddToCart">
                         @php
-                            $calcBasePrice = (int) ($product->min_price ?? 0);
-                            $calcDiscount = (float) ($product->discount ?? 0);
+                            $calcBasePrice = (int) ($firstProduct->min_price ?? 0);
+                            $calcDiscount = (float) ($firstProduct->discount ?? 0);
                             $calcDisplayPrice = $calcBasePrice > 0 ? (int) floor($calcBasePrice * (1 - $calcDiscount / 100)) : null;
                         @endphp
                         <div class="prodForm__price" data-base-price="{{ $calcBasePrice }}">
@@ -237,7 +248,7 @@
         </section>
 
         @if (!empty($workExamples) && $workExamples->isNotEmpty())
-            <x-front.section.subgallery :gallerys="$workExamples" :category='$category' title=""></x-front.section.gallery>
+            <x-front.section.subgallery :gallerys="$workExamples" :category='$category' title=""></x-front.section.subgallery>
         @endif
 
         <!-- Оплата и доставка -->
@@ -812,9 +823,9 @@
                             <div class="bigProdCard__quckView control quickProd" data-modal="#popupProd" data-prod="${product.id}"><i class="fas fa-eye"></i>
                                 <div class="bigProdCard__toolTip">Быстрый просмотр</div>
                             </div>
-                            <div class="bigProdCard__favorites control"><i class="far fa-heart"></i>
+                            <button class="bigProdCard__favorites control" type="button" data-favorite-product="${product.id}" aria-label="Добавить в избранное"><i class="far fa-heart"></i>
                                 <div class="bigProdCard__toolTip">Добавить в избранное</div>
-                            </div>
+                            </button>
                         </div>
                     </div>
                     <div class="bigProdCard__info">
@@ -979,7 +990,7 @@
                     const formWrapper = button.parentElement.parentElement
                     const widthToCalc = formWrapper.querySelector('.width-input').value
                     const heightToCalc = formWrapper.querySelector('.height-input').value
-                    const controlCheck = formWrapper.querySelector('.control').checked
+                    const controlCheck = formWrapper.querySelector('.control')?.checked ?? null
                     const prodsCouunter = formWrapper.querySelector('.quantity-input').value
                     const prodPriceText = formWrapper.querySelector('.prodForm__price').innerText;
 
@@ -987,7 +998,7 @@
                     // const prodsCouunter = formWrapper.querySelector('.quantity-input').value
 
 
-                    const prodPrice = parseInt(prodPriceText.replace(/\D/g, ''), 10);
+                    const prodPrice = parseInt(prodPriceText.replace(/\D/g, ''), 10) || 0;
                     const cardCounter = document.querySelector('.header__cartCounter')
 
 
@@ -1004,6 +1015,7 @@
                                 control: controlCheck,
                                 quantity: prodsCouunter,
                                 price: prodPrice,
+                                ...(window.Shop?.collectCartOptions(formWrapper, button) || {}),
                             })
                         })
                         .then(response => response.json())

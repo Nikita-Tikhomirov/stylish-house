@@ -955,9 +955,6 @@
 
                     const widthToCalc = formWrapper.querySelector('.width-input')?.value || '';
                     const heightToCalc = formWrapper.querySelector('.height-input')?.value || '';
-                    const installationType = formWrapper.querySelector('input[name^="widhType"]:checked')?.value || 'inside';
-                    const lockType = formWrapper.querySelector('input[name="lock-type"]:checked')?.value || 'sliders';
-                    const lockPrice = parseInt(formWrapper.querySelector('input[name="lock-type"]:checked')?.dataset.price || 0);
                     const prodsCouunter = formWrapper.querySelector('.quantity-input')?.value || 1;
                     const prodPriceText = formWrapper.querySelector('.prodForm__price')
                         ?.innerText || '';
@@ -974,11 +971,9 @@
                                 productId,
                                 width: widthToCalc,
                                 height: heightToCalc,
-                                installationType,
-                                lockType,
-                                lockPrice,
                                 quantity: prodsCouunter,
                                 price: prodPrice,
+                                ...(window.Shop?.collectCartOptions(formWrapper, button) || {}),
                             })
                         })
                         .then(response => response.json())

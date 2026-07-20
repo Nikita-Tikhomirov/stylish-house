@@ -22,6 +22,7 @@ use App\Http\Controllers\ModelsController;
 use App\Http\Controllers\TabsController;
 use App\Http\Controllers\FirstScreenSliderController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\ExcelController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\FabrickController;
@@ -50,7 +51,14 @@ Route::get('/sheet-names-test', [ExcelController::class, 'test']);
 // Route::get('/sheet-data', [ExcelController::class, 'getSheetData']);
 
 
-Route::get('/profile/{id}', [OrderController::class, 'show'])->name('profile.show');
+Route::middleware('auth')->group(function () {
+    Route::get('/profile', [OrderController::class, 'show'])->name('profile.account');
+    Route::get('/profile/{id}', [OrderController::class, 'show'])->name('profile.show');
+    Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
+    Route::post('/favorites/sync', [FavoriteController::class, 'sync'])->name('favorites.sync');
+    Route::post('/favorites/{product}', [FavoriteController::class, 'store'])->name('favorites.store');
+    Route::delete('/favorites/{product}', [FavoriteController::class, 'destroy'])->name('favorites.destroy');
+});
 
 Route::get('/popup/{id}', [ProductController::class, 'getProdToPopup']);
 

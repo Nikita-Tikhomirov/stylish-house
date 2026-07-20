@@ -104,7 +104,12 @@
                 <div class="header__btn btn" data-modal="#call">Заказать Звонок</div>
             </div>
         </div>
-        <div class="header__wrapTomobile"><a class="header__cartIconWrap" href="/cart">
+        <div class="header__wrapTomobile">
+            <a class="header__accountIconWrap" href="{{ auth()->check() ? route('profile.account') : route('login') }}"
+                aria-label="{{ auth()->check() ? 'Личный кабинет' : 'Войти' }}" title="{{ auth()->check() ? 'Личный кабинет' : 'Войти' }}">
+                <i class="far fa-user"></i>
+            </a>
+            <a class="header__cartIconWrap" href="/cart">
 
                 <span class="header__cartCounter">{{ collect($cart)->sum('quantity') ?: 0 }}</span>
 
@@ -122,7 +127,8 @@
                         stroke-linejoin="round"></path>
                     <path d="M13.5343 10.1018H13.5801" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
                         stroke-linejoin="round"></path>
-                </svg></a>
+                </svg>
+            </a>
             <div class="header__mobileBurger"> <svg data-v-3b9ee29c="data-v-3b9ee29c" width="18" height="14"
                     viewBox="0 0 18 14" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path fill-rule="evenodd" clip-rule="evenodd"
@@ -250,6 +256,28 @@
 
 
 <style>
+    .header__accountIconWrap {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        margin-right: 8px;
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .bigProdCard__favorites {
+        border: 0;
+        padding: 0;
+        color: inherit;
+        background: transparent;
+    }
+
+    .bigProdCard__favorites.is-favorite {
+        color: #0989ff;
+    }
+
     .filterSubcat {
         display: flex;
         width: 100%;
