@@ -1,1 +1,1175 @@
-@include('admin.subcatEdit')
+<x-admin.head></x-admin.head>
+<x-admin.header></x-admin.header>
+<x-admin.sidebar></x-admin.sidebar>
+
+<div class="row">
+    <div class="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+        <div class="section-block" id="basicform" tabindex="-1">
+            <h1 class="section-title">Редактировать Подкатегорию {{ $subcategory->titleh1 }}</h1>
+        </div>
+    </div>
+</div>
+
+{{-- Первый экран --}}
+<div class="row">
+    <div class="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+        <div class="card">
+            <h5 class="card-header">Первый экран</h5>
+            <div class="card-body">
+                <form id="subcategoryEditForm" enctype="multipart/form-data">
+                    @csrf
+                    @method('PUT')
+
+                    <div class="form-group">
+                        <label for="title">Заголовок(meta)</label>
+                        <input id="title" name="title" type="text" class="form-control"
+                            value="{{ $subcategory->title }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Описание(meta)</label>
+                        <input id="description" name="description" type="text" class="form-control"
+                            value="{{ $subcategory->description }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="slug">slug</label>
+                        <input id="slug" name="slug" type="text" class="form-control"
+                            value="{{ $subcategory->slug }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="titleh1">Заголовок h1</label>
+                        <input id="titleh1" name="titleh1" type="text" class="form-control"
+                            value="{{ $subcategory->titleh1 }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="title">Название в меню</label>
+                        <input id="menu_title" name="menu_title" type="text" class="form-control"
+                            value="{{ $subcategory->menu_title }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="first_screen_text">Текст</label>
+                        <textarea class="form-control" name="first_screen_text" id="first_screen_text">{{ $subcategory->first_screen_text }}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="img">Фото подкатегории</label>
+                        <input name="img" type="file" class="form-control">
+                        <img src="{{ Storage::url($subcategory->img) }}" alt="">
+                    </div>
+
+                    <button class="btn btn-primary" type="button" id="saveSubcategoryBtn">Сохранить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- ВидеоОтзывы --}}
+<div class="row">
+    <div class="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+        <div class="card">
+            <h5 class="card-header">Видеообзоры</h5>
+            <div class="card-body">
+                <div class="videoReviewCards" data-category-id="{{ $category->id }}"
+                    data-subcategory-id="{{ $subcategory->id ?? '' }}">
+
+                    @foreach ($videoReviews as $videoReview)
+                        @if (
+                            $videoReview->category_id == $category->id &&
+                                ($subcategory->id ? $videoReview->subcategory_id == $subcategory->id : true))
+                            <form class="videoReviewCards_card" data-id="{{ $videoReview->id }}"
+                                id="{{ $videoReview->id }}" enctype="multipart/form-data">
+                                <input type="hidden" name="category_id" value="{{ $videoReview->category_id }}">
+                                <input type="hidden" name="subcategory_id"
+                                    value="{{ $videoReview->subcategory_id ?? '' }}">
+                                <div class="form-group">
+                                    <label for="cover_image" class="col-form-label">Обложка</label>
+                                    <input name="cover_image" type="file" class="form-control">
+                                    @if ($videoReview->cover_image)
+                                        <img src="{{ Storage::url($videoReview->cover_image) }}" alt="Cover Image"
+                                            style="max-width: 100px;">
+                                    @endif
+                                </div>
+                                <div class="form-group">
+                                    <label for="video" class="col-form-label">Видео</label>
+                                    <input name="video" type="file" class="form-control">
+                                    @if ($videoReview->video)
+                                        <video controls style="max-width: 200px;">
+                                            <source src="{{ Storage::url($videoReview->video) }}" type="video/mp4">
+                                        </video>
+                                    @endif
+                                </div>
+                                <div class="form-group">
+                                    <label for="title" class="col-form-label">Заголовок</label>
+                                    <input name="title" type="text" class="form-control"
+                                        value="{{ $videoReview->title }}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="description" class="col-form-label">Описание</label>
+                                    <textarea name="description" class="form-control">{{ $videoReview->description }}</textarea>
+                                </div>
+                                <button class="btn btn-primary save-video-review-button"
+                                    type="button">Сохранить</button>
+                                <a class="btn btn-outline-secondary delete-video-review-button">Удалить</a>
+                            </form>
+                        @endif
+                    @endforeach
+
+                    <div class="videoReviewCards__addCard btn btn-primary">Добавить видеообзор</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Галлерея --}}
+<div class="row">
+    <div class="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+        <div class="card">
+            <h5 class="card-header">Примеры работ</h5>
+            <div class="card-body">
+                <div class="work-examples-gallery">
+                    <div id="dropzone" class="dropzone">
+                        Перетащите файлы сюда или нажмите, чтобы выбрать.
+                        <input type="file" id="workExamplesInput" multiple style="display: none;">
+                    </div>
+                    <button id="uploadWorkExamplesBtn" class="btn btn-primary">Загрузить изображения</button>
+                    <div id="workExamplesContainer">
+                        @if ($workExamples->isNotEmpty())
+                            @foreach ($workExamples as $workExample)
+                                <div class="work-example-card" data-id="{{ $workExample->id }}">
+                                    <img src="/storage/{{ $workExample->thumb ?? $workExample->image }}" alt="Work Example Image"
+                                        style="max-width: 100px;">
+                                    <input placeholder="Название" name="title" type="text" class="form-control"
+                                        value="{{ $workExample->title }}">
+                                    <label for="description">Описание</label>
+                                    <textarea name="description" class="form-control">{{ $workExample->description }}</textarea>
+                                    <button class="btn btn-primary save-work-example">Сохранить</button>
+                                    <button class="btn btn-danger delete-work-example">Удалить</button>
+                                </div>
+                            @endforeach
+                        @else
+                            <p>Нет загруженных примеров работ</p>
+                        @endif
+                    </div>
+                    <input type="hidden" id="categoryId" value="{{ $category->id }}">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Калькулятор --}}
+<div class="row">
+    <div class="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+        <div class="card">
+            <h5 class="card-header">Калькулятор (блок "Рассчитать стоимость")</h5>
+            <div class="card-body">
+                <form id="plumbingCalcForm" enctype="multipart/form-data">
+                    @csrf
+                    <div class="form-group">
+                        <label for="plumbing_calc_title">Заголовок калькулятора</label>
+                        <input id="plumbing_calc_title" name="plumbing_calc_title" type="text" class="form-control"
+                            value="{{ $subcategory->plumbing_calc_title }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="plumbing_calc_subtitle">Подзаголовок (над формой)</label>
+                        <input id="plumbing_calc_subtitle" name="plumbing_calc_subtitle" type="text" class="form-control"
+                            value="{{ $subcategory->plumbing_calc_subtitle }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="plumbing_calc_description">Описание</label>
+                        <textarea id="plumbing_calc_description" name="plumbing_calc_description" class="form-control" rows="4">{{ $subcategory->plumbing_calc_description }}</textarea>
+                    </div>
+
+                    @php
+                        $calcImages = $subcategory->plumbing_calc_images ?? [];
+                    @endphp
+                    <div class="form-group">
+                        <label>Изображения калькулятора</label>
+                        <div id="calcImagesContainer" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+                            @foreach ($calcImages as $index => $img)
+                                <div class="calc-image-card" data-index="{{ $index }}" style="position: relative; display: inline-block;">
+                                    <img src="{{ Str::startsWith($img, 'http') ? $img : Storage::url($img) }}" style="max-width: 120px; max-height: 120px; object-fit: cover; border: 1px solid #ddd; border-radius: 4px;" alt="Calc image {{ $index }}">
+                                    <button type="button" class="btn btn-danger btn-sm remove-calc-image" style="position: absolute; top: 2px; right: 2px; padding: 0 5px; line-height: 1.2;">&times;</button>
+                                </div>
+                            @endforeach
+                        </div>
+                        <input type="file" id="calcImageUpload" multiple accept="image/*" class="form-control" style="margin-bottom: 5px;">
+                        <small class="text-muted">
+                            Порядок: 0 — главное фото, 1 — фото материала, 2-5 — миниатюры в баре.
+                            При загрузке новые изображения добавляются в конец списка.
+                        </small>
+                    </div>
+
+                    <input type="hidden" id="plumbing_calc_images_input" name="plumbing_calc_images"
+                        value="{{ json_encode($calcImages) }}">
+
+                    <button class="btn btn-primary" type="button" id="savePlumbingCalcBtn">Сохранить калькулятор</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Виды монтажа --}}
+<div class="row">
+    <div class="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+        <div class="card">
+            <h5 class="card-header">Виды монтажа (аккордеон)</h5>
+            <div class="card-body">
+                <div id="installationTypesContainer">
+                    @forelse ($installationTypes as $item)
+                        <form class="installation-type-card mb-4 p-3 border rounded" data-id="{{ $item->id }}" enctype="multipart/form-data">
+                            <div class="form-group">
+                                <label>Заголовок</label>
+                                <input type="text" name="title" class="form-control" value="{{ $item->title }}">
+                            </div>
+                            <div class="form-group">
+                                <label>Описание</label>
+                                <textarea name="description" class="form-control installation-description d-none" rows="5">{{ $item->description }}</textarea>
+                                <div class="installation-description-editor" style="min-height: 180px;">{!! $item->description !!}</div>
+                            </div>
+                            <div class="form-group">
+                                <label>Порядок сортировки</label>
+                                <input type="number" min="0" name="sort_order" class="form-control" value="{{ $item->sort_order }}">
+                            </div>
+                            <div class="form-group">
+                                <label>Картинка (маленькая, 50x50)</label>
+                                <input type="file" name="image" class="form-control">
+                                @if ($item->image)
+                                    <img src="{{ Storage::url($item->image) }}" style="max-width: 80px; margin-top: 10px;" alt="Монтаж">
+                                @endif
+                            </div>
+                            <div class="form-group">
+                                <label>Детальная картинка (большая)</label>
+                                <input type="file" name="detail_image" class="form-control">
+                                @if ($item->detail_image)
+                                    <img src="{{ Storage::url($item->detail_image) }}" style="max-width: 180px; margin-top: 10px;" alt="Детальный монтаж">
+                                @endif
+                            </div>
+                            <button class="btn btn-primary save-installation-type" type="button">Сохранить</button>
+                            <button class="btn btn-danger delete-installation-type" type="button">Удалить</button>
+                        </form>
+                    @empty
+                        <p class="text-muted">Пока нет добавленных пунктов монтажа</p>
+                    @endforelse
+                </div>
+
+                <button id="addInstallationTypeButton" class="btn btn-outline-primary" type="button">Добавить пункт монтажа</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Секция Сео --}}
+<div class="row">
+    <div class="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+        <div class="card">
+            <h5 class="card-header">Секция СЕО текст</h5>
+            <div class="card-body">
+                <form>
+                    <div class="form-group">
+                        <label for="seoEditor">Редактировать</label>
+                        <button id="toggle-editor" type="button" style="margin-bottom: 10px;">Редактировать HTML</button>
+                        <div id="editor-container">
+                            <div id="seoEditor">
+                                {!! $subcategory->seo !!}
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" type="button" id="saveSeoButton">Сохранить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Секция FAQ HTML --}}
+<div class="row">
+    <div class="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+        <div class="card">
+            <h5 class="card-header">Секция Вопросы и ответы (HTML)</h5>
+            <div class="card-body">
+                <form>
+                    <div class="form-group">
+                        <label for="faqHtmlEditor">HTML контент</label>
+                        <textarea name="faq_html" id="faqHtmlEditor" class="form-control" rows="20">{!! $subcategory->faq_html !!}</textarea>
+                    </div>
+                    <button class="btn btn-primary" type="button" id="saveFaqHtmlButton">Сохранить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Вопросы и ответы --}}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <h5 class="card-header">Секция Вопросы и ответы</h5>
+            <div class="card-body faq">
+                <button class="btn btn-primary add-faq-button">Добавить вопрос</button>
+                <div class="faq-cards-container">
+                    @foreach ($faqs as $faq)
+                        <form class="faq-card" data-id="{{ $faq->id }}">
+                            <div class="form-group">
+                                <label for="title">Вопрос</label>
+                                <input name="title" type="text" class="form-control"
+                                    value="{{ $faq->question }}">
+                            </div>
+                            <div class="form-group">
+                                <label for="text">Ответ</label>
+                                <textarea name="text" class="form-control">{{ $faq->answer }}</textarea>
+                            </div>
+                            <button class="btn btn-primary save-faq-button" type="button">Сохранить</button>
+                            <a class="btn btn-outline-secondary delete-faq-button">Удалить</a>
+                        </form>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Скрытые поля --}}
+<input type="hidden" name="category-slug" value="{{ $category->slug }}">
+@if ($subcategory)
+    <input type="hidden" name="subcategory-slug" value="{{ $subcategory->slug }}">
+@endif
+
+{{-- Выбор шаблона --}}
+@if ((int) $subcategory->category_id === 16)
+<div class="row">
+    <div class="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+        <div class="card">
+            <h5 class="card-header">Выбор шаблона </h5>
+            <div class="card-body">
+                <div class="form-group">
+                    <label for="template_variant">Шаблон (редактирование/фронтент)</label>
+                    <select class="form-control" name="template_variant" id="template_variant">
+                        <option value="1" {{ (int) ($subcategory->template_variant ?? 1) === 1 ? 'selected' : '' }}>Сантех-роллеты</option>
+                        <option value="2" {{ (int) ($subcategory->template_variant ?? 1) === 2 ? 'selected' : '' }}>Роллеты для проёма/окон/ворот/витрин</option>
+                        <option value="3" {{ (int) ($subcategory->template_variant ?? 1) === 3 ? 'selected' : '' }}>Секционные и промышленные ворота</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" type="button" id="applyTemplateButton">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
+{{-- Вывод в меню --}}
+<div class="row">
+    <div class="col-xl-12 col-lg-12 col-md-12 col-sm-12 col-12">
+        <div class="card">
+            <h5 class="card-header">Вывод в виджетах</h5>
+            <div class="card-body">
+                <form id="categoryEditForm">
+                    <div class="form-group">
+                        <label for="show_in_menu">Показывать в меню</label>
+                        <input type="checkbox" id="show_in_menu" name="show_in_menu"
+                            {{ $subcategory->show_in_menu ? 'checked' : '' }}>
+                    </div>
+                    <div class="form-group">
+                        <label for="show_in_catalog">Показывать в каталоге</label>
+                        <input type="checkbox" id="show_in_catalog" name="show_in_catalog"
+                            {{ $subcategory->show_in_catalog ? 'checked' : '' }}>
+                    </div>
+                    <div class="form-group">
+                        <label for="show_in_catalog">Показывать в блоке большой выбор</label>
+                        <input type="checkbox" id="show_in_more_cats" name="show_in_more_cats"
+                            {{ $subcategory->show_in_more_cats ? 'checked' : '' }}>
+                    </div>
+                    <div class="form-group">
+                        <label for="show_in_catalog">Показывать в фильтре на странице категории</label>
+                        <input type="checkbox" id="show_in_cats_filter" name="show_in_cats_filter"
+                            {{ $subcategory->show_in_cats_filter ? 'checked' : '' }}>
+                    </div>
+                    <div class="form-group">
+                        <label for="clone_subcategory_id">Клонировать товары из подкатегории</label>
+                        <select class="form-control" name="clone_subcategory_id" id="clone_subcategory_id">
+                            <option value="">Не выбрано</option>
+                            @foreach ($subcategories as $subcategoryOption)
+                                <option value="{{ $subcategoryOption->id }}"
+                                    @if (isset($subcategory) && $subcategory->clone_subcategory_id == $subcategoryOption->id) selected @endif>
+                                    {{ $subcategoryOption->titleh1 }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="all_subcategory_id">Все категории</label>
+                        <select style="min-height: 300px;" class="form-control" name="all_subcategory_id[]"
+                            id="all_subcategory_id" multiple>
+                            @foreach ($subcategories as $subcategoryOption)
+                                <option value="{{ $subcategoryOption->id }}"
+                                    @if (in_array($subcategoryOption->id, $relatedIds)) selected @endif>
+                                    {{ $subcategoryOption->titleh1 ?? $subcategoryOption->title }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="start_material">Материал для старта фильтра</label>
+                        <select name="start_material" id="start_material" class="form-control">
+                            <option value="">Не выбрано</option>
+                            @foreach ($materials as $material)
+                                <option value="{{ $material }}"
+                                    {{ $subcategory->start_material === $material ? 'selected' : '' }}>
+                                    {{ $material }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="filter_color">Цвет для фильтра</label>
+                        <input id="filter_color" name="filter_color" type="text" class="form-control"
+                            value="{{ $subcategory->filter_color }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="calc_prod">ID товара в блоке "Как заказать"</label>
+                        <input type="number" class="form-control" id="calc_prod" name="calc_prod"
+                            value="{{ $subcategory->calc_prod }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="model_id_to_filter">Все модели</label>
+                        <select style="min-height: 300px;" class="form-control" name="model_id_to_filter[]"
+                            id="model_id_to_filter" multiple>
+                            @foreach ($models as $model)
+                                <option value="{{ $model->id }}" @if (in_array($model->id, $relatedIds)) selected @endif>
+                                    {{ $model->h1 ?? $model->title }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" type="button" id="saveCategoryButton">Сохранить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Включение Dropzone.js -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/dropzone.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/min/dropzone.min.js"></script>
+
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+
+{{-- Первый экран --}}
+<script>
+    document.getElementById('saveSubcategoryBtn').addEventListener('click', function() {
+        let form = document.getElementById('subcategoryEditForm');
+        let formData = new FormData(form);
+
+        fetch('{{ route('subcategories.update', ['category_slug' => $category->slug, 'subcategory_slug' => $subcategory->slug]) }}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'X-Requested-With': 'XMLHttpRequest',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.success);
+                } else {
+                    alert('Произошла ошибка при обновлении подкатегории.');
+                }
+            })
+            .catch(error => console.error('Ошибка:', error));
+    });
+</script>
+
+{{-- Видео --}}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        function saveVideoReviewCard(card) {
+            let formData = new FormData(card);
+            const cardId = card.getAttribute('data-id');
+            const categoryId = document.querySelector('.videoReviewCards').getAttribute('data-category-id');
+            const subcategoryId = document.querySelector('.videoReviewCards').getAttribute('data-subcategory-id');
+            const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            const url = cardId ? `/admin/video-reviews/${cardId}` : `/admin/video-reviews`;
+            const method = cardId ? 'PUT' : 'POST';
+
+            formData.append('_method', method);
+            formData.append('category_id', categoryId || null);
+            formData.append('subcategory_id', subcategoryId || null);
+
+            fetch(url, {
+                    method: method,
+                    headers: {
+                        'X-CSRF-TOKEN': token,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.errors) {
+                        alert('Ошибки: ' + JSON.stringify(data.errors));
+                    } else {
+                        alert('Видеообзор успешно сохранен');
+                        if (!cardId) {
+                            card.setAttribute('data-id', data.videoReview ? data.videoReview.id : null);
+                        }
+                    }
+                })
+                .catch(error => console.error('Ошибка:', error));
+        }
+
+        function addNewVideoReviewCard() {
+            const categoryId = document.querySelector('.videoReviewCards').getAttribute('data-category-id');
+            const subcategoryId = document.querySelector('.videoReviewCards').getAttribute('data-subcategory-id');
+            const newVideoReviewCard = document.createElement('form');
+            newVideoReviewCard.classList.add('video-review-card');
+            newVideoReviewCard.innerHTML = `
+        <div class="form-group">
+            <label for="cover_image">Обложка</label>
+            <input name="cover_image" type="file" class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="video">Видео</label>
+            <input name="video" type="file" class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="title">Заголовок</label>
+            <input name="title" type="text" class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="description">Описание</label>
+            <textarea name="description" class="form-control"></textarea>
+        </div>
+        <input type="hidden" name="category_id" value="${categoryId}">
+        <input type="hidden" name="subcategory_id" value="${subcategoryId}">
+        <button class="btn btn-primary save-video-review-button" type="button">Сохранить</button>
+        <a class="btn btn-outline-secondary delete-video-review-button">Удалить</a>
+    `;
+            document.querySelector('.videoReviewCards').appendChild(newVideoReviewCard);
+        }
+
+        function deleteVideoReviewCard(card) {
+            const cardId = card.getAttribute('data-id');
+            if (!cardId) { card.remove(); return; }
+            const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            fetch(`/admin/video-reviews/destroy/${cardId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) { alert('Видеообзор успешно удален'); card.remove(); }
+                    else { alert('Ошибка при удалении видеообзора'); }
+                })
+                .catch(error => console.error('Ошибка:', error));
+        }
+
+        document.querySelector('.videoReviewCards').addEventListener('click', function(e) {
+            if (e.target.classList.contains('save-video-review-button')) {
+                const card = e.target.closest('.videoReviewCards_card');
+                if (card) saveVideoReviewCard(card);
+            }
+            if (e.target.classList.contains('delete-video-review-button')) {
+                const card = e.target.closest('.videoReviewCards_card');
+                if (card) deleteVideoReviewCard(card);
+            }
+        });
+
+        document.querySelector('.videoReviewCards__addCard').addEventListener('click', addNewVideoReviewCard);
+    });
+</script>
+
+{{-- Галерея --}}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const input = document.getElementById('workExamplesInput');
+        const dropzone = document.getElementById('dropzone');
+        const uploadBtn = document.getElementById('uploadWorkExamplesBtn');
+        const container = document.getElementById('workExamplesContainer');
+        let filesToUpload = [];
+
+        document.addEventListener('dragover', function(e) {
+            if (e.target.id === 'dropzone') { e.preventDefault(); e.target.classList.add('dragover'); }
+        });
+        document.addEventListener('dragleave', function(e) {
+            if (e.target.id === 'dropzone') { e.preventDefault(); e.target.classList.remove('dragover'); }
+        });
+        // Client-side image resizer — shrinks huge photos before upload
+        function resizeImage(file) {
+            return new Promise((resolve, reject) => {
+                if (!file.type.startsWith('image/')) { resolve(file); return; }
+                const img = new Image();
+                const url = URL.createObjectURL(file);
+                img.onload = function() {
+                    URL.revokeObjectURL(url);
+                    const MAX = 2000;
+                    let w = img.width, h = img.height;
+                    if (w <= MAX && h <= MAX) { resolve(file); return; }
+                    if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+                    else       { w = Math.round(w * MAX / h); h = MAX; }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w; canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    canvas.toBlob(function(blob) {
+                        if (!blob) { resolve(file); return; }
+                        resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
+                    }, 'image/jpeg', 0.88);
+                };
+                img.onerror = function() { URL.revokeObjectURL(url); resolve(file); };
+                img.src = url;
+            });
+        }
+
+        // Process files sequentially to avoid browser memory crash
+        async function addFiles(newFiles) {
+            const total = newFiles.length;
+            for (let i = 0; i < total; i++) {
+                dropzone.textContent = 'Сжатие фото ' + (i + 1) + '/' + total + '...';
+                const resized = await resizeImage(newFiles[i]);
+                filesToUpload.push(resized);
+            }
+            dropzone.textContent = 'Перетащите файлы сюда или нажмите, чтобы выбрать.';
+            displayFiles(filesToUpload);
+        }
+
+        document.addEventListener('drop', function(e) {
+            if (e.target.id === 'dropzone') {
+                e.preventDefault(); e.target.classList.remove('dragover');
+                addFiles(Array.from(e.dataTransfer.files));
+            }
+        });
+        document.addEventListener('click', function(e) {
+            if (e.target.id === 'dropzone' || e.target.closest('#dropzone')) { input.click(); }
+        });
+
+        input.addEventListener('change', function(e) {
+            addFiles(Array.from(e.target.files));
+        });
+
+        function displayFiles(files) {
+            container.innerHTML = '';
+            files.forEach((file, index) => {
+                const fileElement = document.createElement('div');
+                fileElement.classList.add('work-example-card');
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    fileElement.innerHTML = `
+                    <img src="${e.target.result}" alt="Image Preview" style="max-width: 100px;">
+                    <span>${file.name}</span>
+                    <button class="remove-file" data-index="${index}">Удалить</button>
+                `;
+                    container.appendChild(fileElement);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        container.addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-file')) {
+                const index = e.target.getAttribute('data-index');
+                filesToUpload.splice(index, 1);
+                displayFiles(filesToUpload);
+            }
+        });
+
+        uploadBtn.addEventListener('click', function() {
+            const formData = new FormData();
+            formData.append('subcategory_id', '{{ $subcategory->id }}');
+            filesToUpload.forEach((file) => { formData.append('images[]', file); });
+            fetch('/work-examples', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content') },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    filesToUpload = []; input.value = ''; container.innerHTML = '';
+                    data.forEach(renderWorkExample);
+                })
+                .catch(error => console.error('Error:', error));
+        });
+
+        function renderWorkExample(workExample) {
+            const card = document.createElement('div');
+            card.classList.add('work-example-card');
+            card.setAttribute('data-id', workExample.id);
+            card.innerHTML = `
+            <img src="/storage/${workExample.thumb || workExample.image}" alt="Work Example Image" style="max-width: 100px;">
+            <input placeholder="Название" name="title" type="text" class="form-control" value="${workExample.title}"><label for="description">Описание</label>
+            <textarea name="description" class="form-control">${workExample.description}</textarea>
+            <button class="btn btn-primary save-work-example">Сохранить</button>
+            <button class="btn btn-danger delete-work-example">Удалить</button>
+        `;
+            container.appendChild(card);
+        }
+
+        container.addEventListener('click', function(e) {
+            if (e.target.classList.contains('save-work-example')) {
+                const card = e.target.closest('.work-example-card');
+                const id = card.getAttribute('data-id');
+                const title = card.querySelector('input[name="title"]').value;
+                const description = card.querySelector('textarea[name="description"]').value;
+                fetch(`/work-examples/${id}`, {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'), 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title, description })
+                    })
+                    .then(response => response.json())
+                    .then(data => { alert('Changes saved'); })
+                    .catch(error => console.error('Error:', error));
+            }
+            if (e.target.classList.contains('delete-work-example')) {
+                const card = e.target.closest('.work-example-card');
+                const id = card.getAttribute('data-id');
+                fetch(`/work-examples/${id}`, {
+                        method: 'DELETE',
+                        headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content') }
+                    })
+                    .then(response => response.json())
+                    .then(data => { if (data.success) { card.remove(); } else { alert('Error deleting'); } })
+                    .catch(error => console.error('Error:', error));
+            }
+        });
+    });
+</script>
+
+{{-- Калькулятор --}}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const calcImagesInput = document.getElementById('plumbing_calc_images_input');
+        const calcImageUpload = document.getElementById('calcImageUpload');
+        const calcImagesContainer = document.getElementById('calcImagesContainer');
+        const savePlumbingCalcBtn = document.getElementById('savePlumbingCalcBtn');
+
+        // Parse existing images
+        function getImagesArray() {
+            try {
+                return JSON.parse(calcImagesInput.value || '[]');
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function renderCalcImages() {
+            const images = getImagesArray();
+            calcImagesContainer.innerHTML = '';
+            images.forEach(function(img, index) {
+                const card = document.createElement('div');
+                card.className = 'calc-image-card';
+                card.dataset.index = index;
+                card.style.cssText = 'position: relative; display: inline-block;';
+                card.innerHTML = `
+                    <img src="${img}" style="max-width: 120px; max-height: 120px; object-fit: cover; border: 1px solid #ddd; border-radius: 4px;" alt="Calc image ${index}">
+                    <button type="button" class="btn btn-danger btn-sm remove-calc-image" style="position: absolute; top: 2px; right: 2px; padding: 0 5px; line-height: 1.2;">&times;</button>
+                `;
+                calcImagesContainer.appendChild(card);
+            });
+            calcImagesInput.value = JSON.stringify(images);
+        }
+
+        // Upload new images
+        calcImageUpload.addEventListener('change', function() {
+            const files = calcImageUpload.files;
+            if (!files.length) return;
+
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('images[]', files[i]);
+            }
+
+            fetch('{{ route('subcategory.plumbing.upload_calc_images', ['category_slug' => $category->slug, 'subcategory_slug' => $subcategory->slug]) }}', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': csrfToken },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.urls && data.urls.length) {
+                        const images = getImagesArray();
+                        data.urls.forEach(function(url) { images.push(url); });
+                        calcImagesInput.value = JSON.stringify(images);
+                        renderCalcImages();
+                    }
+                    calcImageUpload.value = '';
+                })
+                .catch(error => { console.error('Upload error:', error); alert('Ошибка при загрузке изображений'); });
+        });
+
+        // Remove image
+        calcImagesContainer.addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-calc-image')) {
+                const card = e.target.closest('.calc-image-card');
+                const index = parseInt(card.dataset.index);
+                const images = getImagesArray();
+                images.splice(index, 1);
+                calcImagesInput.value = JSON.stringify(images);
+                renderCalcImages();
+            }
+        });
+
+        // Save calc
+        savePlumbingCalcBtn.addEventListener('click', function() {
+            const formData = new FormData(document.getElementById('plumbingCalcForm'));
+            formData.append('plumbing_calc_images', calcImagesInput.value);
+
+            fetch('{{ route('subcategory.plumbing.save_calc', ['category_slug' => $category->slug, 'subcategory_slug' => $subcategory->slug]) }}', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) { alert(data.success); }
+                    else { alert('Ошибка при сохранении'); }
+                })
+                .catch(error => { console.error('Save error:', error); alert('Ошибка при сохранении'); });
+        });
+    });
+</script>
+
+{{-- Виды монтажа --}}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const container = document.getElementById('installationTypesContainer');
+        const addButton = document.getElementById('addInstallationTypeButton');
+        if (!container || !addButton) { return; }
+
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const storeUrl = `{{ route('subcategory.installation_types.store', ['category_slug' => $category->slug, 'subcategory_slug' => $subcategory->slug]) }}`;
+        const installationToolbar = [
+            ['bold', 'italic', 'underline'],
+            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+            [{ 'header': [2, 3, false] }],
+            ['link', 'clean']
+        ];
+
+        function initInstallationEditor(card) {
+            const textarea = card.querySelector('textarea.installation-description');
+            const editorEl = card.querySelector('.installation-description-editor');
+            if (!textarea || !editorEl || editorEl.dataset.inited === '1') { return; }
+            const quill = new Quill(editorEl, { modules: { toolbar: installationToolbar }, theme: 'snow' });
+            if (textarea.value && !editorEl.innerHTML.trim()) { quill.root.innerHTML = textarea.value; }
+            card._installationDescriptionEditor = quill;
+            editorEl.dataset.inited = '1';
+        }
+
+        function syncInstallationEditor(card) {
+            const textarea = card.querySelector('textarea.installation-description');
+            const quill = card._installationDescriptionEditor;
+            if (textarea && quill) { textarea.value = quill.root.innerHTML; }
+        }
+
+        const createCardHtml = () => `
+            <form class="installation-type-card mb-4 p-3 border rounded" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label>Заголовок</label>
+                    <input type="text" name="title" class="form-control" value="">
+                </div>
+                <div class="form-group">
+                    <label>Описание</label>
+                    <textarea name="description" class="form-control installation-description d-none" rows="5"></textarea>
+                    <div class="installation-description-editor" style="min-height: 180px;"></div>
+                </div>
+                <div class="form-group">
+                    <label>Порядок сортировки</label>
+                    <input type="number" min="0" name="sort_order" class="form-control" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Картинка (маленькая, 50x50)</label>
+                    <input type="file" name="image" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Детальная картинка (большая)</label>
+                    <input type="file" name="detail_image" class="form-control">
+                </div>
+                <button class="btn btn-primary save-installation-type" type="button">Сохранить</button>
+                <button class="btn btn-danger delete-installation-type" type="button">Удалить</button>
+            </form>
+        `;
+
+        addButton.addEventListener('click', function() {
+            const tempWrap = document.createElement('div');
+            tempWrap.innerHTML = createCardHtml();
+            const card = tempWrap.firstElementChild;
+            container.appendChild(card);
+            initInstallationEditor(card);
+        });
+
+        container.querySelectorAll('.installation-type-card').forEach(function(card) { initInstallationEditor(card); });
+
+        container.addEventListener('click', function(e) {
+            const card = e.target.closest('.installation-type-card');
+            if (!card) return;
+
+            if (e.target.classList.contains('save-installation-type')) {
+                syncInstallationEditor(card);
+                const formData = new FormData(card);
+                const itemId = card.getAttribute('data-id');
+                const url = itemId
+                    ? `{{ url('/admin/categories/' . $category->slug . '/' . $subcategory->slug . '/installation-types') }}/${itemId}`
+                    : storeUrl;
+                fetch(url, {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) { alert('Пункт монтажа сохранен'); window.location.reload(); }
+                        else { alert('Ошибка при сохранении'); }
+                    })
+                    .catch(error => { console.error(error); alert('Ошибка при сохранении'); });
+            }
+
+            if (e.target.classList.contains('delete-installation-type')) {
+                const itemId = card.getAttribute('data-id');
+                if (!itemId) { card.remove(); return; }
+                fetch(`{{ url('/admin/categories/' . $category->slug . '/' . $subcategory->slug . '/installation-types') }}/${itemId}`, {
+                        method: 'DELETE',
+                        headers: { 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest' }
+                    })
+                    .then(response => response.json())
+                    .then(data => { if (data.success) { card.remove(); } else { alert('Ошибка при удалении'); } })
+                    .catch(error => { console.error(error); alert('Ошибка при удалении'); });
+            }
+        });
+    });
+</script>
+
+{{-- Сео текст --}}
+<style>
+    #editor-container .ql-editor img {
+        display: block; max-width: min(100%, 520px); height: auto; margin: 14px auto; cursor: pointer;
+    }
+    #editor-container .ql-editor img.seo-editor-image-selected {
+        outline: 3px solid #5969ff; outline-offset: 3px;
+    }
+    .seo-image-tools {
+        display: none; gap: 10px; align-items: end; flex-wrap: wrap; margin-top: 12px; padding: 12px;
+        border: 1px solid #d8dbe8; border-radius: 6px; background: #f8f9ff;
+    }
+    .seo-image-tools.is-visible { display: flex; }
+    .seo-image-tools label { margin-bottom: 0; font-size: 12px; color: #525f7f; }
+    .seo-image-tools .seo-image-field { display: flex; flex-direction: column; gap: 4px; }
+    .seo-image-tools input { min-width: 160px; }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const seoImageUploadUrl = "{{ route('subcategory.seo.upload_image') }}";
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const toolbarOptions = [
+            ['bold', 'italic', 'underline', 'strike'], ['blockquote', 'code-block'],
+            ['link', 'image', 'video', 'formula'], [{ 'header': 1 }, { 'header': 2 }],
+            [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'list': 'check' }],
+            [{ 'script': 'sub' }, { 'script': 'super' }], [{ 'indent': '-1' }, { 'indent': '+1' }],
+            [{ 'direction': 'rtl' }], [{ 'size': ['small', false, 'large', 'huge'] }],
+            [{ 'header': [1, 2, 3, 4, 5, 6, false] }], [{ 'color': [] }, { 'background': [] }],
+            [{ 'font': [] }], [{ 'align': [] }], ['clean']
+        ];
+
+        let quill = new Quill('#seoEditor', { modules: { toolbar: toolbarOptions }, theme: 'snow' });
+        const toolbar = quill.getModule('toolbar');
+        toolbar.addHandler('image', selectAndUploadSeoImage);
+
+        let toggleButton = document.getElementById("toggle-editor");
+        let htmlEditor = document.createElement("textarea");
+        htmlEditor.id = "html-editor"; htmlEditor.style.display = "none";
+        htmlEditor.style.width = "100%"; htmlEditor.style.height = "300px";
+        htmlEditor.style.fontFamily = "Consolas, Monaco, monospace"; htmlEditor.style.fontSize = "13px";
+        htmlEditor.setAttribute("wrap", "soft");
+
+        let selectedSeoImage = null;
+        let imageTools = document.createElement("div");
+        imageTools.className = "seo-image-tools";
+        imageTools.innerHTML = `
+            <div class="seo-image-field"><label for="seo-image-alt">Alt</label><input id="seo-image-alt" type="text" class="form-control" placeholder="Описание изображения"></div>
+            <div class="seo-image-field"><label for="seo-image-width">Ширина, px</label><input id="seo-image-width" type="number" min="120" max="1200" step="10" class="form-control" placeholder="Авто"></div>
+            <button type="button" class="btn btn-primary btn-sm" id="seo-image-apply">Применить</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="seo-image-reset">Авторазмер</button>
+            <button type="button" class="btn btn-danger btn-sm" id="seo-image-remove">Удалить</button>
+        `;
+
+        document.getElementById("editor-container").appendChild(htmlEditor);
+        document.getElementById("editor-container").appendChild(imageTools);
+
+        let quillContainer = document.querySelector(".ql-container");
+        let isHtmlMode = false;
+        const imageAltInput = document.getElementById("seo-image-alt");
+        const imageWidthInput = document.getElementById("seo-image-width");
+
+        function selectAndUploadSeoImage() {
+            const input = document.createElement('input');
+            input.setAttribute('type', 'file'); input.setAttribute('accept', 'image/jpeg,image/png,image/gif,image/webp');
+            input.click();
+            input.addEventListener('change', function() {
+                const file = input.files && input.files[0];
+                if (!file) return;
+                const formData = new FormData(); formData.append('image', file);
+                fetch(seoImageUploadUrl, { method: 'POST', headers: { 'X-CSRF-TOKEN': csrfToken }, body: formData })
+                    .then(response => response.ok ? response.json() : response.json().then(data => Promise.reject(data)))
+                    .then(data => {
+                        if (!data.url) throw new Error('Image URL is missing');
+                        const range = quill.getSelection(true);
+                        quill.insertEmbed(range.index, 'image', data.url, 'user');
+                        quill.setSelection(range.index + 1, 0, 'silent');
+                        const image = Array.from(quill.root.querySelectorAll('img')).find(item => item.getAttribute('src') === data.url);
+                        if (image) { image.setAttribute('alt', ''); image.style.maxWidth = '100%'; image.style.height = 'auto'; selectSeoImage(image); }
+                    })
+                    .catch(error => { console.error('SEO image upload failed:', error); alert('Не удалось загрузить изображение.'); });
+            });
+        }
+
+        function selectSeoImage(image) { clearSeoImageSelection(); selectedSeoImage = image; selectedSeoImage.classList.add('seo-editor-image-selected'); imageAltInput.value = selectedSeoImage.getAttribute('alt') || ''; imageWidthInput.value = parseInt(selectedSeoImage.getAttribute('width') || selectedSeoImage.style.width, 10) || ''; imageTools.classList.add('is-visible'); }
+        function clearSeoImageSelection() { if (selectedSeoImage) { selectedSeoImage.classList.remove('seo-editor-image-selected'); } selectedSeoImage = null; imageTools.classList.remove('is-visible'); }
+        function applySeoImageSettings() { if (!selectedSeoImage) return; selectedSeoImage.setAttribute('alt', imageAltInput.value.trim()); const width = parseInt(imageWidthInput.value, 10); if (width > 0) { selectedSeoImage.setAttribute('width', width); selectedSeoImage.style.width = `${width}px`; selectedSeoImage.style.maxWidth = '100%'; selectedSeoImage.style.height = 'auto'; } }
+
+        quill.root.addEventListener('click', function(event) { if (event.target && event.target.tagName === 'IMG') { selectSeoImage(event.target); return; } clearSeoImageSelection(); });
+        document.getElementById('seo-image-apply').addEventListener('click', applySeoImageSettings);
+        document.getElementById('seo-image-reset').addEventListener('click', function() { if (!selectedSeoImage) return; selectedSeoImage.removeAttribute('width'); selectedSeoImage.style.width = ''; selectedSeoImage.style.maxWidth = '100%'; selectedSeoImage.style.height = 'auto'; imageWidthInput.value = ''; });
+        document.getElementById('seo-image-remove').addEventListener('click', function() { if (!selectedSeoImage) return; selectedSeoImage.remove(); clearSeoImageSelection(); });
+
+        toggleButton.addEventListener("click", function() {
+            if (!isHtmlMode) { htmlEditor.value = quill.root.innerHTML; htmlEditor.style.display = "block"; quillContainer.style.display = "none"; imageTools.classList.remove('is-visible'); toggleButton.textContent = "Редактировать в Quill"; }
+            else { quill.root.innerHTML = htmlEditor.value; htmlEditor.style.display = "none"; quillContainer.style.display = "block"; clearSeoImageSelection(); toggleButton.textContent = "Редактировать HTML"; }
+            isHtmlMode = !isHtmlMode;
+        });
+
+        document.getElementById('saveSeoButton').addEventListener('click', function() {
+            const content = isHtmlMode ? htmlEditor.value : quill.root.innerHTML;
+            if (quill.getText().trim() === '') { alert('Контент пустой, введите текст.'); return; }
+            fetch(`/admin/categories/{{ $category->slug }}/{{ $subcategory->slug }}/edit-seo`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+                    body: JSON.stringify({ seo: content })
+                })
+                .then(response => { if (!response.ok) { return response.text().then(text => { console.error('HTML response:', text); throw new Error('Network response was not ok'); }); } return response.json(); })
+                .then(data => { if (data.message) { alert(data.message); } else { alert('Ошибка при обновлении контента'); } })
+                .catch(error => { console.error('Ошибка:', error); alert('Произошла ошибка при отправке данных'); });
+        });
+    });
+</script>
+
+{{-- FAQ HTML --}}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        document.getElementById('saveFaqHtmlButton').addEventListener('click', function() {
+            const content = document.getElementById('faqHtmlEditor').value;
+            if (!content.trim()) { alert('Контент пустой, введите текст.'); return; }
+            fetch(`/admin/categories/{{ $category->slug }}/{{ $subcategory->slug }}/edit-faq`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content') },
+                    body: JSON.stringify({ faq_html: content })
+                })
+                .then(response => response.json())
+                .then(data => { if (data.message) { alert(data.message); } else { alert('FAQ контент успешно обновлен!'); } })
+                .catch(error => { console.error('Ошибка:', error); alert('Произошла ошибка при отправке данных'); });
+        });
+    });
+</script>
+
+{{-- FAQ --}}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        function saveFaqCard(card) {
+            const question = card.querySelector('[name="title"]').value;
+            const answer = card.querySelector('[name="text"]').value;
+            const cardId = card.getAttribute('data-id');
+            const slug = document.querySelector('input[name="category-slug"]').value;
+            const subcategorySlugElement = document.querySelector('input[name="subcategory-slug"]');
+            const subcategorySlug = subcategorySlugElement ? subcategorySlugElement.value : null;
+            const url = cardId ? `/categories/${slug}/questions/${cardId}` : `/categories/${slug}/questions`;
+            const method = cardId ? 'PUT' : 'POST';
+            fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
+                    body: JSON.stringify({ question, answer, subcategory_slug: subcategorySlug })
+                })
+                .then(response => response.json())
+                .then(data => { if (data.errors) { alert('Ошибки: ' + JSON.stringify(data.errors)); } else { alert(data.message); if (!cardId) { card.setAttribute('data-id', data.faq.id); } } })
+                .catch(error => console.error('Ошибка:', error));
+        }
+        function deleteFaqCard(card) {
+            const cardId = card.getAttribute('data-id');
+            if (!cardId) { card.remove(); return; }
+            const slug = document.querySelector('input[name="category-slug"]').value;
+            fetch(`/categories/${slug}/questions/${cardId}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token } })
+                .then(response => response.json())
+                .then(data => { alert(data.message); card.remove(); })
+                .catch(error => console.error('Ошибка:', error));
+        }
+        function addNewFaqCard() {
+            const newFaqCard = document.createElement('form');
+            newFaqCard.classList.add('faq-card');
+            newFaqCard.innerHTML = `
+        <div class="form-group"><label for="title">Вопрос</label><input name="title" type="text" class="form-control"></div>
+        <div class="form-group"><label for="text">Ответ</label><textarea name="text" class="form-control"></textarea></div>
+        <button class="btn btn-primary save-faq-button" type="button">Сохранить</button>
+        <a class="btn btn-outline-secondary delete-faq-button">Удалить</a>
+    `;
+            document.querySelector('.faq-cards-container').appendChild(newFaqCard);
+        }
+        document.querySelector('.faq-cards-container').addEventListener('click', function(e) {
+            if (e.target.classList.contains('save-faq-button')) { const card = e.target.closest('.faq-card'); saveFaqCard(card); }
+            else if (e.target.classList.contains('delete-faq-button')) { const card = e.target.closest('.faq-card'); deleteFaqCard(card); }
+        });
+        document.querySelector('.add-faq-button').addEventListener('click', addNewFaqCard);
+    });
+</script>
+
+{{-- Меню --}}
+<script>
+    document.getElementById('saveCategoryButton').addEventListener('click', function() {
+        const showInMenu = document.getElementById('show_in_menu').checked ? 1 : 0;
+        const showInCatalog = document.getElementById('show_in_catalog').checked ? 1 : 0;
+        const clone_subcategory_id = document.getElementById('clone_subcategory_id').value;
+        const selectedAllSubcategoryIds = Array.from(document.getElementById('all_subcategory_id').selectedOptions).map(option => option.value);
+        const start_material = document.getElementById('start_material').value;
+        const filter_color = document.getElementById('filter_color').value;
+        const show_in_more_cats = document.getElementById('show_in_more_cats').checked ? 1 : 0;
+        const show_in_cats_filter = document.getElementById('show_in_cats_filter').checked ? 1 : 0;
+        const calc_prod = document.getElementById('calc_prod').value;
+        const model_id_to_filter = Array.from(document.getElementById('model_id_to_filter').selectedOptions).map(option => option.value);
+
+        fetch(`/admin/categories/{{ $category->slug }}/{{ $subcategory->slug }}/update-visibility`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content') },
+                body: JSON.stringify({ show_in_menu: showInMenu, show_in_catalog: showInCatalog, clone_subcategory_id: clone_subcategory_id, all_subcategory_ids: selectedAllSubcategoryIds, start_material: start_material, filter_color: filter_color, show_in_more_cats: show_in_more_cats, show_in_cats_filter: show_in_cats_filter, calc_prod: calc_prod, model_id_to_filter: model_id_to_filter })
+            })
+            .then(response => { if (!response.ok) { throw new Error('Network response was not ok'); } return response.json(); })
+            .then(data => { alert('Категория успешно обновлена'); })
+            .catch(error => { console.error('Ошибка:', error); alert('Произошла ошибка при обновлении категории'); });
+    });
+</script>
+
+<x-admin.footer></x-admin.footer>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const applyTemplateButton = document.getElementById('applyTemplateButton');
+        if (!applyTemplateButton) { return; }
+        applyTemplateButton.addEventListener('click', function() {
+            const templateVariant = parseInt(document.getElementById('template_variant').value, 10);
+            const requestUrl = `{{ route('subcategory.update.template', ['category_slug' => $category->slug, 'subcategory_slug' => $subcategory->slug]) }}`;
+            fetch(requestUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content') },
+                    body: JSON.stringify({ template_variant: templateVariant })
+                })
+                .then(async response => {
+                    const responseText = await response.text();
+                    let payload = null;
+                    try { payload = responseText ? JSON.parse(responseText) : null; } catch (e) { payload = null; }
+                    if (!response.ok) { const message = (payload && payload.message) ? payload.message : `HTTP ${response.status}`; throw new Error(`${message} (${requestUrl})`); }
+                    return payload || {};
+                })
+                .then(data => { if (data.redirect_url) { window.location.href = data.redirect_url; return; } window.location.reload(); })
+                .catch(error => { console.error('Error:', error); alert(`Template switch failed: ${error.message}`); });
+        });
+    });
+</script>

@@ -161,7 +161,7 @@
 
                             @foreach ($workExamples as $workExample)
                                 <div class="work-example-card" data-id="{{ $workExample->id }}">
-                                    <img src="/storage/{{ $workExample->image }}" alt="Work Example Image"
+                                    <img src="/storage/{{ $workExample->thumb ?? $workExample->image }}" alt="Work Example Image"
                                         style="max-width: 100px;">
                                     <input placeholder="Название" name="title" type="text" class="form-control"
                                         value="{{ $workExample->title }}">
@@ -184,6 +184,11 @@
 
 @if ($category->id === 16)
 {{-- Типы установки рольставней (только для категории id=16) --}}
+        <style>
+            .ql-container{
+                height: auto !important;
+            }
+        </style>
 <div class="row">
     <div class="col-12">
         <div class="card">
@@ -590,9 +595,6 @@
         const container = document.getElementById('workExamplesContainer');
         let filesToUpload = [];
 
-        // Fetch existing gallery images on page load
-        fetchExistingWorkExamples();
-
         // Highlight dropzone when dragging over
         dropzone.addEventListener('dragover', function(e) {
             e.preventDefault();
@@ -605,17 +607,50 @@
             dropzone.classList.remove('dragover');
         });
 
+        // Client-side image resizer — shrinks huge photos before upload
+        function resizeImage(file) {
+            return new Promise((resolve, reject) => {
+                if (!file.type.startsWith('image/')) { resolve(file); return; }
+                const img = new Image();
+                const url = URL.createObjectURL(file);
+                img.onload = function() {
+                    URL.revokeObjectURL(url);
+                    const MAX = 2000;
+                    let w = img.width, h = img.height;
+                    if (w <= MAX && h <= MAX) { resolve(file); return; }
+                    if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+                    else       { w = Math.round(w * MAX / h); h = MAX; }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w; canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    canvas.toBlob(function(blob) {
+                        if (!blob) { resolve(file); return; }
+                        resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
+                    }, 'image/jpeg', 0.88);
+                };
+                img.onerror = function() { URL.revokeObjectURL(url); resolve(file); };
+                img.src = url;
+            });
+        }
+
+        // Process files sequentially to avoid browser memory crash with 50MB+ photos
+        async function addFiles(newFiles) {
+            const total = newFiles.length;
+            for (let i = 0; i < total; i++) {
+                dropzone.textContent = 'Сжатие фото ' + (i + 1) + '/' + total + '...';
+                const resized = await resizeImage(newFiles[i]);
+                filesToUpload.push(resized);
+            }
+            dropzone.textContent = 'Перетащите файлы сюда или нажмите, чтобы выбрать.';
+            displayFiles(filesToUpload);
+        }
+
         // Handle drop files
         dropzone.addEventListener('drop', function(e) {
             e.preventDefault();
             dropzone.classList.remove('dragover');
-
-            const droppedFiles = e.dataTransfer.files;
-            for (let i = 0; i < droppedFiles.length; i++) {
-                filesToUpload.push(droppedFiles[i]);
-            }
-
-            displayFiles(filesToUpload);
+            addFiles(Array.from(e.dataTransfer.files));
         });
 
         // Open file manager on click
@@ -625,12 +660,7 @@
 
         // Handle file input selection
         input.addEventListener('change', function(e) {
-            const selectedFiles = e.target.files;
-            for (let i = 0; i < selectedFiles.length; i++) {
-                filesToUpload.push(selectedFiles[i]);
-            }
-
-            displayFiles(filesToUpload);
+            addFiles(Array.from(e.target.files));
         });
 
         // Display file preview and remove option
@@ -704,23 +734,13 @@
             card.setAttribute('data-id', workExample.id);
 
             card.innerHTML = `
-            <img src="/storage/${workExample.image}" alt="Work Example Image" style="max-width: 100px;">
+            <img src="/storage/${workExample.thumb || workExample.image}" alt="Work Example Image" style="max-width: 100px;">
             <input placeholder="Название" name="title" type="text" class="form-control" value="${workExample.title}"><label for="description">Описание</label>
             <textarea name="description" class="form-control">${workExample.description}</textarea>
             <button class="btn btn-primary save-work-example">Сохранить</button>
             <button class="btn btn-danger delete-work-example">Удалить</button>
         `;
             container.appendChild(card);
-        }
-
-        // Fetch existing work examples from the server and render them
-        function fetchExistingWorkExamples() {
-            fetch('/category/{{ $category->slug }}/edit') // Adjust URL as needed
-                .then(response => response.json())
-                .then(data => {
-                    data.workExamples.forEach(renderWorkExample); // Render all work examples
-                })
-                .catch(error => console.error('Error fetching work examples:', error));
         }
 
         // Save changes to work example

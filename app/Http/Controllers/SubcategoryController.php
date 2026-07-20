@@ -67,6 +67,14 @@ class SubcategoryController extends Controller
             $variant = self::TEMPLATE_MIN_VARIANT;
         }
 
+        if ($variant === 3) {
+            // Variant 3: plumbing/santeh template with hardcoded calculator
+            $template = $context === 'edit'
+                ? 'admin.subcatEdit-plumbing'
+                : 'front.subcategory-plumbing';
+            return View::exists($template) ? $template : $defaultTemplate;
+        }
+
         $template = $context === 'edit'
             ? "admin.subcatEdit-template-{$variant}"
             : "front.subcategory-template-{$variant}";
@@ -606,6 +614,50 @@ class SubcategoryController extends Controller
             'success' => true,
             'item' => $item->fresh(),
         ]);
+    }
+
+    public function savePlumbingCalc(Request $request, $category_slug, $subcategory_slug)
+    {
+        $category = Category::where('slug', $category_slug)->firstOrFail();
+        $subcategory = Subcategory::where('slug', $subcategory_slug)
+            ->where('category_id', $category->id)
+            ->firstOrFail();
+
+        $subcategory->plumbing_calc_title = $request->input('plumbing_calc_title');
+        $subcategory->plumbing_calc_subtitle = $request->input('plumbing_calc_subtitle');
+        $subcategory->plumbing_calc_description = $request->input('plumbing_calc_description');
+
+        $images = $request->input('plumbing_calc_images');
+        if (is_string($images)) {
+            $images = json_decode($images, true);
+        }
+        $subcategory->plumbing_calc_images = is_array($images) ? $images : [];
+
+        $subcategory->save();
+
+        return response()->json(['success' => 'Калькулятор успешно сохранен']);
+    }
+
+    public function uploadPlumbingCalcImages(Request $request, $category_slug, $subcategory_slug)
+    {
+        $category = Category::where('slug', $category_slug)->firstOrFail();
+        $subcategory = Subcategory::where('slug', $subcategory_slug)
+            ->where('category_id', $category->id)
+            ->firstOrFail();
+
+        $request->validate([
+            'images.*' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:4096',
+        ]);
+
+        $urls = [];
+        if ($request->hasFile('images')) {
+            foreach ($request->file('images') as $image) {
+                $path = $image->store('plumbing-calc', 'public');
+                $urls[] = Storage::url($path);
+            }
+        }
+
+        return response()->json(['urls' => $urls]);
     }
 
     public function destroyInstallationType($category_slug, $subcategory_slug, $id)

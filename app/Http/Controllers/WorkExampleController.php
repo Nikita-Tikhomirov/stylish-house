@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\WorkExample;
 use Illuminate\Support\Facades\Storage;
+use Intervention\Image\ImageManagerStatic as Image;
 
 class WorkExampleController extends Controller
 {
@@ -12,10 +13,9 @@ class WorkExampleController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'images.*' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'images.*' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:20480',
             'category_id' => 'nullable|string',
             'subcategory_id' => 'nullable|string',
-
         ]);
 
         $images = $request->file('images');
@@ -23,20 +23,42 @@ class WorkExampleController extends Controller
 
         if ($images) {
             foreach ($images as $image) {
-                // Сохраняем изображение в директорию 'public/storage/work_examples'
-                $path = $image->store('work_examples', 'public');
-                $savedImages[] = WorkExample::create([
-                    'image' => $path,
-                    'title' => '', // Оставляем пустыми до редактирования
-                    'description' => '',
-                    'category_id' => $request->category_id ,// Привязываем к категории
-                    'subcategory_id' => $request->subcategory_id // Привязываем к категории
+                // Генерируем имя файла
+                $filename = time() . '_' . uniqid() . '.webp';
 
+                // Обрабатываем через Intervention
+                $img = Image::make($image->getRealPath())->orientate();
+
+                // 1. Большое фото: ресайз до максимум 1200px по большей стороне
+                $img->resize(1200, 1200, function ($constraint) {
+                    $constraint->aspectRatio();
+                    $constraint->upsize();
+                });
+
+                $mainPath = 'work_examples/' . $filename;
+                Storage::disk('public')->put($mainPath, (string) $img->encode('webp', 82));
+
+                // 2. Миниатюра: 400x300, обрезка по центру
+                $thumb = Image::make($image->getRealPath())->orientate();
+                $thumb->fit(400, 300, function ($constraint) {
+                    $constraint->upsize();
+                });
+
+                $thumbPath = 'work_examples/thumbs/' . $filename;
+                Storage::disk('public')->put($thumbPath, (string) $thumb->encode('webp', 75));
+
+                $savedImages[] = WorkExample::create([
+                    'image' => $mainPath,
+                    'thumb' => $thumbPath,
+                    'title' => '',
+                    'description' => '',
+                    'category_id' => $request->category_id,
+                    'subcategory_id' => $request->subcategory_id,
                 ]);
             }
         }
 
-        return response()->json($savedImages); // Возвращаем JSON с данными изображений
+        return response()->json($savedImages);
     }
 
     // Метод для обновления отдельного изображения
@@ -70,7 +92,14 @@ class WorkExampleController extends Controller
         $workExample = WorkExample::findOrFail($id);
 
         // Удаление файла изображения
-        Storage::delete('public/' . $workExample->image);
+        if ($workExample->image) {
+            Storage::disk('public')->delete($workExample->image);
+        }
+
+        // Удаление файла миниатюры
+        if ($workExample->thumb) {
+            Storage::disk('public')->delete($workExample->thumb);
+        }
 
         // Удаление записи из базы данных
         $workExample->delete();

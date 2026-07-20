@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 use App\Models\WorkExample;
 use App\Models\SubcategoryInstallationType;
+use App\Models\RollerShutterSystem;
 use Illuminate\Support\Facades\Storage;
 
 class CategoryController extends Controller
@@ -200,8 +201,12 @@ class CategoryController extends Controller
             ->orderBy('sort_order')
             ->get();
 
+        $rollerShutterSystems = RollerShutterSystem::where('category_id', $category->id)
+            ->orderBy('sort_order')
+            ->get();
+
         if ($category->id === 16) {
-            return view('front.categoryrolstavni', compact('category', 'reviews', 'homePageFields', 'iconCards', 'categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'subcatsForSlider', 'subcategoriesWithProducts', 'faqs', 'videoReviews', 'workExamples', 'filterProduts', 'models', 'filterColors', 'cart', 'firstProduct', 'sameModelProducts', 'materials', 'headerInfo', 'curtainSubcats', 'blindSubcats', 'relatedCategories', 'relatedSubcategories', 'maxFilterPrice', 'installationTypes'));
+            return view('front.categoryrolstavni', compact('category', 'reviews', 'homePageFields', 'iconCards', 'categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'subcatsForSlider', 'subcategoriesWithProducts', 'faqs', 'videoReviews', 'workExamples', 'filterProduts', 'models', 'filterColors', 'cart', 'firstProduct', 'sameModelProducts', 'materials', 'headerInfo', 'curtainSubcats', 'blindSubcats', 'relatedCategories', 'relatedSubcategories', 'maxFilterPrice', 'installationTypes', 'rollerShutterSystems'));
         } else {
             return view('front.category', compact('category', 'reviews', 'homePageFields', 'iconCards', 'categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'subcatsForSlider', 'subcategoriesWithProducts', 'faqs', 'videoReviews', 'workExamples', 'filterProduts', 'models', 'filterColors', 'cart', 'firstProduct', 'sameModelProducts', 'materials', 'headerInfo', 'curtainSubcats', 'blindSubcats', 'relatedCategories', 'relatedSubcategories', 'maxFilterPrice'));
         }
@@ -240,7 +245,11 @@ class CategoryController extends Controller
             ->orderBy('sort_order')
             ->get();
 
-        return view('admin.catEdit', compact('category', 'videoReviews', 'workExamples', 'faqs', 'subcategory', 'subcategories', 'categories', 'relatedIds', 'installationTypes'));
+        $rollerShutterSystems = RollerShutterSystem::where('category_id', $category->id)
+            ->orderBy('sort_order')
+            ->get();
+
+        return view('admin.catEdit', compact('category', 'videoReviews', 'workExamples', 'faqs', 'subcategory', 'subcategories', 'categories', 'relatedIds', 'installationTypes', 'rollerShutterSystems'));
     }
 
 
@@ -569,6 +578,86 @@ class CategoryController extends Controller
             Storage::disk('public')->delete($type->detail_image);
         }
         $type->delete();
+
+        return response()->json(['success' => true]);
+    }
+
+    // ============================================================
+    // CRUD: Системы управления рольставнями (roller shutter systems)
+    // ============================================================
+
+    public function storeRollerShutterSystem(Request $request, $slug)
+    {
+        $category = Category::where('slug', $slug)->firstOrFail();
+
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'components' => 'nullable|string',
+            'image' => 'nullable|image|max:20480',
+            'sort_order' => 'nullable|integer|min:0',
+        ]);
+
+        $data = [
+            'category_id' => $category->id,
+            'title' => $request->title,
+            'description' => $request->description,
+            'components' => $request->components,
+            'sort_order' => (int) ($request->sort_order ?? 0),
+        ];
+
+        if ($request->hasFile('image')) {
+            $data['image'] = $request->file('image')->store('roller_shutter_systems', 'public');
+        }
+
+        $system = RollerShutterSystem::create($data);
+
+        return response()->json(['success' => true, 'system' => $system]);
+    }
+
+    public function updateRollerShutterSystem(Request $request, $slug, $id)
+    {
+        $category = Category::where('slug', $slug)->firstOrFail();
+        $system = RollerShutterSystem::where('id', $id)
+            ->where('category_id', $category->id)
+            ->firstOrFail();
+
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'components' => 'nullable|string',
+            'image' => 'nullable|image|max:20480',
+            'sort_order' => 'nullable|integer|min:0',
+        ]);
+
+        $system->title = $request->title;
+        $system->description = $request->description;
+        $system->components = $request->components;
+        $system->sort_order = (int) ($request->sort_order ?? 0);
+
+        if ($request->hasFile('image')) {
+            if ($system->image) {
+                Storage::disk('public')->delete($system->image);
+            }
+            $system->image = $request->file('image')->store('roller_shutter_systems', 'public');
+        }
+
+        $system->save();
+
+        return response()->json(['success' => true, 'system' => $system]);
+    }
+
+    public function destroyRollerShutterSystem($slug, $id)
+    {
+        $category = Category::where('slug', $slug)->firstOrFail();
+        $system = RollerShutterSystem::where('id', $id)
+            ->where('category_id', $category->id)
+            ->firstOrFail();
+
+        if ($system->image) {
+            Storage::disk('public')->delete($system->image);
+        }
+        $system->delete();
 
         return response()->json(['success' => true]);
     }

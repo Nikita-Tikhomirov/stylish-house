@@ -148,7 +148,7 @@
 
                             @foreach ($workExamples as $workExample)
                                 <div class="work-example-card" data-id="{{ $workExample->id }}">
-                                    <img src="/storage/{{ $workExample->image }}" alt="Work Example Image"
+                                    <img src="/storage/{{ $workExample->thumb ?? $workExample->image }}" alt="Work Example Image"
                                         style="max-width: 100px;">
                                     <input placeholder="Название" name="title" type="text" class="form-control"
                                         value="{{ $workExample->title }}">
@@ -267,8 +267,9 @@
                 <div class="form-group">
                     <label for="template_variant">Шаблон (редактирование/фронтент)</label>
                     <select class="form-control" name="template_variant" id="template_variant">
-                        <option value="1" {{ (int) ($subcategory->template_variant ?? 1) === 1 ? 'selected' : '' }}>Сантех роллеты 1</option>
-                        <option value="2" {{ (int) ($subcategory->template_variant ?? 1) === 2 ? 'selected' : '' }}>Шаблон 2</option>
+                        <option value="1" {{ (int) ($subcategory->template_variant ?? 1) === 1 ? 'selected' : '' }}>Сантех-роллеты</option>
+                        <option value="2" {{ (int) ($subcategory->template_variant ?? 1) === 2 ? 'selected' : '' }}>Роллеты для проёма/окон/ворот/витрин</option>
+                        <option value="3" {{ (int) ($subcategory->template_variant ?? 1) === 3 ? 'selected' : '' }}>Секционные и промышленные ворота</option>
                     </select>
                 </div>
                 <button class="btn btn-primary" type="button" id="applyTemplateButton">Сохранить</button>
@@ -550,53 +551,66 @@
         const container = document.getElementById('workExamplesContainer');
         let filesToUpload = [];
 
-        // Fetch existing gallery images on page load
-        fetchExistingWorkExamples();
+        // Client-side image resizer — shrinks huge photos before upload
+        function resizeImage(file) {
+            return new Promise((resolve, reject) => {
+                if (!file.type.startsWith('image/')) { resolve(file); return; }
+                const img = new Image();
+                const url = URL.createObjectURL(file);
+                img.onload = function() {
+                    URL.revokeObjectURL(url);
+                    const MAX = 2000;
+                    let w = img.width, h = img.height;
+                    if (w <= MAX && h <= MAX) { resolve(file); return; }
+                    if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+                    else       { w = Math.round(w * MAX / h); h = MAX; }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w; canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    canvas.toBlob(function(blob) {
+                        if (!blob) { resolve(file); return; }
+                        resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
+                    }, 'image/jpeg', 0.88);
+                };
+                img.onerror = function() { URL.revokeObjectURL(url); resolve(file); };
+                img.src = url;
+            });
+        }
+
+        // Process files sequentially to avoid browser memory crash
+        async function addFiles(newFiles) {
+            const total = newFiles.length;
+            for (let i = 0; i < total; i++) {
+                dropzone.textContent = 'Сжатие фото ' + (i + 1) + '/' + total + '...';
+                const resized = await resizeImage(newFiles[i]);
+                filesToUpload.push(resized);
+            }
+            dropzone.textContent = 'Перетащите файлы сюда или нажмите, чтобы выбрать.';
+            displayFiles(filesToUpload);
+        }
 
         // Use event delegation for drag and drop
         document.addEventListener('dragover', function(e) {
-            if (e.target.id === 'dropzone') {
-                e.preventDefault();
-                e.target.classList.add('dragover');
-            }
+            if (e.target.id === 'dropzone') { e.preventDefault(); e.target.classList.add('dragover'); }
         });
-
         document.addEventListener('dragleave', function(e) {
-            if (e.target.id === 'dropzone') {
-                e.preventDefault();
-                e.target.classList.remove('dragover');
-            }
+            if (e.target.id === 'dropzone') { e.preventDefault(); e.target.classList.remove('dragover'); }
         });
-
         document.addEventListener('drop', function(e) {
             if (e.target.id === 'dropzone') {
-                e.preventDefault();
-                e.target.classList.remove('dragover');
-
-                const droppedFiles = e.dataTransfer.files;
-                for (let i = 0; i < droppedFiles.length; i++) {
-                    filesToUpload.push(droppedFiles[i]);
-                }
-
-                displayFiles(filesToUpload);
+                e.preventDefault(); e.target.classList.remove('dragover');
+                addFiles(Array.from(e.dataTransfer.files));
             }
         });
-
         // Open file manager on click
         document.addEventListener('click', function(e) {
-            if (e.target.id === 'dropzone' || e.target.closest('#dropzone')) {
-                input.click();
-            }
+            if (e.target.id === 'dropzone' || e.target.closest('#dropzone')) { input.click(); }
         });
 
         // Handle file input selection
         input.addEventListener('change', function(e) {
-            const selectedFiles = e.target.files;
-            for (let i = 0; i < selectedFiles.length; i++) {
-                filesToUpload.push(selectedFiles[i]);
-            }
-
-            displayFiles(filesToUpload);
+            addFiles(Array.from(e.target.files));
         });
 
         // Display file preview and remove option
@@ -670,23 +684,13 @@
             card.setAttribute('data-id', workExample.id);
 
             card.innerHTML = `
-            <img src="/storage/${workExample.image}" alt="Work Example Image" style="max-width: 100px;">
+            <img src="/storage/${workExample.thumb || workExample.image}" alt="Work Example Image" style="max-width: 100px;">
             <input placeholder="Название" name="title" type="text" class="form-control" value="${workExample.title}"><label for="description">Описание</label>
             <textarea name="description" class="form-control">${workExample.description}</textarea>
             <button class="btn btn-primary save-work-example">Сохранить</button>
             <button class="btn btn-danger delete-work-example">Удалить</button>
         `;
             container.appendChild(card);
-        }
-
-        // Fetch existing work examples from the server and render them
-        function fetchExistingWorkExamples() {
-            fetch('/categories/{category_slug}/{subcategory_slug}/edit') // Adjust URL as needed
-                .then(response => response.json())
-                .then(data => {
-                    data.workExamples.forEach(renderWorkExample); // Render all work examples
-                })
-                .catch(error => console.error('Error fetching work examples:', error));
         }
 
         // Save changes to work example

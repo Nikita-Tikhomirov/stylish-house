@@ -136,11 +136,20 @@ Route::middleware(['role:admin'])->group(function () {
     Route::post('/admin/categories/{category_slug}/{subcategory_slug}/installation-types/{id}', [SubcategoryController::class, 'updateInstallationType'])->name('subcategory.installation_types.update');
     Route::delete('/admin/categories/{category_slug}/{subcategory_slug}/installation-types/{id}', [SubcategoryController::class, 'destroyInstallationType'])->name('subcategory.installation_types.destroy');
 
+    // Plumbing calculator
+    Route::post('/admin/categories/{category_slug}/{subcategory_slug}/plumbing-calc/save', [SubcategoryController::class, 'savePlumbingCalc'])->name('subcategory.plumbing.save_calc');
+    Route::post('/admin/categories/{category_slug}/{subcategory_slug}/plumbing-calc/upload-images', [SubcategoryController::class, 'uploadPlumbingCalcImages'])->name('subcategory.plumbing.upload_calc_images');
+
     // CRUD типов установки для категорий (рольставни и др.)
     Route::get('/admin/categories/{slug}/installation-types', [CategoryController::class, 'installationTypes'])->name('category.installation_types.index');
     Route::post('/admin/categories/{slug}/installation-types', [CategoryController::class, 'storeInstallationType'])->name('category.installation_types.store');
     Route::post('/admin/categories/{slug}/installation-types/{id}', [CategoryController::class, 'updateInstallationType'])->name('category.installation_types.update');
     Route::delete('/admin/categories/{slug}/installation-types/{id}', [CategoryController::class, 'destroyInstallationType'])->name('category.installation_types.destroy');
+
+    // CRUD систем управления рольставнями
+    Route::post('/admin/categories/{slug}/roller-shutter-systems', [CategoryController::class, 'storeRollerShutterSystem'])->name('category.roller_shutter_systems.store');
+    Route::post('/admin/categories/{slug}/roller-shutter-systems/{id}', [CategoryController::class, 'updateRollerShutterSystem'])->name('category.roller_shutter_systems.update');
+    Route::delete('/admin/categories/{slug}/roller-shutter-systems/{id}', [CategoryController::class, 'destroyRollerShutterSystem'])->name('category.roller_shutter_systems.destroy');
     Route::get('/admin/categories/{category_slug}/{subcategory_slug}/work-examples', [SubcategoryController::class, 'getWorkExamples'])->name('subcategory.work-examples.get');
 
     Route::post('/admin/categories/{category_slug}/{subcategory_slug}/update-visibility', [SubcategoryController::class, 'updateVisibility'])->name('subcategory.update.visibility');
