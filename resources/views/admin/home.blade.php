@@ -207,6 +207,212 @@
         background-color: #5969ff;
         color: #fff
     }
+
+    .cards-wrap {
+        overflow-x: auto;
+        border: 1px solid #e6e8ef;
+        border-radius: 6px;
+    }
+
+    .cardsHeader,
+    .catCard_catWrap {
+        min-width: 1120px;
+        grid-template-columns: 56px 140px 150px minmax(190px, 1fr) 110px minmax(240px, 1.2fr) 90px;
+        align-items: center;
+    }
+
+    .catCard {
+        border-bottom: 1px solid #edf0f5;
+    }
+
+    .catCard:last-child {
+        border-bottom: 0;
+    }
+
+    .cardCell {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .orderInfo {
+        height: auto;
+        overflow: visible;
+        align-items: center;
+    }
+
+    .orderInfoToggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        padding: 6px 12px;
+        color: #334155;
+        font-weight: 600;
+        background: #f4f6ff;
+        border: 1px solid #dbe1ff;
+        border-radius: 4px;
+    }
+
+    .orderInfoToggle__icon {
+        color: #5969ff;
+        font-size: 18px;
+        line-height: 1;
+        transition: transform .2s;
+    }
+
+    .orderInfoToggle.is-open .orderInfoToggle__icon {
+        transform: rotate(90deg);
+    }
+
+    .orderInfoPanel {
+        display: none;
+        min-width: 1120px;
+        grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+        gap: 24px;
+        padding: 20px 24px;
+        background: #f8fafc;
+        border-top: 1px solid #e6e8ef;
+    }
+
+    .orderInfoPanel.is-open {
+        display: grid;
+    }
+
+    .orderInfoPanel__items {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+    }
+
+    .orderInfoPanel .order-item-details {
+        padding: 14px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+    }
+
+    .orderInfoPanel .order-item-details__title {
+        display: block;
+        margin-bottom: 8px;
+        color: #1e293b;
+    }
+
+    .orderInfoPanel__meta {
+        margin: 0;
+        padding: 14px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+    }
+
+    .orderInfoPanel__meta div {
+        display: grid;
+        grid-template-columns: 110px minmax(0, 1fr);
+        gap: 10px;
+        padding: 5px 0;
+    }
+
+    .orderInfoPanel__meta dt {
+        color: #64748b;
+        font-weight: 600;
+    }
+
+    .orderInfoPanel__meta dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 1350px) {
+        .orderInfoPanel__items {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 767px) {
+        .cards-wrap {
+            overflow: visible;
+            border: 0;
+            background: transparent;
+        }
+
+        .cardsHeader {
+            display: none;
+        }
+
+        .catCard {
+            margin-bottom: 16px;
+            overflow: hidden;
+            background: #fff;
+            border: 1px solid #e6e8ef;
+            border-radius: 6px;
+        }
+
+        .catCard_catWrap {
+            min-width: 0;
+            grid-template-columns: 1fr 1fr;
+            align-items: stretch;
+        }
+
+        .cardCell {
+            display: block;
+            padding: 10px 12px;
+            border-bottom: 1px solid #edf0f5;
+        }
+
+        .cardCell::before {
+            display: block;
+            margin-bottom: 3px;
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .cardCell:nth-child(1)::before { content: 'Заказ'; }
+        .cardCell:nth-child(2)::before { content: 'Покупатель'; }
+        .cardCell:nth-child(3)::before { content: 'Телефон'; }
+        .cardCell:nth-child(4)::before { content: 'Состав'; }
+        .cardCell:nth-child(5)::before { content: 'Стоимость'; }
+        .cardCell:nth-child(6)::before { content: 'Статус'; }
+        .cardCell:nth-child(7)::before { content: 'Действия'; }
+
+        .cardCell:nth-child(3),
+        .cardCell:nth-child(4),
+        .cardCell:nth-child(6) {
+            grid-column: 1 / -1;
+        }
+
+        .orderInfoToggle,
+        .order-status {
+            width: 100%;
+        }
+
+        .orderInfoToggle {
+            justify-content: space-between;
+        }
+
+        .orderPrice {
+            text-align: left;
+        }
+
+        .orderInfoPanel {
+            min-width: 0;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            padding: 12px;
+        }
+
+        .orderInfoPanel__items,
+        .orderInfoPanel__meta {
+            min-width: 0;
+        }
+
+        .orderInfoPanel__meta div,
+        .order-item-details dl div {
+            grid-template-columns: 1fr;
+            gap: 2px;
+        }
+    }
 </style>
 
 <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -243,22 +449,10 @@
                             </div>
 
                             <div class="cardCell orderInfo">
-                                @if (!empty($order->items))
-                                    @foreach ($order->items as $item)
-                                        @include('partials.order-item-details', ['item' => $item])
-                                    @endforeach
-                                    <p><strong>Доставка:</strong> {{ $order->delivery_label }}
-                                        @if ((float) $order->delivery_cost > 0)
-                                            ({{ number_format($order->delivery_cost, 0, ',', ' ') }} ₽)
-                                        @endif
-                                    </p>
-                                    <p><strong>Адрес:</strong> {{ data_get($order->customer_details, 'addres', $order->user->addres ?? 'Не указан') }}</p>
-                                    <p><strong>Email:</strong> {{ data_get($order->customer_details, 'email', $order->user->email ?? 'Не указан') }}</p>
-                                    <p><strong>Комментарий:</strong> {{ $order->comment ?: 'Нет' }}</p>
-                                @else
-                                    <p>Товары отсутствуют.</p>
-                                @endif
-                                <div class="orderInfoArrow">></div>
+                                <button class="orderInfoToggle" type="button" aria-expanded="false">
+                                    Товаров: {{ count($order->normalized_items) }}
+                                    <span class="orderInfoToggle__icon">›</span>
+                                </button>
                             </div>
 
 
@@ -294,6 +488,38 @@
                                     class="badge badge-secondary delete-category">Удалить</a>
                             </div> --}}
 
+                        </div>
+                        <div class="orderInfoPanel">
+                            <div class="orderInfoPanel__items">
+                                @forelse ($order->normalized_items as $item)
+                                    @include('partials.order-item-details', ['item' => $item])
+                                @empty
+                                    <p>Товары отсутствуют.</p>
+                                @endforelse
+                            </div>
+                            <dl class="orderInfoPanel__meta">
+                                <div>
+                                    <dt>Доставка</dt>
+                                    <dd>
+                                        {{ $order->delivery_label }}
+                                        @if ((float) $order->delivery_cost > 0)
+                                            ({{ number_format($order->delivery_cost, 0, ',', ' ') }} ₽)
+                                        @endif
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt>Адрес</dt>
+                                    <dd>{{ data_get($order->customer_details, 'addres', $order->user->addres ?? 'Не указан') }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Email</dt>
+                                    <dd>{{ data_get($order->customer_details, 'email', $order->user->email ?? 'Не указан') }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Комментарий</dt>
+                                    <dd>{{ $order->comment ?: 'Нет' }}</dd>
+                                </div>
+                            </dl>
                         </div>
                     </div>
                 @endforeach
@@ -335,11 +561,14 @@
         });
     });
 
-    let infoArrows = document.querySelectorAll('.orderInfoArrow')
-    infoArrows.forEach(element => {
-        element.addEventListener('click', () => {
-            element.parentElement.classList.toggle('active')
-        })
+    document.querySelectorAll('.orderInfoToggle').forEach(button => {
+        button.addEventListener('click', () => {
+            const panel = button.closest('.catCard').querySelector('.orderInfoPanel');
+            const isOpen = panel.classList.toggle('is-open');
+
+            button.classList.toggle('is-open', isOpen);
+            button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
     });
 </script>
 

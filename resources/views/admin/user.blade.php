@@ -35,7 +35,7 @@
                         </header>
 
                         <div class="customer-order__items">
-                            @foreach ($order->items ?: [] as $item)
+                            @foreach ($order->normalized_items as $item)
                                 @include('partials.order-item-details', ['item' => $item])
                             @endforeach
                         </div>
@@ -88,11 +88,16 @@
                                 ])
                                 : '#';
                             $imagePath = $product->image_thumb_path ?: $product->image_path;
+                            $imageUrl = $imagePath
+                                ? (str_starts_with(ltrim($imagePath, '/'), 'storage/')
+                                    ? asset(ltrim($imagePath, '/'))
+                                    : Storage::url($imagePath))
+                                : null;
                         @endphp
                         <article class="customer-favorite" data-favorite-card="{{ $product->id }}">
                             <a href="{{ $productUrl }}">
-                                @if ($imagePath)
-                                    <img src="{{ Storage::url($imagePath) }}" alt="{{ $product->h1 ?: $product->title }}">
+                                @if ($imageUrl)
+                                    <img src="{{ $imageUrl }}" alt="{{ $product->h1 ?: $product->title }}">
                                 @endif
                                 <strong>{{ $product->h1 ?: $product->title }}</strong>
                             </a>
@@ -145,11 +150,14 @@
         .customer-account__empty { padding: 42px 0; color: #66727f; }
         @media (max-width: 800px) {
             .customer-account { padding-top: 32px; }
-            .customer-account__heading { align-items: center; }
+            .customer-account__heading { align-items: center; gap: 12px; }
+            .customer-account__heading .title { font-size: 30px; line-height: 1.15; }
             .customer-account__tabs { overflow-x: auto; }
             .customer-account__tabs button, .customer-account__tabs a { white-space: nowrap; padding-inline: 12px; }
-            .customer-order header, .customer-order footer { align-items: flex-start; }
+            .customer-order header { flex-direction: column; align-items: flex-start; gap: 8px; }
+            .customer-order footer { align-items: flex-start; }
             .customer-order header div { flex-direction: column; gap: 4px; }
+            .customer-order__status { align-self: flex-start; }
             .customer-order__items { grid-template-columns: 1fr; }
             .customer-order__meta { grid-template-columns: 1fr; }
             .customer-order__meta div { grid-template-columns: 1fr; gap: 2px; }

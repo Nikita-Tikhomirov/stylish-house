@@ -21,7 +21,7 @@
 <p><strong>Комментарий:</strong> {{ $order->comment ?: 'Нет' }}</p>
 
 <h2 style="font-size: 18px;">Состав заказа</h2>
-@foreach ($order->items ?: [] as $item)
+@foreach ($order->normalized_items as $item)
     <table width="100%" cellpadding="6" cellspacing="0" border="1" style="border-collapse: collapse; margin-bottom: 16px;">
         <tr>
             <th colspan="2" align="left">{{ $item['productName'] ?? 'Товар' }}</th>

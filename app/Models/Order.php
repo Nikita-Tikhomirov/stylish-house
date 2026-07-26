@@ -53,4 +53,39 @@ class Order extends Model
     {
         return self::DELIVERY_METHODS[$this->delivery_method] ?? 'Не выбрано';
     }
+
+    public function getNormalizedItemsAttribute(): array
+    {
+        $items = $this->items;
+
+        // Some legacy orders contain a JSON string nested inside the JSON column.
+        for ($attempt = 0; $attempt < 2 && is_string($items); $attempt++) {
+            $decoded = json_decode($items, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                break;
+            }
+
+            $items = $decoded;
+        }
+
+        if (is_string($items) && trim($items) !== '') {
+            return [['productName' => trim($items)]];
+        }
+
+        if (! is_array($items) || $items === []) {
+            return [];
+        }
+
+        if (! array_is_list($items)) {
+            $items = [$items];
+        }
+
+        return array_values(array_map(
+            static fn ($item): array => is_array($item)
+                ? $item
+                : ['productName' => trim((string) $item)],
+            $items
+        ));
+    }
 }
