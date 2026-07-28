@@ -1,13 +1,13 @@
 <div class="formWrapper" id="call">
     <form class="form popupForm">
         <div class="form__title">Заказать звонок</div><label class="form__label">
-            <p>Имя</p><input class="form__input" type="text" name="name" placeholder="Александр" required="required" />
+            <span>Имя</span><input class="form__input" type="text" name="name" placeholder="Александр" required="required" />
         </label><label class="form__label">
-            <p>Телефон</p><input class="form__input" type="text" name="phone" placeholder="+7(920)-113-46-44"
+            <span>Телефон</span><input class="form__input" type="text" name="phone" placeholder="+7(920)-113-46-44"
                 required="required" />
         </label><label class="form__label">
-            <p>Комментарий</p>
-            <textarea class="form__input textarea" type="text" name="message" placeholder="Ваш комментарий"></textarea>
+            <span>Комментарий</span>
+            <textarea class="form__input textarea" name="message" placeholder="Ваш комментарий"></textarea>
         </label>
         <x-front.consent />
         <button class="form__btn btn">Заказать звонок</button>
@@ -31,14 +31,14 @@
 <div class="formWrapper" id="measure">
     <form class="form popupForm">
         <div class="form__title">Заказать замер</div><label class="form__label">
-            <p>Имя</p><input class="form__input" type="text" name="name" placeholder="Александр"
+            <span>Имя</span><input class="form__input" type="text" name="name" placeholder="Александр"
                 required="required" />
         </label><label class="form__label">
-            <p>Телефон</p><input class="form__input" type="text" name="phone" placeholder="+7(920)-113-46-44"
+            <span>Телефон</span><input class="form__input" type="text" name="phone" placeholder="+7(920)-113-46-44"
                 required="required" />
         </label><label class="form__label">
-            <p>Комментарий</p>
-            <textarea class="form__input textarea" type="text" name="message" placeholder="Ваш комментарий"></textarea>
+            <span>Комментарий</span>
+            <textarea class="form__input textarea" name="message" placeholder="Ваш комментарий"></textarea>
         </label>
         <x-front.consent />
         <button class="form__btn btn">Заказать замер</button>
@@ -64,14 +64,14 @@
         <div class="form__title">Рассчитать стоимость рольставен</div>
 
         <label class="form__label">
-            <p>Имя</p><input class="form__input" type="text" name="name" placeholder="Александр" required="required" />
+            <span>Имя</span><input class="form__input" type="text" name="name" placeholder="Александр" required="required" />
         </label>
         <label class="form__label">
-            <p>Телефон</p><input class="form__input" type="text" name="phone" placeholder="+7(920)-113-46-44" required="required" />
+            <span>Телефон</span><input class="form__input" type="text" name="phone" placeholder="+7(920)-113-46-44" required="required" />
         </label>
         <label class="form__label">
-            <p>Комментарий</p>
-            <textarea class="form__input textarea" type="text" name="message" placeholder="Опишите ваши требования"></textarea>
+            <span>Комментарий</span>
+            <textarea class="form__input textarea" name="message" placeholder="Опишите ваши требования"></textarea>
         </label>
         <!-- Скрытые поля для передачи данных из калькулятора -->
         <input type="hidden" name="width" id="calc-width">
@@ -98,6 +98,9 @@
 </div>
 
 <div class="formWrapper prodPopup" id="popupProd">
+    <button class="modal__close prodPopup__close" type="button" aria-label="Закрыть">
+        <span aria-hidden="true">&times;</span>
+    </button>
     <div class="prodForm">
 
         {{-- <div class="prodForm__galleryWrap">
@@ -159,12 +162,12 @@
                 id="popup-product-summary" />
             <div class="prodForm__sizeWrap">
                 <label class="prodForm__label">
-                    <p>Ширина, мм</p>
+                    <span>Ширина, мм</span>
                     <input class="prodForm__input width-input" type="number" name="width" value="500"
                         required />
                 </label>
                 <label class="prodForm__label">
-                    <p>Высота, мм</p>
+                    <span>Высота, мм</span>
                     <input class="prodForm__input height-input" type="number" name="height" value="500"
                         required />
                 </label>
@@ -226,37 +229,7 @@
 </div>
 
 
-<style>
-    .radio-buttons {
-        display: flex;
-        gap: 5px;
-    }
 
-    .radio-button {
-        cursor: pointer;
-    }
-
-    .radio-button img {
-        display: block;
-        width: 80px;
-        height: 80px;
-        object-fit: cover;
-        border: 2px solid transparent;
-        transition: border-color 0.3s, box-shadow 0.3s;
-    }
-
-    .radio-button.active img {
-        border: 2px solid #0989ff;
-        /* Синий цвет выделения */
-        box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
-        border-radius: 8px;
-    }
-
-    /* Скрываем радио-кнопки */
-    .radio-button input[type="radio"] {
-        display: none;
-    }
-</style>
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {

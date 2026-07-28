@@ -25,6 +25,18 @@ class AuditContentMarkupTest extends TestCase
         'front/product-plumbing.blade.php',
     ];
 
+    private const PRICE_CALCULATOR_TEMPLATES = [
+        'front/home.blade.php',
+        'front/category.blade.php',
+        'front/categoryrolstavni.blade.php',
+        'front/subcategory.blade.php',
+        'front/subcategory-plumbing.blade.php',
+        'front/subcategory-template-1.blade.php',
+        'front/product.blade.php',
+        'front/product-plumbing.blade.php',
+        'front/cart.blade.php',
+    ];
+
     public function test_public_templates_have_exactly_one_h1(): void
     {
         foreach (self::H1_TEMPLATES as $template) {
@@ -74,6 +86,75 @@ class AuditContentMarkupTest extends TestCase
             $this->assertStringNotContainsString('что бы', $markup, $template);
             $this->assertStringNotContainsString('[object Object]', $markup, $template);
             $this->assertStringNotContainsString('Р ', $markup, $template);
+        }
+    }
+
+    public function test_product_price_requests_do_not_replace_errors_with_zero(): void
+    {
+        foreach (self::PRICE_CALCULATOR_TEMPLATES as $template) {
+            $markup = $this->template($template);
+
+            $this->assertStringNotContainsString('data.price || 0', $markup, $template);
+            $this->assertStringContainsString('response.ok', $markup, $template);
+        }
+    }
+
+    public function test_home_action_cards_expose_separate_cart_and_quick_view_controls(): void
+    {
+        $markup = preg_replace(
+            '/{{--.*?--}}/s',
+            '',
+            $this->template('components/front/section/actions.blade.php')
+        );
+
+        $this->assertStringContainsString('bigProdCard__cart control quickProd', $markup);
+        $this->assertStringContainsString('fas fa-cart-arrow-down', $markup);
+        $this->assertStringContainsString('bigProdCard__quckView control quickProd', $markup);
+        $this->assertStringContainsString('fas fa-eye', $markup);
+    }
+
+    public function test_product_popup_has_an_accessible_inset_close_button(): void
+    {
+        $markup = $this->template('components/front/popups.blade.php');
+
+        $this->assertMatchesRegularExpression(
+            '/<div class="formWrapper prodPopup" id="popupProd">\s*<button[^>]*class="modal__close prodPopup__close"[^>]*aria-label="Закрыть"/s',
+            $markup
+        );
+    }
+
+    public function test_home_markup_avoids_known_validator_regressions(): void
+    {
+        $head = $this->template('components/front/head.blade.php');
+        $header = $this->template('components/front/header.blade.php');
+        $home = $this->template('front/home.blade.php');
+        $forms = $this->template('components/front/popups.blade.php')
+            .$this->template('components/front/section/how.blade.php')
+            .$home;
+        $componentStyles = file_get_contents(__DIR__.'/../../resources/css/front-components.css');
+
+        $this->assertStringNotContainsString('<noscript>', $head);
+        $this->assertStringNotContainsString('user-scalable=no', $head);
+        $this->assertStringContainsString('resources/css/front-components.css', $head);
+        $this->assertSame(1, preg_match_all('/<style\b/i', $header));
+        $this->assertSame(0, preg_match_all('/<label\b[^>]*>\s*<p\b/is', $forms));
+        $this->assertSame(0, preg_match_all('/<textarea\b[^>]*\btype=/i', $forms));
+        $this->assertSame(1, preg_match_all('/<meta\b[^>]*name="csrf-token"/i', $head.$home));
+        $this->assertStringNotContainsString('::hover', $componentStyles);
+    }
+
+    public function test_card_tooltips_use_inline_markup_inside_buttons(): void
+    {
+        $templates = [
+            'components/front/section/actions.blade.php',
+            'components/front/section/populars.blade.php',
+        ];
+
+        foreach ($templates as $template) {
+            $markup = $this->template($template);
+
+            $this->assertStringNotContainsString('<div class="bigProdCard__toolTip">', $markup, $template);
+            $this->assertStringContainsString('<span class="bigProdCard__toolTip">', $markup, $template);
         }
     }
 

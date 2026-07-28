@@ -41,17 +41,17 @@
                                                 <div class="bigProdCard__controls">
                                                     <div class="bigProdCard__cart control">
                                                         <i class="fas fa-cart-arrow-down"></i>
-                                                        <div class="bigProdCard__toolTip">В корзину</div>
+                                                        <span class="bigProdCard__toolTip">В корзину</span>
                                                     </div>
                                                     <div class="bigProdCard__quckView control quickProd"  
                                                          data-prod="{{$product->id }}" data-modal="#popupProd">
                                                         <i class="fas fa-eye"></i>
-                                                        <div class="bigProdCard__toolTip">Быстрый просмотр</div>
+                                                        <span class="bigProdCard__toolTip">Быстрый просмотр</span>
                                                     </div>
                                                     <button class="bigProdCard__favorites control" type="button"
                                                         data-favorite-product="{{ $product->id }}" aria-label="Добавить в избранное">
                                                         <i class="far fa-heart"></i>
-                                                        <div class="bigProdCard__toolTip">Добавить в избранное</div>
+                                                        <span class="bigProdCard__toolTip">Добавить в избранное</span>
                                                     </button>
                                                 </div>
                                             </div>

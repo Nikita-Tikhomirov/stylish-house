@@ -311,9 +311,22 @@
                         fetch(
                                 `/sheet-names?width=${width}&height=${height}&model=${model}&control=${control}&cloth=${cloth}`
                             )
-                            .then(response => response.json())
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error(`Price request failed: ${response.status}`);
+                                }
+
+                                return response.json();
+                            })
                             .then(data => {
-                                const basePrice = data.price || 0;
+                                const basePrice = Number(data.price);
+                                if (!Number.isFinite(basePrice) || basePrice <= 0) {
+                                    if (typeof data.price === 'string' && data.price.trim()) {
+                                        priceElement.textContent = data.price;
+                                    }
+                                    return;
+                                }
+
                                 rebuildPrice(basePrice, quantity, discount);
                             })
                             .catch(error => console.error('Ошибка при получении цены:', error));

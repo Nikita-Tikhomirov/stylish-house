@@ -1,0 +1,714 @@
+/* Shared frontend component styles. Keep CSS out of rendered body markup. */
+
+/* Extracted from resources/views/components/front/header.blade.php */
+.header__accountIconWrap {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        margin-right: 8px;
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .bigProdCard__favorites {
+        border: 0;
+        padding: 0;
+        color: inherit;
+        background: transparent;
+    }
+
+    .bigProdCard__favorites.is-favorite {
+        color: #0989ff;
+    }
+
+    .filterSubcat {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+    }
+
+    .filterSubcat:hover {
+        color: #0989ff;
+    }
+
+    .filterSubcat.active {
+        color: #0989ff;
+    }
+
+    .filterSubcat.active span {
+        background: #0989ff;
+        color: #fff;
+    }
+
+
+    /*  */
+
+    .colorLabel {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+        cursor: pointer;
+    }
+
+    .colorLabel .sidebarFilter__checkbox {
+        display: none;
+        /* Скрываем стандартный чекбокс */
+    }
+
+    .colorLabel .sidebarFilter__labelText {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 25px;
+        height: 25px;
+        /* border-radius: 50%; */
+        margin-right: 10px;
+        border: 2px solid #ccc;
+        transition: border-color 0.3s ease;
+    }
+
+    .colorLabel .sidebarFilter__checkbox:checked+.sidebarFilter__labelText {
+        border-color: #000;
+        /* Изменяем стиль при активном чекбоксе */
+    }
+
+    .filterColors .sidebarFilter__paramsWrap {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-start;
+    }
+
+    .colorLabel__text {
+        position: relative;
+
+    }
+
+    .colorArrow {
+        font-size: 14px;
+        font-weight: bold;
+        /* filter: invert(1); */
+    }
+
+    .colorLabel.active .colorArrow {
+        filter: invert(1);
+    }
+
+    .filterColors {
+        margin-top: 35px;
+    }
+
+    /* .colorLabel__text:before{
+        content: '✔';
+        color: #fff;
+        font-size: 10px;
+
+    } */
+    nav.main-nav ul.categories li.category ul.all-categories {
+        position: relative;
+    }
+
+    .revCard__avatar img {
+        max-width: 65px;
+        height: 65px;
+        width: 100%;
+        object-fit: cover;
+    }
+
+    .bigProdCard__img-wrap img {
+        height: 250px;
+        object-fit: cover
+    }
+
+    .filterColors .sidebarFilter__paramsWrap, .filterMaterials .sidebarFilter__paramsWrap{
+
+        height: 200px;
+        overflow-y: scroll;
+        overflow-x: hidden;
+        /* width: 100%; */
+        /* direction:rtl; */
+
+    }
+    .filterMaterials .sidebarFilter__paramsWrap{
+                display: grid !important;
+            grid-template-columns: repeat(5,1fr);
+            grid-gap: 7px;
+    }
+
+
+    .filterMaterials .materialLabel{
+        margin-bottom: 0 !important;
+    }
+
+    .pagination {
+    display: -ms-flexbox;
+    display: flex;
+    padding-left: 0;
+    list-style: none;
+    border-radius: .25rem
+}
+
+.page-link {
+    position: relative;
+    display: block;
+    padding: .5rem .75rem;
+    margin-left: -1px;
+    line-height: 1.25;
+    color: #007bff;
+    background-color: #fff;
+    border: 1px solid #dee2e6
+}
+
+.page-link:hover {
+    z-index: 2;
+    color: #0056b3;
+    text-decoration: none;
+    background-color: #e9ecef;
+    border-color: #dee2e6
+}
+
+.page-link:focus {
+    z-index: 2;
+    outline: 0;
+    box-shadow: 0 0 0 .2rem #007bff40
+}
+
+.page-link:not(:disabled):not(.disabled) {
+    cursor: pointer
+}
+
+.page-item:first-child .page-link {
+    margin-left: 0;
+    border-top-left-radius: .25rem;
+    border-bottom-left-radius: .25rem
+}
+
+.page-item:last-child .page-link {
+    border-top-right-radius: .25rem;
+    border-bottom-right-radius: .25rem
+}
+
+.page-item.active .page-link {
+    z-index: 1;
+    color: #fff;
+    background-color: #007bff;
+    border-color: #007bff
+}
+
+.page-item.disabled .page-link {
+    color: #6c757d;
+    pointer-events: none;
+    cursor: auto;
+    background-color: #fff;
+    border-color: #dee2e6
+}
+
+.pagination-lg .page-link {
+    padding: .75rem 1.5rem;
+    font-size: 1.25rem;
+    line-height: 1.5
+}
+
+.pagination-lg .page-item:first-child .page-link {
+    border-top-left-radius: .3rem;
+    border-bottom-left-radius: .3rem
+}
+
+.pagination-lg .page-item:last-child .page-link {
+    border-top-right-radius: .3rem;
+    border-bottom-right-radius: .3rem
+}
+
+.pagination-sm .page-link {
+    padding: .25rem .5rem;
+    font-size: .875rem;
+    line-height: 1.5
+}
+
+.pagination-sm .page-item:first-child .page-link {
+    border-top-left-radius: .2rem;
+    border-bottom-left-radius: .2rem
+}
+
+.pagination-sm .page-item:last-child .page-link {
+    border-top-right-radius: .2rem;
+    border-bottom-right-radius: .2rem
+}
+.bigProdCard__img-wrap{
+    height: 250px;
+}
+
+
+    .bigProdCard__imgCustomWrap{
+        position:relative;
+        max-height: 250px;
+        z-index: 1;
+    }
+    .bigProdCard__imgCustomWrap img:first-child{
+        z-index:1;
+        height: 100%;
+        width: 100%;
+        min-height: 250px;
+        
+        object-fit: cover;
+    }
+    .bigProdCard__imgCustomWrap img:nth-child(2){
+        position:absolute;
+        width:100%;
+        height:100%;
+        object-fit:cover;
+        z-index:2;
+        left: 0;
+        opacity: 0;
+        transition: 0.2s;
+        min-height: 250px;
+    }
+    .bigProdCard__imgCustomWrap:hover img:nth-child(2){
+        opacity: 1;
+    }
+
+    .bigProdCard__controls{
+        z-index: 2;
+    }
+
+    /* для попапа фото ткани */
+    .prodForm__imgWrap{
+        position: relative;
+    }
+    .prodForm__imgWrap img:first-child{
+        z-index:1;
+        height: 100%;
+        width: 100%;
+        object-fit: cover; 
+        /* 
+        min-height: 250px;
+        
+        */
+    }
+    .prodForm__imgWrap img:nth-child(2){
+        position:absolute;
+        width:100%;
+        height:100%;
+        object-fit:cover;
+        /* 
+         */
+        z-index:2;
+        left: 0;
+        opacity: 0;
+        transition: 0.2s;
+        /* min-height: 250px; */
+    }
+    .prodForm__imgWrap:hover img:nth-child(2){
+        opacity: 1;
+    }
+    body {
+        overflow-x: hidden
+    }
+    
+/* .prodForm__bar a,.prodForm__bar img{display: none;} */
+
+/* Extracted from resources/views/components/front/section/hero.blade.php */
+.hero .swiper-slide{
+        padding-top: 70px;
+        padding-bottom: 70px;
+        position: relative;
+        z-index: 3;
+        min-height: 450px;
+    }
+    .hero__bg{
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+
+    }
+    .hero__bg img{
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .hero__title,.hero__text,.hero__link{
+        position: relative;
+        z-index: 4;
+        max-width: 650px;
+    }
+
+    .hero__link{
+        width: fit-content;
+    }
+    .hero__title{
+        margin-bottom: 18px;
+        font-size: 48px;
+        font-weight: 600;
+    }
+    .hero__text{
+        margin-bottom: 67px;
+        max-width: 350px;
+    }
+
+/* Extracted from resources/views/components/front/section/populars.blade.php */
+@media only screen and (min-width: 1351px) {
+        .s-populars__cards {
+            min-height: 475px;
+        }
+    }
+
+/* Extracted from resources/views/components/front/section/site-portfolio.blade.php */
+.sitePortfolio{margin-top:34px;margin-bottom:64px}
+    .sitePortfolio__block{margin-top:42px}
+    .sitePortfolio__block:first-child{margin-top:34px}
+    .sitePortfolio__heading{font-size:28px;line-height:1.25;margin:0 0 22px;font-weight:700}
+    .sitePortfolio__tabs{
+        display:flex;
+        flex-wrap:wrap;
+        gap:10px;
+        margin:0 0 24px;
+        padding:14px;
+        border:1px solid #e2e7ed;
+        border-radius:8px;
+        background:#f6f8fb;
+    }
+    .sitePortfolio__tab{
+        display:flex;
+        align-items:center;
+        gap:8px;
+        max-width:100%;
+        min-height:42px;
+        padding:9px 14px;
+        border:1px solid #d9e3ee;
+        border-radius:6px;
+        background:#fff;
+        color:#111923;
+        font-weight:700;
+        line-height:1.25;
+        cursor:pointer;
+        transition:.2s;
+    }
+    .sitePortfolio__tab small{
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        min-width:25px;
+        height:24px;
+        padding:0 7px;
+        border-radius:999px;
+        background:#edf4ff;
+        color:#0989ff;
+        font-size:12px;
+        font-weight:700;
+    }
+    .sitePortfolio__tab:hover,
+    .sitePortfolio__tab.is-active{
+        border-color:#0989ff;
+        background:#0989ff;
+        color:#fff;
+    }
+    .sitePortfolio__tab.is-active small,
+    .sitePortfolio__tab:hover small{
+        background:#fff;
+        color:#0989ff;
+    }
+    .sitePortfolio__panel{display:none}
+    .sitePortfolio__panel.is-active{display:block}
+    .sitePortfolio__panelHead{
+        display:flex;
+        align-items:flex-end;
+        justify-content:space-between;
+        gap:18px;
+        margin:0 0 16px;
+    }
+    .sitePortfolio__panelHead h3{
+        margin:0;
+        font-size:24px;
+        line-height:1.25;
+        font-weight:700;
+    }
+    .sitePortfolio__panelHead span{
+        flex:0 0 auto;
+        color:#6b7280;
+        font-weight:700;
+    }
+    .sitePortfolio__slider{position:relative}
+    .sitePortfolio__swiper,
+    .sitePortfolio__worksSwiper{overflow:hidden}
+    .sitePortfolio__video{height:100%;border:1px solid #e2e7ed;border-radius:8px;overflow:hidden;background:#fff}
+    .sitePortfolio__videoPreview{position:relative;display:block;aspect-ratio:16/9;background:#111;color:#fff}
+    .sitePortfolio__videoPreview img,
+    .sitePortfolio__videoPreview video,
+    .sitePortfolio__videoPreview iframe{display:block;width:100%;height:100%;border:0;object-fit:cover;margin:0}
+    .sitePortfolio__play{position:absolute;left:50%;top:50%;display:flex;align-items:center;justify-content:center;width:58px;height:58px;border-radius:50%;background:#fff;color:#0989ff;transform:translate(-50%,-50%);box-shadow:0 10px 26px rgba(0,0,0,.18)}
+    .sitePortfolio__video h3{font-size:16px;line-height:1.35;margin:0;padding:14px;min-height:62px}
+    .sitePortfolio__work{position:relative;display:block;border-radius:8px;overflow:hidden;background:#f2f4f7;height:230px;color:#fff}
+    .sitePortfolio__work img{width:100%;height:100%;object-fit:cover;margin:0;transition:.2s}
+    .sitePortfolio__work:hover img{transform:scale(1.03)}
+    .sitePortfolio__work span{position:absolute;left:0;right:0;bottom:0;padding:18px;background:linear-gradient(transparent,rgba(0,0,0,.72));font-weight:700}
+    .sitePortfolio__slider .swiper-button-prev,
+    .sitePortfolio__slider .swiper-button-next{top:calc(50% - 34px)}
+    .sitePortfolio__slider > .swiper-pagination{
+        position:static;
+        display:flex;
+        justify-content:center;
+        gap:8px;
+        width:100%;
+        margin-top:24px;
+        transform:none;
+    }
+    .sitePortfolio__slider > .swiper-pagination .swiper-pagination-bullet{
+        margin:0;
+    }
+    .siteVideoModal{
+        position:fixed;
+        inset:0;
+        z-index:9999;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        padding:36px;
+        background:rgba(0,0,0,.78);
+    }
+    .siteVideoModal__inner{
+        position:relative;
+        width:min(1180px,100%);
+        background:#050505;
+        border-radius:8px;
+        overflow:hidden;
+        box-shadow:0 24px 80px rgba(0,0,0,.42);
+    }
+    .siteVideoModal__video{
+        display:block;
+        width:100%;
+        max-height:82vh;
+        aspect-ratio:16/9;
+        background:#050505;
+        object-fit:contain;
+    }
+    .siteVideoModal__play{
+        position:absolute;
+        left:50%;
+        top:50%;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        width:78px;
+        height:78px;
+        border:0;
+        border-radius:50%;
+        color:#0989ff;
+        background:#fff;
+        box-shadow:0 14px 34px rgba(0,0,0,.28);
+        transform:translate(-50%,-50%);
+        cursor:pointer;
+    }
+    .siteVideoModal__play.is-hidden{
+        display:none;
+    }
+    .siteVideoModal__close{
+        position:absolute;
+        right:14px;
+        top:14px;
+        z-index:2;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        width:38px;
+        height:38px;
+        border:0;
+        border-radius:50%;
+        color:#fff;
+        background:rgba(0,0,0,.48);
+        font-size:28px;
+        line-height:1;
+        cursor:pointer;
+    }
+    @media(max-width:620px){
+        .sitePortfolio{margin-bottom:44px}
+        .sitePortfolio__heading{font-size:23px}
+        .sitePortfolio__tabs{
+            flex-wrap:nowrap;
+            overflow-x:auto;
+            padding:10px;
+            margin-bottom:18px;
+            scroll-snap-type:x proximity;
+        }
+        .sitePortfolio__tab{
+            flex:0 0 auto;
+            max-width:260px;
+            scroll-snap-align:start;
+        }
+        .sitePortfolio__panelHead{
+            display:block;
+        }
+        .sitePortfolio__panelHead h3{font-size:21px}
+        .sitePortfolio__panelHead span{
+            display:block;
+            margin-top:5px;
+        }
+        .sitePortfolio__slider{padding-bottom:58px}
+        .sitePortfolio__slider .swiper-button-prev,
+        .sitePortfolio__slider .swiper-button-next{
+            top:auto;
+            bottom:0;
+            transform:none;
+        }
+        .sitePortfolio__slider .swiper-button-prev{left:calc(50% - 74px)}
+        .sitePortfolio__slider .swiper-button-next{right:calc(50% - 74px)}
+        .sitePortfolio__work{height:240px}
+        .sitePortfolio__video h3{min-height:auto}
+        .siteVideoModal{padding:14px}
+        .siteVideoModal__play{width:62px;height:62px}
+    }
+
+/* Extracted from resources/views/components/front/section/map.blade.php */
+.s-map{
+        width: 100%;
+        height: 500px;
+    }
+
+/* Extracted from resources/views/front/home.blade.php */
+.sidebarFilter__label {
+            display: -webkit-box;
+            display: -ms-flexbox;
+            display: flex;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-box-align: center;
+            -ms-flex-align: center;
+            align-items: center;
+            -webkit-box-pack: start;
+            -ms-flex-pack: start;
+            justify-content: flex-start;
+            color: #55585b;
+            font-family: Jost, Tahoma, sans-serif
+        }
+
+        .sidebarFilter__label:not(:last-child) {
+            margin-bottom: 10px
+        }
+
+        .sidebarFilter__label input {
+            opacity: 0;
+            height: 0;
+            width: 0
+        }
+
+        .sidebarFilter .checkmark {
+            display: -webkit-box;
+            display: -ms-flexbox;
+            display: flex;
+            -webkit-box-align: center;
+            -ms-flex-align: center;
+            align-items: center;
+            -webkit-box-pack: center;
+            -ms-flex-pack: center;
+            justify-content: center;
+            height: 23px;
+            width: 22px;
+            background-color: #fff;
+            border: 2px solid #e7e7e7;
+            margin-right: 10px;
+            cursor: pointer
+        }
+
+        .sidebarFilter .checkmark i {
+            opacity: 0;
+            color: #fff
+        }
+
+        .sidebarFilter__label input:checked~.checkmark {
+            background-color: #0989ff;
+            border: 2px solid #0989ff
+        }
+
+        .sidebarFilter__label input:checked~.checkmark i {
+            opacity: 1
+        }
+
+        .sidebarFilter .checkmark:after {
+            content: "";
+            position: absolute;
+            display: none
+        }
+
+        .sidebarFilter__label .checkmark:after {
+            left: 8px;
+            top: 6px;
+            width: 6px;
+            height: 11px;
+            border: solid #fff;
+            border-width: 0 2px 2px 0;
+            -webkit-transform: rotate(45deg);
+            -ms-transform: rotate(45deg);
+            transform: rotate(45deg)
+        }
+
+/* Extracted from resources/views/components/front/popups.blade.php */
+.modal:has(#popupProd) > .modal__container > .modal__close {
+        display: none;
+    }
+
+    #popupProd .prodPopup__close {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        border: 0;
+        border-radius: 50%;
+        color: #fff;
+        background: rgba(1, 15, 28, 0.76);
+        font-size: 30px;
+        line-height: 1;
+        box-shadow: 0 3px 12px rgba(1, 15, 28, 0.18);
+    }
+
+    #popupProd .prodPopup__close:hover,
+    #popupProd .prodPopup__close:focus-visible {
+        background: #0989ff;
+    }
+
+    #popupProd .prodPopup__close span {
+        display: block;
+        margin-top: -3px;
+    }
+
+.radio-buttons {
+        display: flex;
+        gap: 5px;
+    }
+
+    .radio-button {
+        cursor: pointer;
+    }
+
+    .radio-button img {
+        display: block;
+        width: 80px;
+        height: 80px;
+        object-fit: cover;
+        border: 2px solid transparent;
+        transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    .radio-button.active img {
+        border: 2px solid #0989ff;
+        /* Синий цвет выделения */
+        box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
+        border-radius: 8px;
+    }
+
+    /* Скрываем радио-кнопки */
+    .radio-button input[type="radio"] {
+        display: none;
+    }

@@ -101,12 +101,12 @@
 
                                 <div class="prodForm__sizeWrap">
                                     <label class="prodForm__label">
-                                        <p>Ширина, мм</p>
+                                        <span>Ширина, мм</span>
                                         <input class="prodForm__input width-input" type="number" name="width"
                                             value="500" required />
                                     </label>
                                     <label class="prodForm__label">
-                                        <p>Высота, мм</p>
+                                        <span>Высота, мм</span>
                                         <input class="prodForm__input height-input" type="number" name="height"
                                             value="500" required />
                                     </label>
@@ -207,9 +207,9 @@
         <x-front.section.populars :homePopulars="$homePopulars" :categories="$categories"></x-front.section.populars>
 
         @if (!empty($homeVideoReviews) && $homeVideoReviews->isNotEmpty())
-            <section class="wrapper">
+            <div class="wrapper">
                 <x-front.section.site-portfolio :videoReviews="$homeVideoReviews" />
-            </section>
+            </div>
         @endif
 
         {{-- @foreach ($homePopulars as $categoryProducts)
@@ -237,89 +237,6 @@
         <x-front.section.map></x-front.section.map>
 
     </main>
-
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-
-    <style>
-        .sidebarFilter__label {
-            display: -webkit-box;
-            display: -ms-flexbox;
-            display: flex;
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-            -webkit-box-align: center;
-            -ms-flex-align: center;
-            align-items: center;
-            -webkit-box-pack: start;
-            -ms-flex-pack: start;
-            justify-content: flex-start;
-            color: #55585b;
-            font-family: Jost, Tahoma, sans-serif
-        }
-
-        .sidebarFilter__label:not(:last-child) {
-            margin-bottom: 10px
-        }
-
-        .sidebarFilter__label input {
-            opacity: 0;
-            height: 0;
-            width: 0
-        }
-
-        .sidebarFilter .checkmark {
-            display: -webkit-box;
-            display: -ms-flexbox;
-            display: flex;
-            -webkit-box-align: center;
-            -ms-flex-align: center;
-            align-items: center;
-            -webkit-box-pack: center;
-            -ms-flex-pack: center;
-            justify-content: center;
-            height: 23px;
-            width: 22px;
-            background-color: #fff;
-            border: 2px solid #e7e7e7;
-            margin-right: 10px;
-            cursor: pointer
-        }
-
-        .sidebarFilter .checkmark i {
-            opacity: 0;
-            color: #fff
-        }
-
-        .sidebarFilter__label input:checked~.checkmark {
-            background-color: #0989ff;
-            border: 2px solid #0989ff
-        }
-
-        .sidebarFilter__label input:checked~.checkmark i {
-            opacity: 1
-        }
-
-        .sidebarFilter .checkmark:after {
-            content: "";
-            position: absolute;
-            display: none
-        }
-
-        .sidebarFilter__label .checkmark:after {
-            left: 8px;
-            top: 6px;
-            width: 6px;
-            height: 11px;
-            border: solid #fff;
-            border-width: 0 2px 2px 0;
-            -webkit-transform: rotate(45deg);
-            -ms-transform: rotate(45deg);
-            transform: rotate(45deg)
-        }
-    </style>
-
 
     {{-- <x-front.footer :headerInfo="$headerInfo" ></x-front.footer> --}}
     <x-front.footer :headerInfo="$headerInfo" :curtainSubcats="$curtainSubcats" :blindSubcats="$blindSubcats"></x-front.footer>
@@ -430,14 +347,34 @@
                         fetch(
                                 `/sheet-names?width=${width}&height=${height}&model=${model}&control=${control}&cloth=${cloth}&modelId=${modelId}&prodTitle=${prodTitleTorequest}`
                             )
-                            .then(response => response.json())
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error(`Price request failed: ${response.status}`);
+                                }
+
+                                return response.json();
+                            })
                             .then(data => {
-                                const basePrice = data.price || 0;
-                                currentBasePrice = Number(basePrice) || 0;
+                                const basePrice = Number(data.price);
+                                if (!Number.isFinite(basePrice) || basePrice <= 0) {
+                                    if (typeof data.price === 'string' && data.price.trim()) {
+                                        priceElement.textContent = data.price;
+                                    }
+                                    return;
+                                }
+
+                                currentBasePrice = basePrice;
                                 priceElement.dataset.basePrice = currentBasePrice;
                                 rebuildPrice(currentBasePrice, quantity, discount);
                             })
-                            .catch(error => console.error('Ошибка при получении цены:', error));
+                            .catch(error => {
+                                console.error('Ошибка при получении цены:', error);
+                                if (currentBasePrice > 0) {
+                                    rebuildPrice(currentBasePrice, quantity, discount);
+                                } else {
+                                    priceElement.textContent = 'Цена по запросу';
+                                }
+                            });
                     }
 
                     // Инициализация количества
@@ -594,6 +531,9 @@
                                 let widthInput = prodWrap.querySelector('.width-input');
                                 let heightInput = prodWrap.querySelector('.height-input');
 
+                                if (widthInput && product.min_width) {
+                                    widthInput.value = product.min_width;
+                                }
 
                                 if (heightInput && product.min_height) {
                                     heightInput.value = product.min_height;
@@ -699,18 +639,16 @@ tabs.forEach(tab => {
                             ${fabricImageSrc ? `<img src="${fabricImageSrc}" alt="${product.h1}" />` : ''}
                         </div>
                                                         <div class="bigProdCard__controls">
-                                                            <div class="bigProdCard__controls">
-                                                    <div class="bigProdCard__cart control"><i class="fas fa-cart-arrow-down" aria-hidden="true"></i>
-                                                        <div class="bigProdCard__toolTip">В корзину</div>
+                                                    <div class="bigProdCard__cart control quickProd" data-prod="${product.id}" data-modal="#popupProd"><i class="fas fa-cart-arrow-down" aria-hidden="true"></i>
+                                                        <span class="bigProdCard__toolTip">В корзину</span>
                                                     </div>
                                                     <div class="bigProdCard__quckView control quickProd" data-prod="${product.id}" data-modal="#popupProd"><i class="fas fa-eye" aria-hidden="true"></i>
-                                                        <div class="bigProdCard__toolTip">Быстрый просмотр</div>
+                                                        <span class="bigProdCard__toolTip">Быстрый просмотр</span>
                                                     </div>
                                                     <button class="bigProdCard__favorites control" type="button" data-favorite-product="${product.id}" aria-label="Добавить в избранное"><i class="far fa-heart" aria-hidden="true"></i>
-                                                        <div class="bigProdCard__toolTip">Добавить в избранное</div>
+                                                        <span class="bigProdCard__toolTip">Добавить в избранное</span>
                                                     </button>
                                                 </div>
-                                                        </div>
                                                     </div>
                                                     <div class="bigProdCard__info">
                                                         <a class="bigProdCard__category" href="${categorySlug ? '/' + categorySlug : '#'}">${product.category ? product.category.titleh1 : 'Без категории'}</a>

@@ -11,7 +11,7 @@
         <div class="s-actions__swiper swiper">
             <div class="swiper-wrapper">
                 @foreach ($homeActions as $actionCard)
-                    <div class="s-actions__slide swiper-slide card" id="prod{{ $actionCard->id }}"
+                    <div class="s-actions__slide swiper-slide card"
                         data-modelid="{{ $actionCard->model_id ?? '' }}" data-model="{{ $actionCard->model_title }}"
                         data-cloth="{{ $actionCard->cloth }}" data-discount="{{ $actionCard->discount }}"
                         data-min-width="{{ $actionCard->min_width ?? '' }}" data-min-height="{{ $actionCard->min_height ?? '' }}">
@@ -37,17 +37,19 @@
                   
 
                                     <div class="bigProdCard__controls">
-                                        {{-- <div class="bigProdCard__cart control"><i class="fas fa-cart-arrow-down"></i>
-                                            <div class="bigProdCard__toolTip">В корзину</div>
-                                        </div> --}}
                                         <div class="bigProdCard__cart control quickProd"
                                             data-prod="{{ $actionCard->id }}" data-modal="#popupProd"><i
+                                                class="fas fa-cart-arrow-down"></i>
+                                            <span class="bigProdCard__toolTip">В корзину</span>
+                                        </div>
+                                        <div class="bigProdCard__quckView control quickProd"
+                                            data-prod="{{ $actionCard->id }}" data-modal="#popupProd"><i
                                                 class="fas fa-eye"></i>
-                                            <div class="bigProdCard__toolTip">Быстрый просмотр</div>
+                                            <span class="bigProdCard__toolTip">Быстрый просмотр</span>
                                         </div>
                                         <button class="bigProdCard__favorites control" type="button"
                                             data-favorite-product="{{ $actionCard->id }}" aria-label="Добавить в избранное"><i class="far fa-heart"></i>
-                                            <div class="bigProdCard__toolTip">Добавить в избранное</div>
+                                            <span class="bigProdCard__toolTip">Добавить в избранное</span>
                                         </button>
                                     </div>
                                 </div>

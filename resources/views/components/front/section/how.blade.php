@@ -10,16 +10,16 @@
         <div class="s-how__formTitle">Задать вопрос </div>
         <div class="s-how__inputsWrap">
             <label class="s-how__label">
-                <p>Имя</p>
+                <span>Имя</span>
                 <input class="s-how__input" type="text" name="name" placeholder="Андрей" required />
             </label>
             <label class="s-how__label">
-                <p>Номер</p>
+                <span>Номер</span>
                 <input class="s-how__input" type="text" name="phone" placeholder="+7 000 000-00-00" required />
             </label>
         </div>
         <label class="s-how__label">
-            <p>Вопрос</p>
+            <span>Вопрос</span>
             <textarea class="s-how__input textarea" name="message" placeholder="Ваш вопрос" required></textarea>
         </label>
         <x-front.consent />

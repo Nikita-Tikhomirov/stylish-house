@@ -7,7 +7,7 @@
                     <div class="hero__bg">
                         <img src="{{ Storage::url($slide->image_path) }}" alt="" class="hero__bg">
                     </div>
-                    <div class="hero__title">{{ $slide->title }}</div>
+                    <h2 class="hero__title">{{ $slide->title }}</h2>
                     <div class="hero__text">
                         {{$slide->description}}
                     </div>
@@ -29,48 +29,7 @@
 </section>
 
 
-<style>
-    .hero .swiper-slide{
-        padding-top: 70px;
-        padding-bottom: 70px;
-        position: relative;
-        z-index: 3;
-        min-height: 450px;
-    }
-    .hero__bg{
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
 
-    }
-    .hero__bg img{
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-
-    .hero__title,.hero__text,.hero__link{
-        position: relative;
-        z-index: 4;
-        max-width: 650px;
-    }
-
-    .hero__link{
-        width: fit-content;
-    }
-    .hero__title{
-        margin-bottom: 18px;
-        font-size: 48px;
-        font-weight: 600;
-    }
-    .hero__text{
-        margin-bottom: 67px;
-        max-width: 350px;
-    }
-
-</style>
 
 {{--
 <script>

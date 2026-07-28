@@ -640,17 +640,33 @@
                         fetch(
                                 `/sheet-names?width=${width}&height=${height}&model=${model}&control=${control}&cloth=${cloth}&modelId=${modelId}&prodTitle=${prodTitleTorequest}`
                             )
-                            .then(response => response.json())
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error(`Price request failed: ${response.status}`);
+                                }
+
+                                return response.json();
+                            })
                             .then(data => {
-                                const basePrice = data.price || 0;
-                                currentBasePrice = Number(basePrice) || 0;
+                                const basePrice = Number(data.price);
+                                if (!Number.isFinite(basePrice) || basePrice <= 0) {
+                                    if (typeof data.price === 'string' && data.price.trim()) {
+                                        priceElement.textContent = data.price;
+                                    }
+                                    return;
+                                }
+
+                                currentBasePrice = basePrice;
                                 priceElement.dataset.basePrice = currentBasePrice;
                                 rebuildPrice(currentBasePrice, quantity, discount);
                             })
                             .catch(error => {
                                 console.error('Ошибка при получении цены:', error);
-                                rebuildPrice(0, quantity,
-                                discount); // Здесь тоже "Цена по запросу" в случае ошибки
+                                if (currentBasePrice > 0) {
+                                    rebuildPrice(currentBasePrice, quantity, discount);
+                                } else {
+                                    priceElement.textContent = 'Цена по запросу';
+                                }
                             });
                     }
 
@@ -818,13 +834,13 @@
                         </div>
                         <div class="bigProdCard__controls">
                             <div class="bigProdCard__cart control"><i class="fas fa-cart-arrow-down"></i>
-                                <div class="bigProdCard__toolTip">В корзину</div>
+                                <span class="bigProdCard__toolTip">В корзину</span>
                             </div>
                             <div class="bigProdCard__quckView control quickProd" data-modal="#popupProd" data-prod="${product.id}"><i class="fas fa-eye"></i>
-                                <div class="bigProdCard__toolTip">Быстрый просмотр</div>
+                                <span class="bigProdCard__toolTip">Быстрый просмотр</span>
                             </div>
                             <button class="bigProdCard__favorites control" type="button" data-favorite-product="${product.id}" aria-label="Добавить в избранное"><i class="far fa-heart"></i>
-                                <div class="bigProdCard__toolTip">Добавить в избранное</div>
+                                <span class="bigProdCard__toolTip">Добавить в избранное</span>
                             </button>
                         </div>
                     </div>

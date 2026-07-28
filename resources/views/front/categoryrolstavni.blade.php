@@ -198,17 +198,26 @@
                         fetch(
                                 `/sheet-names?width=${width}&height=${height}&model=${model}&control=${control}&cloth=${cloth}`
                             )
-                            .then(response => response.json())
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error(`Price request failed: ${response.status}`);
+                                }
+
+                                return response.json();
+                            })
                             .then(data => {
                                 let basePrice = data.price;
                                 if (typeof basePrice === 'string') {
                                     // Если backend вернул строку fallback
                                     priceElement.textContent = basePrice;
                                 } else {
-                                    basePrice = basePrice || 0;
-                                    currentBasePrice = Number(basePrice) || 0;
-                                priceElement.dataset.basePrice = currentBasePrice;
-                                rebuildPrice(currentBasePrice, quantity, discount);
+                                    basePrice = Number(basePrice);
+                                    if (!Number.isFinite(basePrice) || basePrice <= 0) {
+                                        throw new Error('Price response does not contain a positive number');
+                                    }
+                                    currentBasePrice = basePrice;
+                                    priceElement.dataset.basePrice = currentBasePrice;
+                                    rebuildPrice(currentBasePrice, quantity, discount);
                                 }
                             })
                             .catch(error => {
@@ -374,6 +383,9 @@
                                 let widthInput = prodWrap.querySelector('.width-input');
                                 let heightInput = prodWrap.querySelector('.height-input');
 
+                                if (widthInput && product.min_width) {
+                                    widthInput.value = product.min_width;
+                                }
 
                                 if (heightInput && product.min_height) {
                                     heightInput.value = product.min_height;
@@ -528,13 +540,13 @@ function fetchProducts(url) {
                         </div>
                         <div class="bigProdCard__controls">
                             <div class="bigProdCard__cart control"><i class="fas fa-cart-arrow-down"></i>
-                                <div class="bigProdCard__toolTip">В корзину</div>
+                                <span class="bigProdCard__toolTip">В корзину</span>
                             </div>
                             <div class="bigProdCard__quckView control quickProd" data-modal="#popupProd" data-prod="${product.id}"><i class="fas fa-eye"></i>
-                                <div class="bigProdCard__toolTip">Быстрый просмотр</div>
+                                <span class="bigProdCard__toolTip">Быстрый просмотр</span>
                             </div>
                             <button class="bigProdCard__favorites control" type="button" data-favorite-product="${product.id}" aria-label="Добавить в избранное"><i class="far fa-heart"></i>
-                                <div class="bigProdCard__toolTip">Добавить в избранное</div>
+                                <span class="bigProdCard__toolTip">Добавить в избранное</span>
                             </button>
                         </div>
                     </div>
