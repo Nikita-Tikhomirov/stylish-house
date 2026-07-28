@@ -166,6 +166,21 @@ class OrderFlowTest extends TestCase
         $this->assertStringContainsString('Нужен монтаж после 18:00', $adminHtml);
     }
 
+    public function test_checkout_rejects_missing_privacy_consent(): void
+    {
+        Mail::fake();
+
+        $response = $this->withSession([
+            'cart' => [$this->cartKey() => $this->cartItem()],
+        ])->postJson('/create-order', $this->customerPayload([
+            'privacy_consent' => null,
+        ]));
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors('privacy_consent');
+        $this->assertDatabaseCount('orders', 0);
+    }
+
     public function test_existing_customer_email_does_not_authenticate_guest_without_password(): void
     {
         Mail::fake();
@@ -288,6 +303,7 @@ class OrderFlowTest extends TestCase
             'phone' => '+7 999 123-45-67',
             'email' => 'ivan@example.test',
             'comment' => 'Нужен монтаж после 18:00',
+            'privacy_consent' => '1',
         ], $overrides);
     }
 }

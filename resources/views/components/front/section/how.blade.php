@@ -22,6 +22,7 @@
             <p>Вопрос</p>
             <textarea class="s-how__input textarea" name="message" placeholder="Ваш вопрос" required></textarea>
         </label>
+        <x-front.consent />
         <button type="submit" class="s-how__button btn">Отправить</button>
     </form>
 

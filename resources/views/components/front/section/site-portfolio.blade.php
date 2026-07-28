@@ -40,7 +40,7 @@
                                            data-video-title="{{ $video->title }}"
                                        @endif>
                                         @if ($poster)
-                                            <img src="{{ $poster }}" alt="{{ $video->title }}">
+                                            <img src="{{ $poster }}" alt="{{ $video->title }}" loading="lazy" decoding="async">
                                         @elseif ($isExternalVideo)
                                             <iframe src="{{ $embedUrl }}" loading="lazy" allow="autoplay; encrypted-media" allowfullscreen></iframe>
                                         @else
@@ -99,7 +99,7 @@
                             @if ($image)
                                 <div class="swiper-slide">
                                     <a class="sitePortfolio__work" data-fslightbox="{{ $galleryName }}" href="{{ Storage::url($work->image ?: $image) }}">
-                                        <img src="{{ Storage::url($image) }}" alt="{{ $work->title ?: $groupTitle }}" loading="lazy">
+                                        <img src="{{ Storage::url($image) }}" alt="{{ $work->title ?: $groupTitle }}" loading="lazy" decoding="async">
                                         @if ($work->title)
                                             <span>{{ $work->title }}</span>
                                         @endif

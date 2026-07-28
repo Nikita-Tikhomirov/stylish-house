@@ -86,6 +86,8 @@
 
                                 </label>
 
+                                <x-front.consent />
+
                                 <button type="submit" class="contacts-btn btn">Зарегистрироваться</button>
                             </form>
 
@@ -95,13 +97,13 @@
                                         <p>Спасибо!</p>
                                         <p>Ваша заявка принята</p>
                                     </div>
-                                    <div class="ajaxMessage__text">Мы свяжемся с вами в ближайшее время, что бы обсудить
+                                    <div class="ajaxMessage__text">Мы свяжемся с вами в ближайшее время, чтобы обсудить
                                         детали и ответить на вопросы</div>
                                 </div>
                                 <div class="ajaxMessage__error">
                                     <div class="ajaxMessage__title">Ошибка при отправке!</div>
                                     <div class="ajaxMessage__text">Попробуйте позднее</div>
-                                </div><button class="btn closeModal">[object Object]</button>
+                                </div><button class="btn closeModal" type="button">Закрыть</button>
                             </div>
                         </div>
                     </div>

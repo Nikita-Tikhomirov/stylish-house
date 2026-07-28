@@ -15,7 +15,7 @@
                     @if ($gallery->subcategory_id)
                         <div class="s-gallery__slide swiper-slide">
                             <a data-fslightbox="gallery" class="galleryCard" href="{{ Storage::url($gallery->image) }}">
-                                <img src="{{ Storage::url($gallery->thumb ?? $gallery->image) }}" alt="" />
+                                <img src="{{ Storage::url($gallery->thumb ?? $gallery->image) }}" alt="" loading="lazy" decoding="async" />
                                 <span class="galleryCard__icon">
                                     <i class="fas fa-camera"></i>
                                 </span>

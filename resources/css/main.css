@@ -2,6 +2,139 @@
 .header__logo img{
     width: 200px;
 }
+
+.consentCheck {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 14px 0;
+    font-size: 14px;
+    line-height: 1.4;
+    cursor: pointer;
+}
+
+.consentCheck input {
+    flex: 0 0 18px;
+    width: 18px !important;
+    height: 18px !important;
+    margin-top: 1px;
+}
+
+.consentCheck a,
+.policyPage a {
+    color: #0989ff;
+    text-decoration: underline;
+}
+
+.policyHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 72px;
+    border-bottom: 1px solid #e5ebf2;
+    font-weight: 700;
+}
+
+.policyHeader a:last-child {
+    color: #0989ff;
+}
+
+.policyPage {
+    padding-top: 56px;
+    padding-bottom: 72px;
+}
+
+.policyPage .title {
+    margin-bottom: 36px;
+}
+
+.policyPage__content {
+    max-width: 900px;
+    font-size: 18px;
+    line-height: 1.65;
+}
+
+.policyPage__content h2 {
+    margin: 28px 0 12px;
+    font-size: 26px;
+    font-weight: 700;
+}
+
+.policyPage__content p {
+    margin-bottom: 16px;
+}
+
+.policyPage__updated {
+    margin-top: 32px;
+    color: #687480;
+}
+
+@media only screen and (max-width: 575px) {
+    .policyHeader {
+        min-height: 60px;
+        font-size: 14px;
+    }
+
+    .policyPage {
+        padding-top: 36px;
+        padding-bottom: 48px;
+    }
+
+    .policyPage__content {
+        font-size: 16px;
+    }
+
+    .policyPage__content h2 {
+        font-size: 22px;
+    }
+
+    html,
+    body,
+    .header,
+    .header__bottomMenu {
+        max-width: 100%;
+        min-width: 0;
+        overflow-x: hidden;
+    }
+
+    .header__bottomMenu > .header__infoWrap {
+        min-width: 0;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        gap: 4px 12px;
+    }
+
+    .header__bottomMenu > .header__infoWrap .header__infoWrapItem {
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    .header__bottomMenu > .header__infoWrap .header__infoWrapItem span,
+    .header__bottomMenu > .header__infoWrap .header__infoWrapItem a {
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+
+    .hero__title {
+        max-width: 100%;
+        font-size: 36px !important;
+        line-height: 1.15;
+        overflow-wrap: anywhere;
+    }
+
+    .breadcrumbs {
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .breadcrumbs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .breadcrumbs__list {
+        width: max-content;
+    }
+}
 .s-catMain{
     min-height: 400px;
 }

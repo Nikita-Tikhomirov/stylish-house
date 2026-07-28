@@ -9,17 +9,17 @@ class FormController extends Controller
 {
     public function send(Request $request)
     {
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'required|string|max:50',
+            'message' => 'nullable|string|max:255',
+            'privacy_consent' => 'accepted',
+        ]);
+
+        $data['user_message'] = $data['message'] ?? '';
+        unset($data['message'], $data['privacy_consent']);
+
         try {
-            $data = $request->validate([
-                'name' => 'required|string',
-                'phone' => 'required|string',
-                'message' => 'max:255',
-            ]);
-
-            // Переименовываем переменную message → user_message
-            $data['user_message'] = $data['message'];
-            unset($data['message']);
-
             Mail::send('emails.contact', $data, function ($m) {
                 $m->to('info@stylish-house.net')->subject('Новое сообщение с сайта');
             });
@@ -28,7 +28,10 @@ class FormController extends Controller
 
         } catch (\Throwable $e) {
             \Log::error('Mail error: ' . $e->getMessage());
-            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+            return response()->json([
+                'success' => false,
+                'error' => 'Не удалось отправить сообщение. Попробуйте позднее.',
+            ], 500);
         }
     }
 }

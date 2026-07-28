@@ -68,7 +68,6 @@
                     <path class="cls-3"
                         d="M361.25,163.42a48,48,0,1,0,48,48A48.05,48.05,0,0,0,361.25,163.42Zm0,85a37,37,0,1,1,37-37A37,37,0,0,1,361.25,248.42Z" />
                 </g>
-                <script xmlns="" />
                 </svg>
                 </a>
                 <div class="footer__requzits">
@@ -145,7 +144,8 @@
                                         headers: {
                                             'X-CSRF-TOKEN': document.querySelector(
                                                 'meta[name="csrf-token"]').getAttribute(
-                                                'content')
+                                                'content'),
+                                            'Accept': 'application/json'
                                         },
                                         body: data
                                     });
@@ -155,7 +155,7 @@
                                         alert('Сообщение отправлено!');
                                         form.reset();
                                     } else {
-                                        alert('Ошибка при отправке: ' + (result.error ?? ''));
+                                        alert(result.error ?? 'Проверьте обязательные поля формы.');
                                     }
                                 } catch (error) {
                                     console.error('AJAX error:', error);

@@ -6,9 +6,11 @@
             <p>Телефон</p><input class="form__input" type="text" name="phone" placeholder="+7(920)-113-46-44"
                 required="required" />
         </label><label class="form__label">
-            <p>Коментарий</p>
-            <textarea class="form__input textarea" type="text" name="message" placeholder="Ваш коментарий"></textarea>
-        </label><button class="form__btn btn">Заказать звонок</button>
+            <p>Комментарий</p>
+            <textarea class="form__input textarea" type="text" name="message" placeholder="Ваш комментарий"></textarea>
+        </label>
+        <x-front.consent />
+        <button class="form__btn btn">Заказать звонок</button>
     </form>
     <div class="ajaxMessage">
         <div class="ajaxMessage__success">
@@ -16,13 +18,13 @@
                 <p>Спасибо!</p>
                 <p>Ваша заявка принята</p>
             </div>
-            <div class="ajaxMessage__text">Мы свяжемся с вами в ближайшее время, что бы обсудить детали и ответить
+            <div class="ajaxMessage__text">Мы свяжемся с вами в ближайшее время, чтобы обсудить детали и ответить
                 на вопросы</div>
         </div>
         <div class="ajaxMessage__error">
             <div class="ajaxMessage__title">Ошибка при отправке!</div>
             <div class="ajaxMessage__text">Попробуйте позднее</div>
-        </div><button class="btn closeModal">[object Object]</button>
+        </div><button class="btn closeModal" type="button">Закрыть</button>
     </div>
 </div>
 
@@ -35,9 +37,11 @@
             <p>Телефон</p><input class="form__input" type="text" name="phone" placeholder="+7(920)-113-46-44"
                 required="required" />
         </label><label class="form__label">
-            <p>Коментарий</p>
-            <textarea class="form__input textarea" type="text" name="message" placeholder="Ваш коментарий"></textarea>
-        </label><button class="form__btn btn">Заказать замер</button>
+            <p>Комментарий</p>
+            <textarea class="form__input textarea" type="text" name="message" placeholder="Ваш комментарий"></textarea>
+        </label>
+        <x-front.consent />
+        <button class="form__btn btn">Заказать замер</button>
     </form>
     <div class="ajaxMessage">
         <div class="ajaxMessage__success">
@@ -45,13 +49,13 @@
                 <p>Спасибо!</p>
                 <p>Ваша заявка принята</p>
             </div>
-            <div class="ajaxMessage__text">Мы свяжемся с вами в ближайшее время, что бы обсудить детали и ответить
+            <div class="ajaxMessage__text">Мы свяжемся с вами в ближайшее время, чтобы обсудить детали и ответить
                 на вопросы</div>
         </div>
         <div class="ajaxMessage__error">
             <div class="ajaxMessage__title">Ошибка при отправке!</div>
             <div class="ajaxMessage__text">Попробуйте позднее</div>
-        </div><button class="btn closeModal">[object Object]</button>
+        </div><button class="btn closeModal" type="button">Закрыть</button>
     </div>
 </div>
 
@@ -74,6 +78,7 @@
         <input type="hidden" name="height" id="calc-height">
         <input type="hidden" name="color" id="calc-color">
         <input type="hidden" name="purposes" id="calc-purposes">
+        <x-front.consent />
         <button class="form__btn btn">Рассчитать стоимость</button>
     </form>
     <div class="ajaxMessage">
@@ -82,13 +87,13 @@
                 <p>Спасибо!</p>
                 <p>Ваша заявка принята</p>
             </div>
-            <div class="ajaxMessage__text">Мы свяжемся с вами в ближайшее время, что бы обсудить детали и ответить на вопросы</div>
+            <div class="ajaxMessage__text">Мы свяжемся с вами в ближайшее время, чтобы обсудить детали и ответить на вопросы</div>
         </div>
         <div class="ajaxMessage__error">
             <div class="ajaxMessage__title">Ошибка при отправке!</div>
             <div class="ajaxMessage__text">Попробуйте позднее</div>
         </div>
-        <button class="btn closeModal">[object Object]</button>
+        <button class="btn closeModal" type="button">Закрыть</button>
     </div>
 </div>
 
@@ -149,11 +154,9 @@
         <div class="prodForm__calcFormWrap">
             <div class="prodForm__formSubtitle">Товар 1</div>
             <div class="prodForm__formTitle">Заказать товар</div>
-            <div class="prodForm__description">
-                <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Minus incidunt sit quisquam illum
-                    pariatur vitae est cumque ea similique corporis deleniti, veritatis culpa! Saepe fugiat
-                    quibusdam voluptas ratione quaerat voluptatibus...</p><span class="more">Подробнее</span>
-            </div>
+            <x-front.read-more
+                text="Описание выбранного товара и его параметры появятся после открытия карточки."
+                id="popup-product-summary" />
             <div class="prodForm__sizeWrap">
                 <label class="prodForm__label">
                     <p>Ширина, мм</p>

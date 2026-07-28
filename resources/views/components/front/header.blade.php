@@ -74,7 +74,6 @@
                     <path class="cls-3"
                         d="M361.25,163.42a48,48,0,1,0,48,48A48.05,48.05,0,0,0,361.25,163.42Zm0,85a37,37,0,1,1,37-37A37,37,0,0,1,361.25,248.42Z" />
                 </g>
-                <script xmlns="" />
             </svg>
             <span style="display: block; font-size:16px; text-transform:uppercase">жалюзи, роллеты, ворота</span>
         </a>

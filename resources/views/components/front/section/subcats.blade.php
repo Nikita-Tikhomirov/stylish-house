@@ -15,7 +15,7 @@
                             <div class="bigProdCard bigCatCard">
                                 <div class="bigProdCard__wrap">
                                     <div class="bigProdCard__img-wrap"><img src="{{ Storage::url($subcategory->img) }}"
-                                            alt="" />
+                                            alt="" loading="lazy" decoding="async" />
                                         <div class="bigProdCard__controls">
                                             <div class="bigProdCard__cart"> </div>
                                             <div class="bigProdCard__quckView"> </div>

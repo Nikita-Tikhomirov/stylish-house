@@ -4,3 +4,7 @@
 
 
 import { fabric } from 'fabric';
+
+import { initReadMore } from './read-more.js';
+
+document.addEventListener('DOMContentLoaded', () => initReadMore());

@@ -281,9 +281,8 @@
                 <div class="prodForm__calcFormWrap">
                     <div class="prodForm__formSubtitle">{{ $category->titleh1 }}</div>
                     <div class="prodForm__formTitle">{{ $product->h1 }}</div>
-                    <div class="prodForm__description">
-                        <p>{{ $product->first_screenn_description }}...</p><span class="more">Подробнее</span>
-                    </div>
+                    <x-front.read-more :text="$product->first_screenn_description"
+                        :id="'product-summary-'.$product->id" />
                     {{-- <select class="select-js modelSelect" name="model">
                             @foreach ($models as $model)
                                 <option value="{{ $model->id }}">{{ $model->title }}</option>

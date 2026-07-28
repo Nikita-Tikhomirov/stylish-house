@@ -38,11 +38,11 @@
                                             <div class="bigProdCard__img-wrap">
                                                 <div class="bigProdCard__imgCustomWrap">
                                                     @isset($product->image_path)
-                                                        <img src="{{ Storage::url($product->image_path) }}" alt="{{ $product->h1 }}" />
+                                                        <img src="{{ Storage::url($product->image_path) }}" alt="{{ $product->h1 }}" loading="lazy" decoding="async" />
                                                     @endisset
 
                                                     @isset($product->fabric_photo)
-                                                        <img src="{{ Storage::url($product->fabric_photo) }}" alt="{{ $product->h1 }}" />
+                                                        <img src="{{ Storage::url($product->fabric_photo) }}" alt="{{ $product->h1 }}" loading="lazy" decoding="async" />
                                                     @endisset
                                                 </div>
 

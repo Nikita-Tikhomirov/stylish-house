@@ -7,9 +7,7 @@
                     <div class="hero__bg">
                         <img src="{{ Storage::url($slide->image_path) }}" alt="" class="hero__bg">
                     </div>
-                    <div class="hero__title">
-                        {{$slide->title}}
-                    </div>
+                    <div class="hero__title">{{ $slide->title }}</div>
                     <div class="hero__text">
                         {{$slide->description}}
                     </div>

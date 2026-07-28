@@ -44,7 +44,7 @@ use Illuminate\Support\Facades\Storage;
 
 Auth::routes();
 Route::get('/sheet-names', [ExcelController::class, 'getProdPrice']);
-Route::get('/sheet-names-test', [ExcelController::class, 'test']);
+Route::get('/sheet-names-test', [ExcelController::class, 'test'])->middleware('role:admin');
 
 
 // Route::get('/sheet-names', [ExcelController::class, 'getProdPrice']);
@@ -61,6 +61,8 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::get('/popup/{id}', [ProductController::class, 'getProdToPopup']);
+
+Route::view('/policy', 'front.privacy-policy')->name('policy');
 
 Route::get('/shop-pages/{slug}', [PageController::class, 'index'])->name('pages.index');
 // Route::get('/admin', [AdminController::class, 'index'])->middleware('role:admin');

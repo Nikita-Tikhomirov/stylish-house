@@ -28,6 +28,7 @@ class OrderController extends Controller
             'phone' => 'required|string|max:20',
             'email' => 'required|email|max:255',
             'comment' => 'nullable|string|max:2000',
+            'privacy_consent' => 'accepted',
         ]);
 
         $cart = $request->session()->get('cart', []);

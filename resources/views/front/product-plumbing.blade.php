@@ -387,9 +387,8 @@
                 <div class="prodForm__calcFormWrap">
                     <div class="prodForm__formSubtitle">{{ $category->titleh1 }}</div>
                     <div class="prodForm__formTitle">{{ $product->h1 }}</div>
-                    <div class="prodForm__description">
-                        <p>{{ $product->first_screenn_description }}...</p><span class="more">Подробнее</span>
-                    </div>
+                    <x-front.read-more :text="$product->first_screenn_description"
+                        :id="'plumbing-product-summary-'.$product->id" />
 
                     <input type="hidden" name="modelSelect" class="modelSelect" value="{{ $product->model_title }}">
 

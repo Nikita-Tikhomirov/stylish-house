@@ -10,11 +10,11 @@
                     @endphp
 
                     @if ($mainImagePath)
-                        <img src="{{ asset($mainImagePath) }}" alt="" />
+                        <img src="{{ asset($mainImagePath) }}" alt="" loading="lazy" decoding="async" />
                     @endif
 
                     @if ($fabricImagePath)
-                        <img src="{{ asset($fabricImagePath) }}" alt="" />
+                        <img src="{{ asset($fabricImagePath) }}" alt="" loading="lazy" decoding="async" />
 
                     @endif
                 </div>

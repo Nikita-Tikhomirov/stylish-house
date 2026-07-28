@@ -7,6 +7,7 @@ use Spatie\Sitemap\Sitemap;
 use Spatie\Sitemap\Tags\Url;
 use App\Models\Product;
 use App\Models\Category;
+use App\Models\Page;
 use App\Models\Subcategory;
 use Carbon\Carbon;
 
@@ -17,36 +18,49 @@ class GenerateSitemap extends Command
 
     public function handle()
     {
+        $today = Carbon::today();
         $sitemap = Sitemap::create()
-            ->add(Url::create(route('front.home'))->setLastModificationDate(Carbon::today()))
-            ->add(Url::create(route('cart.show'))->setLastModificationDate(Carbon::today()));
-            // ->add(Url::create(route('catalog'))->setLastModificationDate(Carbon::today()));
-            // ->add(Url::create(route('contact'))->setLastModificationDate(Carbon::today()));
+            ->add(Url::create(route('front.home'))->setLastModificationDate($today))
+            ->add(Url::create(route('policy'))->setLastModificationDate($today));
 
-            foreach (Category::all() as $category) {
+            foreach (Category::query()->where('show_in_catalog', true)->get() as $category) {
                 $sitemap->add(Url::create(route('category.show', ['slug' => $category->slug]))
-                    ->setLastModificationDate(Carbon::today()));
+                    ->setLastModificationDate($today));
             }
 
-            foreach (Subcategory::all() as $subcategory) {
+            foreach (Subcategory::query()
+                ->where('show_in_catalog', true)
+                ->whereHas('category', fn ($query) => $query->where('show_in_catalog', true))
+                ->with('category:id,slug')
+                ->get() as $subcategory) {
                 $sitemap->add(Url::create(route('subcategory.show', [
                     'category_slug' => $subcategory->category->slug,
                     'subcategory_slug' => $subcategory->slug
-                ]))->setLastModificationDate(Carbon::today()));
+                ]))->setLastModificationDate($today));
             }
 
-            foreach (Product::all() as $product) {
-                if ($product->category && $product->subcategory) {
-                    $sitemap->add(Url::create(route('product.show', [
-                        'category_slug' => $product->category->slug,
-                        'subcategory_slug' => $product->subcategory->slug,
-                        'product_slug' => $product->slug
-                    ]))->setLastModificationDate(Carbon::today()));
-                }
+            foreach (Product::query()
+                ->where('show_in_catalog', true)
+                ->whereHas('category', fn ($query) => $query->where('show_in_catalog', true))
+                ->whereHas('subcategory', fn ($query) => $query->where('show_in_catalog', true))
+                ->with(['category:id,slug', 'subcategory:id,slug'])
+                ->get() as $product) {
+                $sitemap->add(Url::create(route('product.show', [
+                    'category_slug' => $product->category->slug,
+                    'subcategory_slug' => $product->subcategory->slug,
+                    'product_slug' => $product->slug
+                ]))->setLastModificationDate($today));
+            }
+
+            foreach (Page::query()->get() as $page) {
+                $sitemap->add(Url::create(route('pages.index', ['slug' => $page->slug]))
+                    ->setLastModificationDate($page->updated_at ?? $today));
             }
 
         $sitemap->writeToFile(public_path('sitemap.xml'));
 
         $this->info('Карта сайта создана!');
+
+        return self::SUCCESS;
     }
 }

@@ -100,29 +100,9 @@
                     <input style="display: none" type='text' name='user_result_callback'
                         value='http://stylish-house.net/profile/' />
 
-                    <div class="userContacts__inputWrap policyCheck">
-                        <label class="policy-label">
-                            <input type="checkbox" name="policy" required>
-                            <span>Я согласен с <a href="https://stylish-house.net/policy" target="_blank">политикой
-                                    конфиденциальности</a></span>
-                        </label>
-                    </div>
+                    <x-front.consent />
 
                 </form>
-
-                <style>
-                    .policyCheck input {
-                        display: inline-block;
-                        height: fit-content !important;
-                        width: fit-content !important;
-                        margin-right: 8px;
-                    }
-
-                    .policyCheck a {
-                        color: #0989ff;
-                        text-decoration: underline;
-                    }
-                </style>
 
                 <div class="checkoutInfo">
                     <div class="checkoutInfo__title">Ваш заказ </div>

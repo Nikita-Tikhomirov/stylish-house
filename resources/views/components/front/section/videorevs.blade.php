@@ -122,7 +122,7 @@
                             <div class="videoCard__imgWrap">
                                 <div class="videoCard__date">{{$rev->created_at}}</div>
                                 @if ($rev->cover_image)
-                                    <div class="videoCard__img"> <img src="{{ Storage::url($rev->cover_image) }}" alt="{{ $rev->title }}" /></div>
+                                    <div class="videoCard__img"> <img src="{{ Storage::url($rev->cover_image) }}" alt="{{ $rev->title }}" loading="lazy" decoding="async" /></div>
                                 @elseif ($isExternalVideo)
                                     <iframe class="videoCard__video" src="{{ $embedUrl }}" loading="lazy" allow="autoplay; encrypted-media" allowfullscreen></iframe>
                                 @else

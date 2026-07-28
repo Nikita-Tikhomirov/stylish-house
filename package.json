@@ -4,7 +4,7 @@
     "scripts": {
         "dev": "vite",
         "build": "vite build",
-        "test:shop": "node --test tests/js/shop-options.test.mjs"
+        "test:shop": "node --test tests/js/*.test.mjs"
     },
     "devDependencies": {
         "@popperjs/core": "^2.11.6",
