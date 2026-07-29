@@ -54,6 +54,10 @@
                                 </li>
                                 <li class="nav-item">
                                     <a class="nav-link"
+                                        href="{{ route('admin.navigation.edit') }}">Структура меню</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link"
                                         href="{{route('admin.prod_generator.index')}}">Генератор</a>
                                 </li>
                                 <li class="nav-item">
@@ -427,4 +431,3 @@
 <div class="dashboard-wrapper">
     <div class="dashboard-ecommerce">
       <div class="container-fluid dashboard-content ">
-

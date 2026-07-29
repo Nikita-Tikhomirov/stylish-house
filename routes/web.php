@@ -31,6 +31,7 @@ use App\Http\Controllers\SliderController;
 use App\Http\Controllers\ProductGenerator;
 use App\Http\Controllers\MinPriceRunController;
 use App\Http\Controllers\FormController;
+use App\Http\Controllers\NavigationMenuController;
 
 
 use App\Http\Controllers\ColorController;
@@ -72,6 +73,11 @@ Route::middleware(['role:admin'])->group(function () {
 
     // Главная админская панель
     Route::get('/admin', [AdminController::class, 'index']);
+
+    Route::get('/admin/navigation-menu', [NavigationMenuController::class, 'edit'])
+        ->name('admin.navigation.edit');
+    Route::put('/admin/navigation-menu', [NavigationMenuController::class, 'update'])
+        ->name('admin.navigation.update');
 
     // Редактирование главной страницы
     Route::get('/admin/home/edit', [AdminController::class, 'show'])->name('home.edit');
