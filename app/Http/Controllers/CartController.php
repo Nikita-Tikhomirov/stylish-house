@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Services\CartService;
 use Illuminate\Http\Request;
-use App\Models\Category;
 use App\Models\Subcategory;
 use App\Models\Product;
 use App\Models\ProdModel;
@@ -77,32 +76,6 @@ class CartController extends Controller
     public function show(Request $request)
     {
         $cart = $request->session()->get('cart', []); // Извлекаем данные корзины из сессии
-        // Получаем категории, подкатегории и товары, где show_in_catalog = true
-        $categoriesInCatalogMenu = Category::where('show_in_catalog', true)
-            ->with([
-                'subcategories' => function ($query) {
-                    $query->where('show_in_catalog', true)
-                        ->with([
-                            'products' => function ($query) {
-                                $query->where('show_in_catalog', true);
-                            }
-                        ]);
-                }
-            ])
-            ->get();
-
-        $categoriesInHeaderMenu = Category::where('show_in_menu', true)
-            ->with([
-                'subcategories' => function ($query) {
-                    $query->where('show_in_menu', true)
-                        ->with([
-                            'products' => function ($query) {
-                                $query->where('show_in_menu', true);
-                            }
-                        ]);
-                }
-            ])
-            ->get();
         // Собираем уникальные ID товаров
         $productIds = array_column($cart, 'productId');
         $products = Product::whereIn('id', $productIds)->get();
@@ -114,7 +87,7 @@ class CartController extends Controller
 
 
 
-        return view('front.cart', compact('cart', 'categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'products', 'headerInfo', 'curtainSubcats', 'blindSubcats'));
+        return view('front.cart', compact('cart', 'products', 'headerInfo', 'curtainSubcats', 'blindSubcats'));
     }
 
 

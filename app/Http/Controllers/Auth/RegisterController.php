@@ -7,7 +7,6 @@ use App\Models\User;
 use Illuminate\Foundation\Auth\RegistersUsers;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use App\Models\Category;
 use App\Models\ThrouElement;
 use App\Services\CartService;
 use Illuminate\Http\Request;
@@ -79,35 +78,10 @@ class RegisterController extends Controller
 
     public function showRegistrationForm(Request $request)
     {
-        $categoriesInCatalogMenu = Category::where('show_in_catalog', true)
-            ->with([
-                'subcategories' => function ($query) {
-                    $query->where('show_in_catalog', true)
-                        ->with([
-                            'products' => function ($query) {
-                                $query->where('show_in_catalog', true);
-                            }
-                        ]);
-                }
-            ])
-            ->get();
-
-        $categoriesInHeaderMenu = Category::where('show_in_menu', true)
-            ->with([
-                'subcategories' => function ($query) {
-                    $query->where('show_in_menu', true)
-                        ->with([
-                            'products' => function ($query) {
-                                $query->where('show_in_menu', true);
-                            }
-                        ]);
-                }
-            ])
-            ->get();
         $headerInfo = ThrouElement::firstOrFail();
         $cart = $request->session()->get('cart', []);
         $curtainSubcats = Subcategory::whereIn('id', $headerInfo->curtain_subcategories ?? [])->with('category')->get();
         $blindSubcats = Subcategory::whereIn('id', $headerInfo->blind_subcategories ?? [])->with('category')->get();
-        return view('auth.register', compact('categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'headerInfo', 'cart', 'curtainSubcats', 'blindSubcats')); // Возвращаем вид с переменной
+        return view('auth.register', compact('headerInfo', 'cart', 'curtainSubcats', 'blindSubcats')); // Возвращаем вид с переменной
     }
 }

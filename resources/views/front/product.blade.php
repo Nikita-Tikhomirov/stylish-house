@@ -172,7 +172,7 @@
 
 <body class="p-index">
 
-    <x-front.header :categoriesInCatalogMenu="$categoriesInCatalogMenu" :categoriesInHeaderMenu="$categoriesInHeaderMenu" :cart="$cart" :headerInfo="$headerInfo"></x-front.header>
+    <x-front.header :cart="$cart" :headerInfo="$headerInfo"></x-front.header>
 
     <main class="layout">
 

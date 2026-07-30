@@ -2,7 +2,7 @@
 @vite('resources/css/user.css')
 
 <body class="p-cart">
-    <x-front.header :categoriesInCatalogMenu="$categoriesInCatalogMenu" :categoriesInHeaderMenu="$categoriesInHeaderMenu" :headerInfo="$headerInfo" :cart="$cart"></x-front.header>
+    <x-front.header :headerInfo="$headerInfo" :cart="$cart"></x-front.header>
 
     <main class="layout customer-account">
         <section class="wrapper">

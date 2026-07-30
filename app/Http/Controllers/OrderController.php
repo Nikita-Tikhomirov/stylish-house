@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Mail\OrderCreatedMail;
-use App\Models\Category;
 use Illuminate\Http\Request;
 use App\Models\Order;
 use App\Models\User;
@@ -85,32 +84,6 @@ class OrderController extends Controller
             ->with(['category', 'subcategory'])
             ->latest('favorites.created_at')
             ->get();
-
-        $categoriesInCatalogMenu = Category::where('show_in_catalog', true)
-            ->with([
-                'subcategories' => function ($query) {
-                    $query->where('show_in_catalog', true)
-                        ->with([
-                            'products' => function ($query) {
-                                $query->where('show_in_catalog', true);
-                            }
-                        ]);
-                }
-            ])
-            ->get();
-
-        $categoriesInHeaderMenu = Category::where('show_in_menu', true)
-            ->with([
-                'subcategories' => function ($query) {
-                    $query->where('show_in_menu', true)
-                        ->with([
-                            'products' => function ($query) {
-                                $query->where('show_in_menu', true);
-                            }
-                        ]);
-                }
-            ])
-            ->get();
         $headerInfo = ThrouElement::first();
 
 
@@ -120,8 +93,6 @@ class OrderController extends Controller
 
         return view('admin.user', compact(
             'user',
-            'categoriesInCatalogMenu',
-            'categoriesInHeaderMenu',
             'orders',
             'favoriteProducts',
             'cart',

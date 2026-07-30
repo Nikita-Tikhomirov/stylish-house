@@ -1,4 +1,4 @@
-﻿{{-- @include('front.head') --}}
+{{-- @include('front.head') --}}
 <x-front.head title="{{ $product->title }}" description="{{ \App\Support\ProductMetaDescription::make($product->title, $product->description) }}"></x-front.head>
 @vite('resources/css/prod.css')
 
@@ -308,7 +308,7 @@
         };
     @endphp
 
-    <x-front.header :categoriesInCatalogMenu="$categoriesInCatalogMenu" :categoriesInHeaderMenu="$categoriesInHeaderMenu" :cart="$cart" :headerInfo="$headerInfo"></x-front.header>
+    <x-front.header :cart="$cart" :headerInfo="$headerInfo"></x-front.header>
 
     <main class="layout">
 

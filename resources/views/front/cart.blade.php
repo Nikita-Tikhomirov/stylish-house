@@ -17,7 +17,7 @@
         }
     </style>
 
-    <x-front.header :categoriesInCatalogMenu="$categoriesInCatalogMenu" :categoriesInHeaderMenu="$categoriesInHeaderMenu" :cart="$cart" :headerInfo="$headerInfo"></x-front.header>
+    <x-front.header :cart="$cart" :headerInfo="$headerInfo"></x-front.header>
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <main class="layout">

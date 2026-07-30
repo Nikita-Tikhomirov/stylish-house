@@ -83,4 +83,31 @@ class AuditHtmlPerformanceTest extends TestCase
         $this->assertStringContainsString('rel="preconnect" href="https://fonts.googleapis.com"', $head);
         $this->assertStringContainsString('rel="preconnect" href="https://fonts.gstatic.com" crossorigin', $head);
     }
+
+    public function test_legacy_product_menu_queries_are_removed(): void
+    {
+        $header = file_get_contents(__DIR__.'/../../resources/views/components/front/header.blade.php');
+        $this->assertStringNotContainsString('categoriesInCatalogMenu', $header);
+        $this->assertStringNotContainsString('categoriesInHeaderMenu', $header);
+        $this->assertStringNotContainsString('@foreach ($subcategory->products', $header);
+
+        $controllers = [
+            'app/Http/Controllers/CartController.php',
+            'app/Http/Controllers/CheckoutController.php',
+            'app/Http/Controllers/CategoryController.php',
+            'app/Http/Controllers/HomeController.php',
+            'app/Http/Controllers/OrderController.php',
+            'app/Http/Controllers/PageController.php',
+            'app/Http/Controllers/ProductController.php',
+            'app/Http/Controllers/SubcategoryController.php',
+            'app/Http/Controllers/Auth/LoginController.php',
+            'app/Http/Controllers/Auth/RegisterController.php',
+        ];
+
+        foreach ($controllers as $controller) {
+            $source = file_get_contents(__DIR__.'/../../'.$controller);
+            $this->assertStringNotContainsString('categoriesInCatalogMenu', $source, $controller);
+            $this->assertStringNotContainsString('categoriesInHeaderMenu', $source, $controller);
+        }
+    }
 }

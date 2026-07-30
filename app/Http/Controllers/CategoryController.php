@@ -45,33 +45,6 @@ class CategoryController extends Controller
         $homePageFields = HomePage::firstOrFail();
         $iconCards = IconCard::all();
 
-        // Получаем категории, подкатегории и товары, где show_in_catalog = true
-        $categoriesInCatalogMenu = Category::where('show_in_catalog', true)
-            ->with([
-                'subcategories' => function ($query) {
-                    $query->where('show_in_catalog', true)
-                        ->with([
-                            'products' => function ($query) {
-                                $query->where('show_in_catalog', true);
-                            }
-                        ]);
-                }
-            ])
-            ->get();
-
-        $categoriesInHeaderMenu = Category::where('show_in_menu', true)
-            ->with([
-                'subcategories' => function ($query) {
-                    $query->where('show_in_menu', true)
-                        ->with([
-                            'products' => function ($query) {
-                                $query->where('show_in_menu', true);
-                            }
-                        ]);
-                }
-            ])
-            ->get();
-
         $subcatsForSlider = Category::where('slug', $slug)
             ->with(['subcategories.products'])
             ->firstOrFail();
@@ -206,9 +179,9 @@ class CategoryController extends Controller
             ->get();
 
         if ($category->id === 16) {
-            return view('front.categoryrolstavni', compact('category', 'reviews', 'homePageFields', 'iconCards', 'categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'subcatsForSlider', 'subcategoriesWithProducts', 'faqs', 'videoReviews', 'workExamples', 'filterProduts', 'models', 'filterColors', 'cart', 'firstProduct', 'sameModelProducts', 'materials', 'headerInfo', 'curtainSubcats', 'blindSubcats', 'relatedCategories', 'relatedSubcategories', 'maxFilterPrice', 'installationTypes', 'rollerShutterSystems'));
+            return view('front.categoryrolstavni', compact('category', 'reviews', 'homePageFields', 'iconCards', 'subcatsForSlider', 'subcategoriesWithProducts', 'faqs', 'videoReviews', 'workExamples', 'filterProduts', 'models', 'filterColors', 'cart', 'firstProduct', 'sameModelProducts', 'materials', 'headerInfo', 'curtainSubcats', 'blindSubcats', 'relatedCategories', 'relatedSubcategories', 'maxFilterPrice', 'installationTypes', 'rollerShutterSystems'));
         } else {
-            return view('front.category', compact('category', 'reviews', 'homePageFields', 'iconCards', 'categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'subcatsForSlider', 'subcategoriesWithProducts', 'faqs', 'videoReviews', 'workExamples', 'filterProduts', 'models', 'filterColors', 'cart', 'firstProduct', 'sameModelProducts', 'materials', 'headerInfo', 'curtainSubcats', 'blindSubcats', 'relatedCategories', 'relatedSubcategories', 'maxFilterPrice'));
+            return view('front.category', compact('category', 'reviews', 'homePageFields', 'iconCards', 'subcatsForSlider', 'subcategoriesWithProducts', 'faqs', 'videoReviews', 'workExamples', 'filterProduts', 'models', 'filterColors', 'cart', 'firstProduct', 'sameModelProducts', 'materials', 'headerInfo', 'curtainSubcats', 'blindSubcats', 'relatedCategories', 'relatedSubcategories', 'maxFilterPrice'));
         }
         
 

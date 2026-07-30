@@ -20,33 +20,6 @@ class PageController extends Controller
     public function index(Request $request, string $slug, )
     {
         $page = Page::where('slug', $slug)->firstOrFail();
-
-        // Получаем категории, подкатегории и товары, где show_in_catalog = true
-        $categoriesInCatalogMenu = Category::where('show_in_catalog', true)
-            ->with([
-                'subcategories' => function ($query) {
-                    $query->where('show_in_catalog', true)
-                        ->with([
-                            'products' => function ($query) {
-                                $query->where('show_in_catalog', true);
-                            }
-                        ]);
-                }
-            ])
-            ->get();
-
-        $categoriesInHeaderMenu = Category::where('show_in_menu', true)
-            ->with([
-                'subcategories' => function ($query) {
-                    $query->where('show_in_menu', true)
-                        ->with([
-                            'products' => function ($query) {
-                                $query->where('show_in_menu', true);
-                            }
-                        ]);
-                }
-            ])
-            ->get();
         $cart = $request->session()->get('cart', []);
         $headerInfo = ThrouElement::firstOrFail();
         $homePageFields = HomePage::firstOrFail();
@@ -84,8 +57,6 @@ class PageController extends Controller
 
         return view('front.pages', compact(
             'page',
-            'categoriesInCatalogMenu',
-            'categoriesInHeaderMenu',
             'cart',
             'headerInfo',
             'homePageFields',

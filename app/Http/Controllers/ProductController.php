@@ -107,32 +107,6 @@ class ProductController extends Controller
             ->leftJoin('prod_model', 'products.model_id', '=', 'prod_model.id')
             ->select('products.*', 'prod_model.title as model_title')
             ->firstOrFail();
-
-        $categoriesInCatalogMenu = Category::where('show_in_catalog', true)
-            ->with([
-                'subcategories' => function ($query) {
-                    $query->where('show_in_catalog', true)
-                        ->with([
-                            'products' => function ($query) {
-                                $query->where('show_in_catalog', true);
-                            }
-                        ]);
-                }
-            ])
-            ->get();
-
-        $categoriesInHeaderMenu = Category::where('show_in_menu', true)
-            ->with([
-                'subcategories' => function ($query) {
-                    $query->where('show_in_menu', true)
-                        ->with([
-                            'products' => function ($query) {
-                                $query->where('show_in_menu', true);
-                            }
-                        ]);
-                }
-            ])
-            ->get();
             
         $tabs = $product->tabs()
             // ->where('title', '!=', 'Описание')
@@ -194,7 +168,7 @@ class ProductController extends Controller
         // Определяем шаблон в зависимости от категории
         $template = $product->category_id == 16 ? 'front.product-plumbing' : 'front.product';
 
-        return view($template, compact('product', 'categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'tabs', 'relatedProducts', 'altProducts', 'cart', 'sameModelProducts', 'category', 'model', 'headerInfo', 'seamlesProds', 'homePageFields', 'iconCards','curtainSubcats','blindSubcats'));
+        return view($template, compact('product', 'tabs', 'relatedProducts', 'altProducts', 'cart', 'sameModelProducts', 'category', 'model', 'headerInfo', 'seamlesProds', 'homePageFields', 'iconCards','curtainSubcats','blindSubcats'));
     }
 
     /**

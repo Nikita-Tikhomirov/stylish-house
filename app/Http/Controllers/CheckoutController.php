@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Category;
 use App\Models\Subcategory;
 use App\Services\CartService;
 use App\Models\Product;
@@ -25,32 +24,6 @@ class CheckoutController extends Controller
     public function index(Request $request)
     {
         $cart = $request->session()->get('cart', []);
-        // Получаем категории, подкатегории и товары, где show_in_catalog = true
-        $categoriesInCatalogMenu = Category::where('show_in_catalog', true)
-            ->with([
-                'subcategories' => function ($query) {
-                    $query->where('show_in_catalog', true)
-                        ->with([
-                            'products' => function ($query) {
-                                $query->where('show_in_catalog', true);
-                            }
-                        ]);
-                }
-            ])
-            ->get();
-
-        $categoriesInHeaderMenu = Category::where('show_in_menu', true)
-            ->with([
-                'subcategories' => function ($query) {
-                    $query->where('show_in_menu', true)
-                        ->with([
-                            'products' => function ($query) {
-                                $query->where('show_in_menu', true);
-                            }
-                        ]);
-                }
-            ])
-            ->get();
         $productIds = array_map(function ($item) {
             return $item['productId'];
         }, $cart); // Извлекаем productId из всех элементов корзины
@@ -63,7 +36,7 @@ class CheckoutController extends Controller
         // Получение стоимости доставки из сессии
         $deliveryCost = session('delivery_cost', 0); // По умолчанию 0, если не выбрана доставка
 
-        return view('front.checkout', compact('categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'cart', 'products', 'headerInfo', 'curtainSubcats', 'blindSubcats', 'deliveryCost'));
+        return view('front.checkout', compact('cart', 'products', 'headerInfo', 'curtainSubcats', 'blindSubcats', 'deliveryCost'));
     }
 
     /**

@@ -155,33 +155,6 @@ class SubcategoryController extends Controller
             ? $subcategory->id
             : ($subcategory->clone_subcategory_id ?: $subcategory->id);
 
-        // Получаем категории, подкатегории и товары, где show_in_catalog = true
-        $categoriesInCatalogMenu = Category::where('show_in_catalog', true)
-            ->with([
-                'subcategories' => function ($query) {
-                    $query->where('show_in_catalog', true)
-                        ->with([
-                            'products' => function ($query) {
-                                $query->where('show_in_catalog', true);
-                            }
-                        ]);
-                }
-            ])
-            ->get();
-
-        $categoriesInHeaderMenu = Category::where('show_in_menu', true)
-            ->with([
-                'subcategories' => function ($query) {
-                    $query->where('show_in_menu', true)
-                        ->with([
-                            'products' => function ($query) {
-                                $query->where('show_in_menu', true);
-                            }
-                        ]);
-                }
-            ])
-            ->get();
-
         $reviews = Review::all();
         $homePageFields = HomePage::firstOrFail();
         $iconCards = IconCard::all();
@@ -330,7 +303,7 @@ class SubcategoryController extends Controller
         // Resolve front template by subcategory mapping with fallback to default template.
         $frontTemplate = $this->resolveTemplateBySubcategory($subcategory, 'front');
 
-        return view($frontTemplate, compact('subcategory', 'categoriesInCatalogMenu', 'categoriesInHeaderMenu', 'reviews', 'homePageFields', 'iconCards', 'faqs', 'workExamples', 'category', 'videoReviews', 'installationTypes', 'subcategoriesWithProducts', 'filterProduts', 'filterColors', 'models', 'cart', 'firstProduct', 'sameModelProducts', 'materials', 'headerInfo', 'seoCats', 'curtainSubcats', 'blindSubcats','selectedModels', 'maxFilterPrice'));
+        return view($frontTemplate, compact('subcategory', 'reviews', 'homePageFields', 'iconCards', 'faqs', 'workExamples', 'category', 'videoReviews', 'installationTypes', 'subcategoriesWithProducts', 'filterProduts', 'filterColors', 'models', 'cart', 'firstProduct', 'sameModelProducts', 'materials', 'headerInfo', 'seoCats', 'curtainSubcats', 'blindSubcats','selectedModels', 'maxFilterPrice'));
     }
     /**
      * Show the form for editing the specified resource.

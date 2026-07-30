@@ -82,34 +82,6 @@ class HomeController extends Controller
             ->with('category')
             ->get();
 
-
-        // Получаем категории, подкатегории и товары, где show_in_catalog = true
-        $categoriesInCatalogMenu = Category::where('show_in_catalog', true)
-            ->with([
-                'subcategories' => function ($query) {
-                    $query->where('show_in_catalog', true)
-                        ->with([
-                            'products' => function ($query) {
-                                $query->where('show_in_catalog', true);
-                            }
-                        ]);
-                }
-            ])
-            ->get();
-
-        $categoriesInHeaderMenu = Category::where('show_in_menu', true)
-            ->with([
-                'subcategories' => function ($query) {
-                    $query->where('show_in_menu', true)
-                        ->with([
-                            'products' => function ($query) {
-                                $query->where('show_in_menu', true);
-                            }
-                        ]);
-                }
-            ])
-            ->get();
-
         $categories = Category::all();
         $models = ProdModel::all();
 
@@ -133,8 +105,6 @@ class HomeController extends Controller
             'iconCards',
             'faqs',
             'reviews',
-            'categoriesInCatalogMenu',
-            'categoriesInHeaderMenu',
             'sliders',
             'homeActions',
             'homePopulars',

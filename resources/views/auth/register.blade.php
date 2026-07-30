@@ -3,7 +3,7 @@
 
 <body class="p-index">
 
-    <x-front.header :categoriesInCatalogMenu="$categoriesInCatalogMenu" :categoriesInHeaderMenu="$categoriesInHeaderMenu" :headerInfo="$headerInfo" :cart="$cart"></x-front.header>
+    <x-front.header :headerInfo="$headerInfo" :cart="$cart"></x-front.header>
     @vite('resources/css/login.css')
 
 
