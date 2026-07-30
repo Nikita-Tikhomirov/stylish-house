@@ -1,5 +1,5 @@
 ﻿{{-- @include('front.head') --}}
-<x-front.head title="{{ $product->title }}" description="{{ $product->description }}"></x-front.head>
+<x-front.head title="{{ $product->title }}" description="{{ \App\Support\ProductMetaDescription::make($product->title, $product->description) }}"></x-front.head>
 @vite('resources/css/prod.css')
 
 <style>
