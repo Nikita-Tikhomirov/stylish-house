@@ -3,6 +3,7 @@ import {
     collectConfiguration,
 } from './shop-options.js';
 import './header-navigation.js';
+import './lazy-yandex-map.js';
 import '../css/header-navigation.css';
 
 const FAVORITES_KEY = 'stylish-house-favorites';

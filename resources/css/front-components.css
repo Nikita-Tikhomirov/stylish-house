@@ -570,6 +570,25 @@
         height: 500px;
     }
 
+.s-map--pending{
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        background:#f4f7f9;
+        border-top:1px solid #e3e9ee;
+        border-bottom:1px solid #e3e9ee;
+    }
+
+.s-map__placeholder{text-align:center;padding:32px 20px}
+.s-map__address{font-size:20px;font-weight:600;margin-bottom:18px}
+.s-map__load{margin:0 auto}
+.s-map__status{margin-top:14px;color:#55585b}
+
+@media (max-width:575px){
+    .s-map{height:360px}
+    .s-map__address{font-size:18px}
+}
+
 /* Extracted from resources/views/front/home.blade.php */
 .sidebarFilter__label {
             display: -webkit-box;

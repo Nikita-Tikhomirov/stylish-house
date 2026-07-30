@@ -61,4 +61,26 @@ class AuditHtmlPerformanceTest extends TestCase
         $this->assertStringContainsString('.breadcrumbs {', $css);
         $this->assertStringContainsString('overflow-x: auto;', $css);
     }
+
+    public function test_yandex_map_is_loaded_by_the_lazy_frontend_module(): void
+    {
+        $map = file_get_contents(__DIR__.'/../../resources/views/components/front/section/map.blade.php');
+        $shop = file_get_contents(__DIR__.'/../../resources/js/shop.js');
+
+        $this->assertStringContainsString('data-yandex-map', $map);
+        $this->assertStringNotContainsString('api-maps.yandex.ru', $map);
+        $this->assertStringNotContainsString('<script', $map);
+        $this->assertStringContainsString("import './lazy-yandex-map.js';", $shop);
+    }
+
+    public function test_google_fonts_are_connected_once_without_css_imports(): void
+    {
+        $css = file_get_contents(__DIR__.'/../../resources/css/main.css');
+        $head = file_get_contents(__DIR__.'/../../resources/views/components/front/head.blade.php');
+
+        $this->assertStringNotContainsString('@import url', $css);
+        $this->assertSame(1, substr_count($head, 'fonts.googleapis.com/css2'));
+        $this->assertStringContainsString('rel="preconnect" href="https://fonts.googleapis.com"', $head);
+        $this->assertStringContainsString('rel="preconnect" href="https://fonts.gstatic.com" crossorigin', $head);
+    }
 }

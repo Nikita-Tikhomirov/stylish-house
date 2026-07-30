@@ -10,6 +10,10 @@
     <title>{{ $title ?? 'Default Title' }}</title>
     <meta name="description" content="{{ $description ?? 'Default Title' }}" />
 
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&amp;family=Roboto:wght@300;400;500;600;700;900&amp;display=swap" />
+
     @vite('resources/css/main.css')
     @vite('resources/css/front-components.css')
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
@@ -58,4 +62,3 @@
 
 
 </head>
-
