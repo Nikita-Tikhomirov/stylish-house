@@ -155,6 +155,11 @@ class HeaderNavigationSeeder extends Seeder
                     'is_active' => true,
                 ]);
             }
+
+            $section->children()
+                ->where('node_type', 'link')
+                ->whereNotIn('label', array_column($definition['links'], 0))
+                ->delete();
         }
     }
 
@@ -164,10 +169,13 @@ class HeaderNavigationSeeder extends Seeder
             [
                 'label' => 'На пластиковые окна',
                 'links' => [
-                    ['Все модели', '/story/rulonnye-shtory-na-plastikovye-okna'],
                     ['Мини', '/story/rulonnye-shtory-na-plastikovye-okna?model=43'],
-                    ['UNI-1', '/story/rulonnye-shtory-na-plastikovye-okna?model=45'],
-                    ['UNI-2', '/story/rulonnye-shtory-na-plastikovye-okna?model=46'],
+                    ['УНИ-1', '/story/rulonnye-shtory-na-plastikovye-okna?model=45'],
+                    ['УНИ-2', '/story/rulonnye-shtory-na-plastikovye-okna?model=46'],
+                    ['Комбо Мини Нью', '/story/kombo-den-noch-na-plastikovye-okna?model=49'],
+                    ['Комбо УНИ-1 белый', '/story/kombo-den-noch-na-plastikovye-okna?model=50'],
+                    ['Комбо УНИ-2 белый', '/story/kombo-den-noch-na-plastikovye-okna?model=51'],
+                    ['Комбо УНИ-2 ламинированный', '/story/kombo-den-noch-na-plastikovye-okna?model=52'],
                 ],
             ],
             [

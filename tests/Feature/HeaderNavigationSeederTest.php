@@ -89,12 +89,24 @@ class HeaderNavigationSeederTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame(
-            ['Все модели', 'Мини', 'UNI-1', 'UNI-2'],
+            [
+                'Мини',
+                'УНИ-1',
+                'УНИ-2',
+                'Комбо Мини Нью',
+                'Комбо УНИ-1 белый',
+                'Комбо УНИ-2 белый',
+                'Комбо УНИ-2 ламинированный',
+            ],
             $menu->items()->where('parent_id', $plasticSection->id)->orderBy('position')->pluck('label')->all()
         );
         $this->assertSame(
             '/story/rulonnye-shtory-na-plastikovye-okna?model=45',
-            $menu->items()->where('parent_id', $plasticSection->id)->where('label', 'UNI-1')->value('url')
+            $menu->items()->where('parent_id', $plasticSection->id)->where('label', 'УНИ-1')->value('url')
+        );
+        $this->assertSame(
+            '/story/kombo-den-noch-na-plastikovye-okna?model=52',
+            $menu->items()->where('parent_id', $plasticSection->id)->where('label', 'Комбо УНИ-2 ламинированный')->value('url')
         );
         $this->assertContains(
             'Стандарт',
