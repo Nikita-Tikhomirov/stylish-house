@@ -1,6 +1,6 @@
 <div class="s-how wrapper">
-    <div class="s-how__bgWrap"> <img src="img/subscribe-shape-1.png" alt="" /></div>
-    <div class="s-how__bgWrapBottom"><img src="img/subscribe-shape-1.png" alt="" /></div>
+    <div class="s-how__bgWrap"> <img src="{{ asset('/img/subscribe-shape-1.png') }}" alt="" /></div>
+    <div class="s-how__bgWrapBottom"><img src="{{ asset('/img/subscribe-shape-1.png') }}" alt="" /></div>
     <div class="s-how__textWrap">
         <div class="s-how__subtitle">{{ $subtitle }}</div>
         <h2 class="s-how__title">{{ $title }}</h2>

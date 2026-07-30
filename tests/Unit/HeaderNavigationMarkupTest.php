@@ -32,4 +32,15 @@ class HeaderNavigationMarkupTest extends TestCase
         $this->assertStringNotContainsString('categoriesInHeaderMenu', $contents);
         $this->assertStringNotContainsString('@foreach ($subcategory->products', $contents);
     }
+
+    public function test_navigation_panel_is_isolated_from_legacy_hidden_catalog_styles(): void
+    {
+        $path = dirname(__DIR__, 2).'/resources/css/header-navigation.css';
+        $contents = file_get_contents($path);
+
+        $this->assertMatchesRegularExpression(
+            '/\.header-navigation__panel\s*\{[^}]*opacity:\s*1;[^}]*visibility:\s*visible;/s',
+            $contents
+        );
+    }
 }

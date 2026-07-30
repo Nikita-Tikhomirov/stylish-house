@@ -44,7 +44,11 @@
     display: block;
     width: 100%;
     height: 100%;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
     background: transparent;
+    transition: none;
 }
 .header-navigation__panel[hidden] { display: none !important; }
 .header-navigation__backdrop { position: absolute; inset: 0; width: 100%; border: 0; background: rgba(8, 20, 35, .46); }

@@ -84,6 +84,14 @@ class AuditHtmlPerformanceTest extends TestCase
         $this->assertStringContainsString('rel="preconnect" href="https://fonts.gstatic.com" crossorigin', $head);
     }
 
+    public function test_shared_contact_decoration_uses_an_absolute_asset_url(): void
+    {
+        $source = file_get_contents(__DIR__.'/../../resources/views/components/front/section/how.blade.php');
+
+        $this->assertSame(2, substr_count($source, "asset('/img/subscribe-shape-1.png')"));
+        $this->assertStringNotContainsString('src="img/subscribe-shape-1.png"', $source);
+    }
+
     public function test_legacy_product_menu_queries_are_removed(): void
     {
         $header = file_get_contents(__DIR__.'/../../resources/views/components/front/header.blade.php');
