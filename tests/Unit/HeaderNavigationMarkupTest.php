@@ -27,9 +27,9 @@ class HeaderNavigationMarkupTest extends TestCase
         $contents = file_get_contents($path);
 
         $this->assertStringContainsString('<x-front.header-navigation', $contents);
-        $componentPosition = strpos($contents, '<x-front.header-navigation');
-        $disabledLegacyPosition = strpos($contents, '@if (false)', $componentPosition);
-        $this->assertIsInt($disabledLegacyPosition, 'The legacy tree must not be rendered.');
-        $this->assertLessThan($disabledLegacyPosition, $componentPosition);
+        $this->assertStringNotContainsString('@if (false)', $contents);
+        $this->assertStringNotContainsString('categoriesInCatalogMenu', $contents);
+        $this->assertStringNotContainsString('categoriesInHeaderMenu', $contents);
+        $this->assertStringNotContainsString('@foreach ($subcategory->products', $contents);
     }
 }
