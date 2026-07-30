@@ -171,6 +171,33 @@
     grid-gap: 10px;
 }
 
+.prodForm__imgWrap {
+    overflow: hidden;
+}
+
+.prodForm__imgWrap img:nth-child(2) {
+    pointer-events: none;
+}
+
+.prodForm__productLink {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid transparent;
+    transition: border-color 0.2s ease;
+}
+
+.prodForm__productLink:hover,
+.prodForm__productLink:focus-visible {
+    border-color: #0989ff;
+}
+
+.prodForm__productLink img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
 .prodForm .complectTitle {
     margin-bottom: 10px;
     font-size: 20px;

@@ -235,13 +235,19 @@
                                 @php
                                     $sameMainImage = $sameProduct->image_path ?: $sameProduct->image_thumb_path;
                                     $sameFabricImage = $sameProduct->fabric_photo ?: $sameProduct->fabric_thumb_path;
+                                    $sameProductImage = $sameMainImage ?: $sameFabricImage;
                                 @endphp
-                                @if ($sameMainImage)
-                                    <img src="{{ asset($sameMainImage) }}"
-                                        alt="{{ $sameProduct->h1 }}" />
-                                @elseif ($sameFabricImage)
-                                    <img src="{{ asset($sameFabricImage) }}"
-                                        alt="{{ $sameProduct->h1 }}" />
+                                @if ($sameProductImage)
+                                    <a class="prodForm__productLink"
+                                        href="{{ route('product.show', [
+                                            'category_slug' => $product->category->slug,
+                                            'subcategory_slug' => $product->subcategory->slug,
+                                            'product_slug' => $sameProduct->slug,
+                                        ]) }}"
+                                        aria-label="Открыть товар {{ $sameProduct->h1 }}">
+                                        <img src="{{ asset($sameProductImage) }}"
+                                            alt="{{ $sameProduct->h1 }}" />
+                                    </a>
                                 @endif
                             @endforeach
                         </div>
