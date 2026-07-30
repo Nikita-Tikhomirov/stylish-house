@@ -138,6 +138,9 @@
         </div>
     </div>
     <div class="header__mainMenu wrapper mobileMenu">
+        <x-front.header-navigation></x-front.header-navigation>
+
+        @if (false)
         <div class="header__catalogWrap">
             <div class="header__catalogOpenBtn"> <svg data-v-3b9ee29c="data-v-3b9ee29c" width="18"
                     height="14" viewBox="0 0 18 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -251,5 +254,6 @@
 
             </li>
         </ul>
+        @endif
     </div>
 </header>

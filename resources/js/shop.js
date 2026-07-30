@@ -2,6 +2,8 @@ import {
     collectCartOptions,
     collectConfiguration,
 } from './shop-options.js';
+import './header-navigation.js';
+import '../css/header-navigation.css';
 
 const FAVORITES_KEY = 'stylish-house-favorites';
 let currentFavoriteIds = [];

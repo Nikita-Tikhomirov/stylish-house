@@ -1,10 +1,12 @@
 <?php
 namespace App\Providers;
 
+use App\Services\NavigationService;
 use Illuminate\Support\ServiceProvider;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\View;
 class AppServiceProvider extends ServiceProvider
 {
     protected static $spreadsheet; // Загруженный файл
@@ -19,6 +21,10 @@ class AppServiceProvider extends ServiceProvider
         // Загружаем файл и кэшируем данные листов
         // $this->loadExcelFile();
         Paginator::useBootstrap();
+
+        View::composer('components.front.header-navigation', function ($view) {
+            $view->with('navigation', app(NavigationService::class)->header());
+        });
     }
 
     // Метод для загрузки файла и его листов
