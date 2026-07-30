@@ -78,6 +78,33 @@ class HeaderNavigationSeederTest extends TestCase
         $this->assertGreaterThanOrEqual(6, $menu->items()->where('source_type', 'subcategory')->count());
         $this->assertFalse($menu->items()->where('source_type', 'product')->exists());
 
+        $curtainTab = $menu->items()->where('node_type', 'tab')->where('label', 'Шторы')->firstOrFail();
+        $plasticSection = $menu->items()
+            ->where('parent_id', $curtainTab->id)
+            ->where('label', 'На пластиковые окна')
+            ->firstOrFail();
+        $freeHangingSection = $menu->items()
+            ->where('parent_id', $curtainTab->id)
+            ->where('label', 'Свободновисящие')
+            ->firstOrFail();
+
+        $this->assertSame(
+            ['Все модели', 'Мини', 'UNI-1', 'UNI-2'],
+            $menu->items()->where('parent_id', $plasticSection->id)->orderBy('position')->pluck('label')->all()
+        );
+        $this->assertSame(
+            '/story/rulonnye-shtory-na-plastikovye-okna?model=45',
+            $menu->items()->where('parent_id', $plasticSection->id)->where('label', 'UNI-1')->value('url')
+        );
+        $this->assertContains(
+            'Стандарт',
+            $menu->items()->where('parent_id', $freeHangingSection->id)->pluck('label')->all()
+        );
+        $this->assertContains(
+            'Дабл люкс',
+            $menu->items()->where('parent_id', $freeHangingSection->id)->pluck('label')->all()
+        );
+
         $before = NavigationItem::count();
         $seeder->run();
         $this->assertSame($before, NavigationItem::count());

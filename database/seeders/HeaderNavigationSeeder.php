@@ -19,6 +19,8 @@ class HeaderNavigationSeeder extends Seeder
         );
 
         if ($menu->items()->exists()) {
+            $this->syncCurtainModelSections($menu);
+            app(NavigationService::class)->forgetHeader();
             return;
         }
 
@@ -92,7 +94,98 @@ class HeaderNavigationSeeder extends Seeder
             ]);
         }
 
+        $this->syncCurtainModelSections($menu);
         app(NavigationService::class)->forgetHeader();
+    }
+
+    private function syncCurtainModelSections(NavigationMenu $menu): void
+    {
+        $category = Category::query()->where('slug', 'story')->first();
+        if (! $category) {
+            return;
+        }
+
+        $tab = $menu->items()
+            ->where('node_type', 'tab')
+            ->where('source_type', 'category')
+            ->where('source_id', $category->id)
+            ->first();
+        if (! $tab) {
+            return;
+        }
+
+        $definitions = $this->curtainModelSections();
+        $labels = array_column($definitions, 'label');
+        $otherSections = $menu->items()
+            ->where('parent_id', $tab->id)
+            ->where('node_type', 'section')
+            ->whereNotIn('label', $labels)
+            ->orderBy('position')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($otherSections as $position => $section) {
+            $section->update(['position' => $position + count($definitions)]);
+        }
+
+        foreach ($definitions as $sectionPosition => $definition) {
+            $section = NavigationItem::updateOrCreate([
+                'navigation_menu_id' => $menu->id,
+                'parent_id' => $tab->id,
+                'node_type' => 'section',
+                'label' => $definition['label'],
+            ], [
+                'placement' => 'mega',
+                'position' => $sectionPosition,
+                'is_active' => true,
+            ]);
+
+            foreach ($definition['links'] as $linkPosition => [$label, $url]) {
+                NavigationItem::updateOrCreate([
+                    'navigation_menu_id' => $menu->id,
+                    'parent_id' => $section->id,
+                    'node_type' => 'link',
+                    'label' => $label,
+                ], [
+                    'placement' => 'mega',
+                    'source_type' => 'custom',
+                    'source_id' => null,
+                    'url' => $url,
+                    'position' => $linkPosition,
+                    'is_active' => true,
+                ]);
+            }
+        }
+    }
+
+    private function curtainModelSections(): array
+    {
+        return [
+            [
+                'label' => 'На пластиковые окна',
+                'links' => [
+                    ['Все модели', '/story/rulonnye-shtory-na-plastikovye-okna'],
+                    ['Мини', '/story/rulonnye-shtory-na-plastikovye-okna?model=43'],
+                    ['UNI-1', '/story/rulonnye-shtory-na-plastikovye-okna?model=45'],
+                    ['UNI-2', '/story/rulonnye-shtory-na-plastikovye-okna?model=46'],
+                ],
+            ],
+            [
+                'label' => 'Свободновисящие',
+                'links' => [
+                    ['Все рулонные шторы', '/story/rulstori'],
+                    ['Стандарт', '/story/rulstori?model=33'],
+                    ['Гранд', '/story/rulstori?model=35'],
+                    ['Спринг', '/story/rulstori?model=36'],
+                    ['Кватро классик', '/story/rulstori?model=37'],
+                    ['Кватро люкс', '/story/rulstori?model=38'],
+                    ['Классик премиум', '/story/rulstori?model=39'],
+                    ['Дабл классик', '/story/rulstori?model=40'],
+                    ['Люкс премиум', '/story/rulstori?model=41'],
+                    ['Дабл люкс', '/story/rulstori?model=42'],
+                ],
+            ],
+        ];
     }
 
     private function createItem(NavigationMenu $menu, array $attributes): NavigationItem

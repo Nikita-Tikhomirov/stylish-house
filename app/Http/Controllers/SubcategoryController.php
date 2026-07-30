@@ -16,6 +16,7 @@ use App\Models\Product;
 use App\Models\ProdModel;
 use App\Models\SubcategoryInstallationType;
 use App\Services\CartService;
+use App\Support\CatalogModelSelection;
 use App\Support\PreviewCardData;
 use App\Models\Fabric;
 use App\Models\ThrouElement;
@@ -174,6 +175,11 @@ class SubcategoryController extends Controller
         $models = ProdModel::whereHas('products', function ($query) use ($sourceSubcategoryId) {
             $query->where('subcategory_id', $sourceSubcategoryId);
         })->get();
+        $selectedModels = CatalogModelSelection::resolve(
+            $request->query('model'),
+            $models->pluck('id'),
+            $subcategory->model_id_to_filter
+        );
 
         $cart = $request->session()->get('cart', []);
 
@@ -246,11 +252,8 @@ class SubcategoryController extends Controller
             ->when(!empty($subcategory->filter_color), function ($query) use ($subcategory) {
                 $query->where('color', $subcategory->filter_color);
             })
-            ->when(!empty($subcategory->model_id_to_filter), function ($query) use ($subcategory) {
-                $models = json_decode($subcategory->model_id_to_filter, true);
-                if (!empty($models)) {
-                    $query->whereIn('model_id', $models);
-                }
+            ->when($selectedModels !== [], function ($query) use ($selectedModels) {
+                $query->whereIn('model_id', $selectedModels);
             })
             ->leftJoin('prod_model', 'products.model_id', '=', 'prod_model.id')
             ->select('products.*', 'prod_model.title as model_title')
@@ -264,11 +267,8 @@ class SubcategoryController extends Controller
             ->when(!empty($subcategory->filter_color), function ($query) use ($subcategory) {
                 $query->where('color', $subcategory->filter_color);
             })
-            ->when(!empty($subcategory->model_id_to_filter), function ($query) use ($subcategory) {
-                $models = json_decode($subcategory->model_id_to_filter, true);
-                if (!empty($models)) {
-                    $query->whereIn('model_id', $models);
-                }
+            ->when($selectedModels !== [], function ($query) use ($selectedModels) {
+                $query->whereIn('model_id', $selectedModels);
             })
             ->whereNotNull('min_price')
             ->where('min_price', '>', 0)
@@ -298,8 +298,7 @@ class SubcategoryController extends Controller
         $seoCats = Subcategory::whereIn('id', $subcategory->related_subcategory_ids ?? [])->get();
         $curtainSubcats = Subcategory::whereIn('id', $headerInfo->curtain_subcategories ?? [])->with('category')->get();
         $blindSubcats = Subcategory::whereIn('id', $headerInfo->blind_subcategories ?? [])->with('category')->get();
-        $selectedModels = json_decode($subcategory->model_id_to_filter, true) ?? [];
-        
+
         // Resolve front template by subcategory mapping with fallback to default template.
         $frontTemplate = $this->resolveTemplateBySubcategory($subcategory, 'front');
 
