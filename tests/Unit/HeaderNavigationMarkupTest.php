@@ -43,4 +43,23 @@ class HeaderNavigationMarkupTest extends TestCase
             $contents
         );
     }
+
+    public function test_desktop_navigation_resets_legacy_arrow_and_scrolls_long_columns(): void
+    {
+        $path = dirname(__DIR__, 2).'/resources/css/header-navigation.css';
+        $contents = file_get_contents($path);
+
+        $this->assertMatchesRegularExpression(
+            '/\.header-navigation__toggle::after\s*\{[^}]*content:\s*none;/s',
+            $contents
+        );
+        $this->assertMatchesRegularExpression(
+            '/\.header-navigation__desktop\s*\{[^}]*height:\s*calc\([^;]+;[^}]*min-height:\s*0;/s',
+            $contents
+        );
+        $this->assertMatchesRegularExpression(
+            '/\.header-navigation__content\s*\{[^}]*min-height:\s*0;[^}]*overflow-y:\s*auto;/s',
+            $contents
+        );
+    }
 }
