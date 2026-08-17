@@ -50,8 +50,14 @@ class ProductMinPriceCalculator
         }
 
         $sheetData = Cache::get('sheet_' . $modelName);
-        if ($sheetData === null) {
+        if (!is_array($sheetData)) {
             return ['price' => null, 'error' => self::ERROR_SHEET_NOT_FOUND];
+        }
+
+        foreach ($sheetData as $row) {
+            if (!is_array($row)) {
+                return ['price' => null, 'error' => self::ERROR_SHEET_NOT_FOUND];
+            }
         }
 
         $materialPattern = "/^" . preg_quote($material, '/') . "$/ui";
@@ -110,21 +116,11 @@ class ProductMinPriceCalculator
         };
 
         if (in_array($modelName, ['Дерево, бамбук 50 мм АБСОЛЮТ'], true)) {
-            if ($modelId === 69) {
-                $groups = [
-                    [range(301, 305), 13743.4],
-                    [range(306, 310), 14378.2],
-                    [range(201, 206), 12519.4],
-                ];
-            } elseif ($modelId === 71) {
-                $groups = [
-                    [range(31, 44), 12690.5],
-                    [range(51, 63), 12690.5],
-                    [[10, 13, 15, 16, 20, 22, 23, 24], 11241.5],
-                ];
-            } else {
-                $groups = [];
+            $groups = $this->woodTariffGroups($sheetData);
+            if ($groups === null) {
+                return ['price' => null, 'error' => self::ERROR_SHEET_NOT_FOUND];
             }
+
             $price = $calcPrice($groups, $prodTitle, $width, $height, 0.8);
             return $price === null
                 ? ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND]
@@ -132,16 +128,11 @@ class ProductMinPriceCalculator
         }
 
         if (in_array($modelName, ['Дерево, бамбук 25 мм'], true)) {
-            if ($modelId === 68) {
-                $groups = [
-                    [[31, 32, 33, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 52, 53, 56, 58, 59, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71], 10787.5],
-                    [[10, 13, 15, 16, 20, 22, 23, 24], 9879.4],
-                ];
-            } else {
-                $groups = [
-                    [range(201, 206), 11242.9],
-                ];
+            $groups = $this->woodTariffGroups($sheetData);
+            if ($groups === null) {
+                return ['price' => null, 'error' => self::ERROR_SHEET_NOT_FOUND];
             }
+
             $price = $calcPrice($groups, $prodTitle, $width, $height, 0.8);
             return $price === null
                 ? ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND]
@@ -149,41 +140,33 @@ class ProductMinPriceCalculator
         }
 
         if (mb_strtolower(trim($modelName)) === 'горизонтальные алюминиевые') {
-            $groups = [];
-            if ($modelId === 66) {
-                $groups = [
-                    [[100], 1738.8],
-                    [[10, 17, 159, 19, 23, 27, 292, 39, 40, 44, 46, 48, 50, 56, 67, 84, 97, 104, 106, 130, 146, 163, 187, 188, 189, 330, 427, 497, 532, 608, 611, 7016, 730], 1959.6],
-                    [[1, 203, 207, 211, 1042], 2842.8],
-                    [[772081, 772082, 772083, 772085, 772091, 772093, 772095, 772098], 3408.6],
-                ];
-            } elseif ($modelId === 67) {
-                $groups = [
-                    [[100, 130, 23, 52, 56, 7016], 2842.8],
-                ];
-            } elseif ($modelId === 65) {
-                $groups = [
-                    [[21, 23, 48, 56, 79, 90, 100, 187, 7016], 2939.4],
-                    [[772082, 772085, 772091, 772093, 772095, 772098], 4650.6],
-                ];
+            $tariffs = $this->horizontalTariffMap($sheetData);
+            if ($tariffs === null) {
+                return ['price' => null, 'error' => self::ERROR_SHEET_NOT_FOUND];
             }
 
-            $price = $calcPrice($groups, $prodTitle, $width, $height, 1.0);
-            return $price === null
-                ? ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND]
-                : ['price' => $this->finalizePrice((float) $price, $prodTitle), 'error' => null];
+            $tariffKey = $this->horizontalProductTariffKey($prodTitle);
+            if ($tariffKey === null || !array_key_exists($tariffKey, $tariffs)) {
+                return ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND];
+            }
+
+            $area = max(($width / 1000) * ($height / 1000), 1.0);
+
+            return [
+                'price' => $this->finalizePrice($tariffs[$tariffKey] * $area, $prodTitle),
+                'error' => null,
+            ];
         }
 
         if (mb_strtolower(trim($modelName)) === 'вертикальные') {
-            $words = preg_split('/\s+/', trim($prodTitle));
-            $searchNames = array_values(array_filter(array_slice($words ?: [], 0, 2)));
-            if ($searchNames === []) {
+            $titleRemainder = $this->verticalProductTitleRemainder($prodTitle);
+            if ($titleRemainder === '') {
                 return ['price' => null, 'error' => self::ERROR_MISSING_TITLE_PART];
             }
 
             $billableHeight = max($height / 1000, 1.0);
             $area = max(($width / 1000) * $billableHeight, 1.0);
-            $pricePerM2 = $this->findVerticalUnitPrice($sheetData, $searchNames);
+            $pricePerM2 = $this->findVerticalUnitPrice($sheetData, $titleRemainder);
 
             if ($pricePerM2 === null) {
                 return ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND];
@@ -291,11 +274,11 @@ class ProductMinPriceCalculator
         }
 
         preg_match_all('/[-‐‑–—]\s*(\d+)(?!\d)/u', $productTitle, $explicitMatches);
-        $explicitCodes = array_reverse($explicitMatches[1] ?? []);
-        foreach ($explicitCodes as $code) {
-            if (array_key_exists($code, $pricesByCode)) {
-                return $pricesByCode[$code];
-            }
+        $explicitCodes = $explicitMatches[1] ?? [];
+        if ($explicitCodes !== []) {
+            $code = (string) end($explicitCodes);
+
+            return $pricesByCode[$code] ?? null;
         }
 
         preg_match_all('/(?<!\d)(\d+)(?!\d)/u', $productTitle, $numericMatches, PREG_OFFSET_CAPTURE);
@@ -314,16 +297,226 @@ class ProductMinPriceCalculator
     }
 
     /**
-     * @param array<int, string> $searchNames
+     * @return array<int,array{0:array<int,int>,1:float}>|null
      */
-    private function findVerticalUnitPrice(array $sheetData, array $searchNames): ?float
+    private function woodTariffGroups(array $sheetData): ?array
     {
-        $normalizedSearchNames = array_values(array_unique(array_map(
-            fn (string $searchName) => $this->normalizeMaterialName($searchName),
-            $searchNames
-        )));
-        $exactCandidates = [];
-        $prefixCandidates = [];
+        $groups = [];
+        $pricesByCode = [];
+
+        foreach ($sheetData as $row) {
+            $tariffLabel = null;
+            foreach (['A', 'B'] as $labelColumn) {
+                $label = trim((string) ($row[$labelColumn] ?? ''));
+                if ($this->looksLikeWoodTariffLabel($label)) {
+                    $tariffLabel = $label;
+                    break;
+                }
+            }
+
+            if ($tariffLabel === null) {
+                continue;
+            }
+
+            $priceValue = str_replace(',', '.', trim((string) ($row['C'] ?? '')));
+            if ($priceValue === '' || !is_numeric($priceValue)) {
+                return null;
+            }
+
+            $codes = $this->woodCodesFromLabel($tariffLabel);
+            if ($codes === []) {
+                return null;
+            }
+
+            $price = (float) $priceValue;
+            foreach ($codes as $code) {
+                if (isset($pricesByCode[$code]) && abs($pricesByCode[$code] - $price) > 0.00001) {
+                    return null;
+                }
+
+                $pricesByCode[$code] = $price;
+            }
+
+            $groups[] = [$codes, $price];
+        }
+
+        return $groups === [] ? null : $groups;
+    }
+
+    private function looksLikeWoodTariffLabel(string $label): bool
+    {
+        return preg_match('/(?:…|\.{3})/u', $label) === 1
+            || preg_match('/^\s*\d+\s*,/u', $label) === 1;
+    }
+
+    /**
+     * @return array<int,int>
+     */
+    private function woodCodesFromLabel(string $label): array
+    {
+        if (preg_match('/(?:…|\.{3})\s*(.+)$/u', $label, $listMatch)) {
+            $codeList = trim($listMatch[1], " \t\n\r\0\x0B.");
+        } elseif (preg_match('/^\s*\d+(?:\s*,\s*\d+)+\s*$/u', $label)) {
+            $codeList = trim($label);
+        } else {
+            return [];
+        }
+
+        if (!preg_match('/^\d+(?:\s*,\s*\d+)+$/u', $codeList)) {
+            return [];
+        }
+
+        preg_match_all('/(?<!\d)\d+(?!\d)/u', $codeList, $matches);
+
+        return array_values(array_unique(array_map('intval', $matches[0] ?? [])));
+    }
+
+    /**
+     * @return array<string,float>|null
+     */
+    private function horizontalTariffMap(array $sheetData): ?array
+    {
+        $headerFound = false;
+        $currentSize = null;
+        $tariffs = [];
+
+        foreach ($sheetData as $row) {
+            $widthLabel = trim((string) ($row['A'] ?? ''));
+            $codesLabel = trim((string) ($row['B'] ?? ''));
+            $priceValue = str_replace(',', '.', trim((string) ($row['D'] ?? '')));
+
+            if (!$headerFound) {
+                $headerFound = $this->normalizeMaterialName($widthLabel) === 'ширина ламели'
+                    && $this->normalizeMaterialName($codesLabel) === 'цвет'
+                    && str_contains($this->normalizeMaterialName($priceValue), 'цена');
+                continue;
+            }
+
+            if (preg_match('/^(16|25)\s*мм$/ui', $widthLabel, $sizeMatch)) {
+                $currentSize = (int) $sizeMatch[1];
+            } elseif ($widthLabel !== '') {
+                if ($codesLabel !== '' || $priceValue !== '') {
+                    return null;
+                }
+
+                if ($currentSize !== null && $tariffs !== []) {
+                    break;
+                }
+
+                return null;
+            }
+
+            if ($currentSize === null) {
+                if ($codesLabel === '' && $priceValue === '') {
+                    continue;
+                }
+
+                return null;
+            }
+
+            if ($codesLabel === '' && $priceValue === '') {
+                continue;
+            }
+
+            if ($codesLabel === '' || $priceValue === '') {
+                return null;
+            }
+
+            if (!is_numeric($priceValue)) {
+                return null;
+            }
+
+            $parsedCodes = $this->horizontalCodesFromLabel($codesLabel);
+            if ($parsedCodes === null) {
+                return null;
+            }
+
+            foreach ($parsedCodes['codes'] as $code) {
+                $key = $this->horizontalTariffKey($currentSize, $parsedCodes['variant'], $code);
+                $price = (float) $priceValue;
+                if (isset($tariffs[$key]) && abs($tariffs[$key] - $price) > 0.00001) {
+                    return null;
+                }
+
+                $tariffs[$key] = $price;
+            }
+        }
+
+        return $headerFound && $tariffs !== [] ? $tariffs : null;
+    }
+
+    /**
+     * @return array{variant:string,codes:array<int,string>}|null
+     */
+    private function horizontalCodesFromLabel(string $label): ?array
+    {
+        $normalized = $this->normalizeMaterialName($label);
+        $variant = 'standard';
+        if (preg_match('/^перфорированн\p{L}*\s+/u', $normalized)) {
+            $variant = 'perforated';
+            $normalized = preg_replace('/^перфорированн\p{L}*\s+/u', '', $normalized) ?? $normalized;
+        }
+
+        $tokens = preg_split('/\s*,\s*/u', $normalized) ?: [];
+        $codes = [];
+        foreach ($tokens as $token) {
+            $token = trim($token);
+            if (!preg_match('/^\d+(?:[\/_]\d+)?$/', $token)) {
+                return null;
+            }
+
+            $codes[] = str_replace('/', '_', $token);
+        }
+
+        $codes = array_values(array_unique($codes));
+
+        return $codes === [] ? null : ['variant' => $variant, 'codes' => $codes];
+    }
+
+    private function horizontalProductTariffKey(string $productTitle): ?string
+    {
+        $normalized = $this->normalizeMaterialName($productTitle);
+        if (!preg_match('/(?<!\d)(16|25)\s*мм\b/u', $normalized, $sizeMatch)) {
+            return null;
+        }
+        if (!preg_match('/(?<!\d)(?:16|25)[-‐‑–—]\s*(\d+(?:[\/_]\d+)?)(?=\s|$)/u', $normalized, $codeMatch)) {
+            return null;
+        }
+
+        $variant = str_contains($normalized, 'перф') ? 'perforated' : 'standard';
+        $code = str_replace('/', '_', $codeMatch[1]);
+
+        return $this->horizontalTariffKey((int) $sizeMatch[1], $variant, $code);
+    }
+
+    private function horizontalTariffKey(int $size, string $variant, string $code): string
+    {
+        return $size . '|' . $variant . '|' . $code;
+    }
+
+    private function verticalProductTitleRemainder(string $productTitle): string
+    {
+        $remainder = $this->normalizeMaterialName($productTitle);
+        $remainder = preg_replace(
+            '/^(?:тканевые|пластиковые|алюминиевые)(?:\s+|$)/u',
+            '',
+            $remainder
+        ) ?? $remainder;
+
+        if ($remainder === 'металлик') {
+            return 'металлик глянец';
+        }
+
+        return preg_replace(
+            '/^металлик\s+перфорация(?=\s|$)/u',
+            'металлик перфорированный',
+            $remainder
+        ) ?? $remainder;
+    }
+
+    private function findVerticalUnitPrice(array $sheetData, string $titleRemainder): ?float
+    {
+        $candidates = [];
 
         foreach ($sheetData as $row) {
             foreach ($row as $colIndex => $cellValue) {
@@ -339,38 +532,45 @@ class ProductMinPriceCalculator
                     continue;
                 }
 
-                $normalizedCellValue = $this->normalizeMaterialName((string) $cellValue);
-                foreach ($normalizedSearchNames as $normalizedSearchName) {
-                    if ($normalizedCellValue === $normalizedSearchName) {
-                        $exactCandidates[] = (float) $priceValue;
-                        continue 2;
-                    }
+                $normalizedLabel = $this->normalizeMaterialName((string) $cellValue);
+                $normalizedLabel = preg_replace('/\s*\([^)]*\)\s*$/u', '', $normalizedLabel) ?? $normalizedLabel;
+                if ($normalizedLabel === '') {
+                    continue;
+                }
 
-                    if (preg_match('/^' . preg_quote($normalizedSearchName, '/') . '(?:[\s(\/\-]|$)/u', $normalizedCellValue)) {
-                        $prefixCandidates[] = (float) $priceValue;
-                        continue 2;
-                    }
+                if (preg_match('/^' . preg_quote($normalizedLabel, '/') . '(?=\s|$)/u', $titleRemainder)) {
+                    $candidates[] = [
+                        'length' => mb_strlen($normalizedLabel),
+                        'price' => (float) $priceValue,
+                    ];
                 }
             }
         }
 
-        $exactCandidates = array_values(array_unique($exactCandidates, SORT_REGULAR));
-        $prefixCandidates = array_values(array_unique($prefixCandidates, SORT_REGULAR));
-        $candidates = array_values(array_unique(
-            array_merge($exactCandidates, $prefixCandidates),
-            SORT_REGULAR
-        ));
+        if ($candidates === []) {
+            return null;
+        }
 
-        return count($candidates) === 1 ? $candidates[0] : null;
+        $longestLength = max(array_column($candidates, 'length'));
+        $longestPrices = array_column(array_filter(
+            $candidates,
+            static fn (array $candidate) => $candidate['length'] === $longestLength
+        ), 'price');
+        $longestPrices = array_values(array_unique($longestPrices, SORT_REGULAR));
+
+        return count($longestPrices) === 1 ? $longestPrices[0] : null;
     }
 
     private function normalizeMaterialName(string $name): string
     {
         $normalized = mb_strtolower(trim($name));
         $normalized = str_replace('ё', 'е', $normalized);
+        $normalized = preg_replace('/\s*%\s*/u', '% ', $normalized) ?? $normalized;
         $normalized = preg_replace('/\s+/u', ' ', $normalized) ?? $normalized;
+        $normalized = trim($normalized);
+        $normalized = preg_replace('/(?<!\S)трафик(?!\S)/u', 'траффик', $normalized) ?? $normalized;
 
-        return $normalized === 'трафик' ? 'траффик' : $normalized;
+        return $normalized;
     }
 
     private function isSantehRolletsProduct(string $prodTitle, string $modelName): bool
