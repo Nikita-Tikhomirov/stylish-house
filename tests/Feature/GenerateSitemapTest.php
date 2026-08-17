@@ -30,6 +30,16 @@ class GenerateSitemapTest extends TestCase
 
     protected function tearDown(): void
     {
+        Schema::disableForeignKeyConstraints();
+        try {
+            Schema::dropIfExists('products');
+            Schema::dropIfExists('subcategories');
+            Schema::dropIfExists('categories');
+            Schema::dropIfExists('pages');
+        } finally {
+            Schema::enableForeignKeyConstraints();
+        }
+
         app()->usePublicPath($this->originalPublicPath);
 
         $sitemapPath = $this->temporaryPublicPath.DIRECTORY_SEPARATOR.'sitemap.xml';

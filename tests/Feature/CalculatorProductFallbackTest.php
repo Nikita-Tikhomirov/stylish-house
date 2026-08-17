@@ -79,6 +79,63 @@ class CalculatorProductFallbackTest extends TestCase
         $this->assertSame('Visible first', $categoryProduct?->model_title);
     }
 
+    public function test_empty_scopes_return_no_calculator_product(): void
+    {
+        $this->assertNull((new TestableSubcategoryController())->calculatorProduct(null, 7));
+        $this->assertNull((new TestableCategoryController())->calculatorProduct(null, 3));
+    }
+
+    public function test_orphan_only_scopes_return_no_calculator_product(): void
+    {
+        $timestamp = now();
+
+        DB::table('products')->insert([
+            'id' => 15,
+            'category_id' => 3,
+            'subcategory_id' => 7,
+            'model_id' => 999,
+            'title' => 'Orphan model',
+            'show_in_catalog' => '1',
+            'created_at' => $timestamp,
+            'updated_at' => $timestamp,
+        ]);
+
+        $this->assertNull((new TestableSubcategoryController())->calculatorProduct(15, 7));
+        $this->assertNull((new TestableCategoryController())->calculatorProduct(15, 3));
+    }
+
+    public function test_category_and_subcategory_views_guard_the_calculator_when_product_is_null(): void
+    {
+        foreach (['front/category.blade.php', 'front/subcategory.blade.php'] as $view) {
+            $source = file_get_contents(resource_path("views/{$view}"));
+
+            $this->assertIsString($source);
+            $this->assertMatchesRegularExpression(
+                '/@if\s*\(\s*\$firstProduct\s*\)\s*<section class="catCalculator\b.*?<\/section>\s*@endif/s',
+                $source,
+                "The calculator in {$view} must be omitted when no product with a valid model exists.",
+            );
+        }
+    }
+
+    public function test_subcategory_catalog_is_outside_the_nullable_calculator_guard(): void
+    {
+        $source = file_get_contents(resource_path('views/front/subcategory.blade.php'));
+
+        $this->assertIsString($source);
+        $catalogPosition = strpos($source, '<section class="popularsWithFilter wrapper">');
+        $calculatorPosition = strpos($source, '<section class="catCalculator wrapper">');
+        $guardPosition = strpos($source, '@if ($firstProduct)', $catalogPosition ?: 0);
+
+        $this->assertNotFalse($catalogPosition);
+        $this->assertNotFalse($calculatorPosition);
+        $this->assertNotFalse($guardPosition);
+        $this->assertTrue(
+            $catalogPosition < $guardPosition && $guardPosition < $calculatorPosition,
+            'The product catalog must render before the nullable calculator guard.',
+        );
+    }
+
     private function seedCalculatorProducts(): void
     {
         $timestamp = now();

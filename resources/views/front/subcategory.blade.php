@@ -40,10 +40,7 @@
                 </svg></h1>
             <div class="s-catMain__text">{{ $subcategory->first_screen_text }}</div>
         </section>
-        @isset($firstProduct)
-
-
-            <section class="popularsWithFilter wrapper">
+        <section class="popularsWithFilter wrapper">
                 <h2 class="popularsWithFilter__title title"> <span>Популярные товары</span><svg width="114"
                         height="35" viewBox="0 0 114 35" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M112 23.275C1.84952 -10.6834 -7.36586 1.48086 7.50443 32.9053" stroke="currentColor"
@@ -286,7 +283,8 @@
             </section>
 
 
-            <section class="catCalculator wrapper">
+        @if ($firstProduct)
+        <section class="catCalculator wrapper">
                 <h2 class="catCalculator__title title" style="margin-bottom:40px"> <span>Как заказать</span><svg
                         width="114" height="35" viewBox="0 0 114 35" fill="none"
                         xmlns="http://www.w3.org/2000/svg">
@@ -489,8 +487,8 @@
 
 
                 </div>
-            </section>
-        @endisset
+        </section>
+        @endif
         <x-front.section.delivery :title="$homePageFields->section_delivery_title" :topText="$homePageFields->section_delivery_top_text" :bottomText="$homePageFields->section_delivery_bottom_text"
             :iconCards="$iconCards"></x-front.section.delivery>
 

@@ -301,6 +301,7 @@
 
 
 
+        @if ($firstProduct)
         <section class="catCalculator wrapper">
             <h2 style="margin-bottom:40px" class="catCalculator__title title"> <span>Как заказать</span><svg
                     width="114" height="35" viewBox="0 0 114 35" fill="none"
@@ -501,6 +502,7 @@
                 </div>
             </div>
         </section>
+        @endif
 
         <x-front.section.delivery :title="$homePageFields->section_delivery_title" :topText="$homePageFields->section_delivery_top_text" :bottomText="$homePageFields->section_delivery_bottom_text"
             :iconCards="$iconCards"></x-front.section.delivery>

@@ -280,6 +280,46 @@ class ProductMinPriceCalculatorTest extends TestCase
         $this->assertNull($result['error']);
     }
 
+    public function test_vertical_aluminium_blinds_match_a_unique_price_from_the_first_two_title_tokens(): void
+    {
+        $calculator = new ProductMinPriceCalculator();
+        Cache::put('sheet_Вертикальные', [
+            31 => ['A' => 'Алюминиевые 89 мм', 'B' => 3491.40],
+            34 => ['C' => 'Белый глянец', 'D' => 3491.40],
+        ]);
+
+        $result = $calculator->calculate([
+            'model' => 'Вертикальные',
+            'modelId' => 62,
+            'prodTitle' => 'Алюминиевые белый глянец',
+            'width' => 1000,
+            'height' => 1000,
+        ]);
+
+        $this->assertSame(3491, $result['price']);
+        $this->assertNull($result['error']);
+    }
+
+    public function test_vertical_blinds_reject_conflicting_prices_across_title_tokens(): void
+    {
+        $calculator = new ProductMinPriceCalculator();
+        Cache::put('sheet_Вертикальные', [
+            31 => ['A' => 'Алюминиевые 89 мм', 'B' => 3491.40],
+            34 => ['C' => 'Белый глянец', 'D' => 4071.00],
+        ]);
+
+        $result = $calculator->calculate([
+            'model' => 'Вертикальные',
+            'modelId' => 62,
+            'prodTitle' => 'Алюминиевые белый глянец',
+            'width' => 1000,
+            'height' => 1000,
+        ]);
+
+        $this->assertNull($result['price']);
+        $this->assertSame(ProductMinPriceCalculator::ERROR_PRICE_NOT_FOUND, $result['error']);
+    }
+
     public function test_horizontal_aluminium_blinds_charge_at_least_one_square_metre(): void
     {
         $calculator = new ProductMinPriceCalculator();

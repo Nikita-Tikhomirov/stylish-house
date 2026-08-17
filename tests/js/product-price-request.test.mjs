@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 let buildProductPriceRequestUrl;
@@ -32,4 +33,19 @@ test('buildProductPriceRequestUrl includes the model id and product title', () =
     assert.equal(parsedUrl.searchParams.get('modelId'), '66');
     assert.equal(parsedUrl.searchParams.get('prodTitle'), 'Алюминиевые 25 мм 25-100');
     assert.equal(requestUrl.includes('undefined'), false);
+});
+
+test('roller shutter category uses the shared full and popup price request contract', async () => {
+    const template = await readFile(
+        new URL('../../resources/views/front/categoryrolstavni.blade.php', import.meta.url),
+        'utf8',
+    );
+
+    assert.match(
+        template,
+        /function getPrice\([^)]*modelIdFromRequest, prodTitleFromRequest\)/,
+    );
+    assert.match(template, /window\.Shop\.buildProductPriceRequestUrl\(\{/);
+    assert.match(template, /modelId,\s*prodTitle: prodTitleToRequest,/s);
+    assert.match(template, /product\.model_id, product\.title\)/);
 });

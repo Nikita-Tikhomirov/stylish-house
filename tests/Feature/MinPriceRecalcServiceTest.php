@@ -227,6 +227,46 @@ class MinPriceRecalcServiceTest extends TestCase
         $this->assertNull($item->new_min_price);
     }
 
+    public function test_failed_overwrite_preserves_existing_price_when_excel_sheet_is_unavailable(): void
+    {
+        $this->seedBaseData();
+        $staleTimestamp = now()->subDay()->startOfSecond();
+        $product = $this->productRow(1, 1, 10, 100, 'P1', 999);
+        $product['min_price_updated_at'] = $staleTimestamp;
+        Product::query()->insert([$product]);
+
+        $this->app->instance(ProductMinPriceCalculator::class, new class extends ProductMinPriceCalculator {
+            public function calculate(array $payload): array
+            {
+                return ['price' => null, 'error' => self::ERROR_SHEET_NOT_FOUND];
+            }
+        });
+
+        /** @var MinPriceRecalcService $service */
+        $service = $this->app->make(MinPriceRecalcService::class);
+        $run = $service->startRun([
+            'category_id' => 1,
+            'subcategory_id' => 10,
+            'model_ids' => [100],
+            'mode' => PriceRecalcRun::MODE_MANUAL,
+            'skip_filled' => false,
+            'overwrite_existing' => true,
+        ], 25);
+
+        $service->processNextBatch($run);
+
+        $product = Product::query()->findOrFail(1);
+        $this->assertSame(999, $product->min_price);
+        $this->assertTrue($product->min_price_updated_at->equalTo($staleTimestamp));
+        $this->assertSame(ProductMinPriceCalculator::ERROR_SHEET_NOT_FOUND, $product->min_price_error);
+
+        $item = PriceRecalcRunItem::query()->where('run_id', $run->id)->sole();
+        $this->assertSame(PriceRecalcRunItem::STATUS_ERROR, $item->status);
+        $this->assertSame(999, $item->old_min_price);
+        $this->assertNull($item->new_min_price);
+        $this->assertSame(ProductMinPriceCalculator::ERROR_SHEET_NOT_FOUND, $item->error_code);
+    }
+
     public function test_stop_run_marks_status_and_preserves_cursor(): void
     {
         $this->seedBaseData();

@@ -14,7 +14,7 @@ class PrivacyConsentTest extends TestCase
     {
         $this->get('/policy')
             ->assertMovedPermanently()
-            ->assertRedirect('http://localhost/policy/');
+            ->assertRedirect('/policy/');
 
         // Laravel's test URL helper trims trailing slashes, so send this
         // request through the HTTP kernel without normalizing the URI.

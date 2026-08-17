@@ -19,11 +19,36 @@ class TrailingSlashRedirectTest extends TestCase
         $response->assertStatus(Response::HTTP_MOVED_PERMANENTLY);
         $location = $response->headers->get('Location');
 
-        $this->assertSame('http://localhost/policy/', strtok($location, '?'));
+        $this->assertSame('/policy/', strtok($location, '?'));
         parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
         $this->assertCount(2, $query);
         $this->assertSame('audit', $query['utm_source']);
         $this->assertSame('canonical', $query['utm_campaign']);
+    }
+
+    public function test_redirect_preserves_the_raw_query_string_byte_for_byte(): void
+    {
+        $response = $this->runMiddleware(Request::create(
+            '/policy?tag=a&tag=b&encoded=a%2Fb&space=a+b',
+            'GET'
+        ));
+
+        $this->assertSame(Response::HTTP_MOVED_PERMANENTLY, $response->getStatusCode());
+        $this->assertSame(
+            '/policy/?tag=a&tag=b&encoded=a%2Fb&space=a+b',
+            $response->headers->get('Location')
+        );
+    }
+
+    public function test_redirect_location_does_not_reflect_the_request_host(): void
+    {
+        $response = $this->runMiddleware(Request::create(
+            'https://attacker.example/policy?source=host',
+            'GET'
+        ));
+
+        $this->assertSame(Response::HTTP_MOVED_PERMANENTLY, $response->getStatusCode());
+        $this->assertSame('/policy/?source=host', $response->headers->get('Location'));
     }
 
     public function test_head_request_redirects_to_a_trailing_slash(): void
@@ -31,7 +56,7 @@ class TrailingSlashRedirectTest extends TestCase
         $response = $this->runMiddleware(Request::create('/policy?source=head', 'HEAD'));
 
         $this->assertSame(Response::HTTP_MOVED_PERMANENTLY, $response->getStatusCode());
-        $this->assertSame('http://localhost/policy/?source=head', $response->headers->get('Location'));
+        $this->assertSame('/policy/?source=head', $response->headers->get('Location'));
     }
 
     public function test_root_is_left_unchanged(): void
@@ -46,6 +71,22 @@ class TrailingSlashRedirectTest extends TestCase
         $response = $this->runMiddleware(Request::create('/policy/', 'GET'));
 
         $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
+    }
+
+    public function test_repeated_trailing_slashes_redirect_to_one_slash(): void
+    {
+        $response = $this->runMiddleware(Request::create('/policy//?source=duplicate', 'GET'));
+
+        $this->assertSame(Response::HTTP_MOVED_PERMANENTLY, $response->getStatusCode());
+        $this->assertSame('/policy/?source=duplicate', $response->headers->get('Location'));
+    }
+
+    public function test_public_content_slug_ending_in_a_file_extension_is_canonicalized(): void
+    {
+        $response = $this->runMiddleware(Request::create('/shop-pages/catalog.pdf', 'GET'));
+
+        $this->assertSame(Response::HTTP_MOVED_PERMANENTLY, $response->getStatusCode());
+        $this->assertSame('/shop-pages/catalog.pdf/', $response->headers->get('Location'));
     }
 
     #[DataProvider('mutatingMethods')]
@@ -109,7 +150,7 @@ class TrailingSlashRedirectTest extends TestCase
             'image asset' => ['/images/logo.webp'],
             'storage asset' => ['/storage/catalog/image.jpg'],
             'favicon' => ['/favicon.ico'],
-            'manifest' => ['/manifest.json'],
+            'front controller' => ['/index.php'],
         ];
     }
 
@@ -119,7 +160,7 @@ class TrailingSlashRedirectTest extends TestCase
         $response = $this->runMiddleware(Request::create($path, 'GET'));
 
         $this->assertSame(Response::HTTP_MOVED_PERMANENTLY, $response->getStatusCode(), $path);
-        $this->assertSame('http://localhost'.$path.'/', $response->headers->get('Location'));
+        $this->assertSame($path.'/', $response->headers->get('Location'));
     }
 
     public static function publicPathsSharingExcludedPrefixes(): array
@@ -137,7 +178,7 @@ class TrailingSlashRedirectTest extends TestCase
         $response = $this->runMiddleware(Request::create($path, 'GET'));
 
         $this->assertSame(Response::HTTP_MOVED_PERMANENTLY, $response->getStatusCode(), $path);
-        $this->assertSame('http://localhost'.$path.'/', $response->headers->get('Location'));
+        $this->assertSame($path.'/', $response->headers->get('Location'));
     }
 
     public static function representativePublicPaths(): array

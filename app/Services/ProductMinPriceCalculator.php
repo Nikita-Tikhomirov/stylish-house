@@ -176,14 +176,14 @@ class ProductMinPriceCalculator
 
         if (mb_strtolower(trim($modelName)) === 'вертикальные') {
             $words = preg_split('/\s+/', trim($prodTitle));
-            $searchName = $words[1] ?? null;
-            if (!$searchName) {
+            $searchNames = array_values(array_filter(array_slice($words ?: [], 0, 2)));
+            if ($searchNames === []) {
                 return ['price' => null, 'error' => self::ERROR_MISSING_TITLE_PART];
             }
 
             $billableHeight = max($height / 1000, 1.0);
             $area = max(($width / 1000) * $billableHeight, 1.0);
-            $pricePerM2 = $this->findVerticalUnitPrice($sheetData, $searchName);
+            $pricePerM2 = $this->findVerticalUnitPrice($sheetData, $searchNames);
 
             if ($pricePerM2 === null) {
                 return ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND];
@@ -313,9 +313,15 @@ class ProductMinPriceCalculator
         return null;
     }
 
-    private function findVerticalUnitPrice(array $sheetData, string $searchName): ?float
+    /**
+     * @param array<int, string> $searchNames
+     */
+    private function findVerticalUnitPrice(array $sheetData, array $searchNames): ?float
     {
-        $normalizedSearchName = $this->normalizeMaterialName($searchName);
+        $normalizedSearchNames = array_values(array_unique(array_map(
+            fn (string $searchName) => $this->normalizeMaterialName($searchName),
+            $searchNames
+        )));
         $exactCandidates = [];
         $prefixCandidates = [];
 
@@ -334,13 +340,16 @@ class ProductMinPriceCalculator
                 }
 
                 $normalizedCellValue = $this->normalizeMaterialName((string) $cellValue);
-                if ($normalizedCellValue === $normalizedSearchName) {
-                    $exactCandidates[] = (float) $priceValue;
-                    continue;
-                }
+                foreach ($normalizedSearchNames as $normalizedSearchName) {
+                    if ($normalizedCellValue === $normalizedSearchName) {
+                        $exactCandidates[] = (float) $priceValue;
+                        continue 2;
+                    }
 
-                if (preg_match('/^' . preg_quote($normalizedSearchName, '/') . '(?:[\s(\/\-]|$)/u', $normalizedCellValue)) {
-                    $prefixCandidates[] = (float) $priceValue;
+                    if (preg_match('/^' . preg_quote($normalizedSearchName, '/') . '(?:[\s(\/\-]|$)/u', $normalizedCellValue)) {
+                        $prefixCandidates[] = (float) $priceValue;
+                        continue 2;
+                    }
                 }
             }
         }

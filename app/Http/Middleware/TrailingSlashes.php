@@ -4,8 +4,8 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class TrailingSlashes
@@ -39,6 +39,8 @@ class TrailingSlashes
         '/colors',
         '/sitemap.xml',
         '/robots.txt',
+        '/favicon.ico',
+        '/index.php',
         '/.well-known',
         '/build',
         '/assets',
@@ -50,30 +52,6 @@ class TrailingSlashes
         '/media',
         '/storage',
         '/vendor',
-    ];
-
-    private const ASSET_EXTENSIONS = [
-        '.css',
-        '.js',
-        '.mjs',
-        '.map',
-        '.ico',
-        '.png',
-        '.jpg',
-        '.jpeg',
-        '.gif',
-        '.webp',
-        '.avif',
-        '.svg',
-        '.woff',
-        '.woff2',
-        '.ttf',
-        '.eot',
-        '.xml',
-        '.txt',
-        '.json',
-        '.webmanifest',
-        '.pdf',
     ];
 
     /**
@@ -90,7 +68,8 @@ class TrailingSlashes
 
         // Laravel can normalize a routed URI before middleware runs. REQUEST_URI
         // preserves whether the browser already sent the canonical trailing slash.
-        $requestUriPath = parse_url((string) $request->server->get('REQUEST_URI', ''), PHP_URL_PATH);
+        $requestUri = (string) $request->server->get('REQUEST_URI', '');
+        $requestUriPath = parse_url($requestUri, PHP_URL_PATH);
         $path = is_string($requestUriPath) && $requestUriPath !== ''
             ? $requestUriPath
             : $request->getPathInfo();
@@ -100,14 +79,20 @@ class TrailingSlashes
             return $next($request);
         }
 
-        if ($path !== '/' && ! Str::endsWith($path, '/')) {
-            $queryString = $request->getQueryString();
-            $targetUrl = $request->getSchemeAndHttpHost().$path.'/';
-            if ($queryString !== null && $queryString !== '') {
+        $canonicalPath = $path === '/' ? '/' : rtrim($path, '/').'/';
+        if ($path !== $canonicalPath) {
+            $queryString = parse_url($requestUri, PHP_URL_QUERY);
+            if (! is_string($queryString)) {
+                $serverQueryString = $request->server->get('QUERY_STRING');
+                $queryString = is_string($serverQueryString) ? $serverQueryString : '';
+            }
+
+            $targetUrl = $canonicalPath;
+            if ($queryString !== '') {
                 $targetUrl .= '?'.$queryString;
             }
 
-            return Redirect::to($targetUrl, Response::HTTP_MOVED_PERMANENTLY);
+            return new RedirectResponse($targetUrl, Response::HTTP_MOVED_PERMANENTLY);
         }
 
         return $next($request);
@@ -121,6 +106,6 @@ class TrailingSlashes
             }
         }
 
-        return Str::endsWith(Str::lower($path), self::ASSET_EXTENSIONS);
+        return false;
     }
 }

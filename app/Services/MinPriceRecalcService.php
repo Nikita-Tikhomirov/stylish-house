@@ -214,8 +214,10 @@ class MinPriceRecalcService
                 && $run->overwrite_existing
                 && $errorCode !== null
                 && $errorCode !== 'already_filled') {
-                $product->min_price = null;
-                $product->min_price_updated_at = null;
+                if ($errorCode !== ProductMinPriceCalculator::ERROR_SHEET_NOT_FOUND) {
+                    $product->min_price = null;
+                    $product->min_price_updated_at = null;
+                }
                 $product->min_price_error = $errorCode;
                 $product->save();
             }
