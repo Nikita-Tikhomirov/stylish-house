@@ -18,9 +18,18 @@ class MinPriceRecalcServiceTest extends TestCase
     {
         parent::setUp();
 
-        config()->set('database.default', 'sqlite');
-        config()->set('database.connections.sqlite.database', ':memory:');
-        DB::purge('sqlite');
+        if (extension_loaded('pdo_sqlite')) {
+            config()->set('database.default', 'sqlite');
+            config()->set('database.connections.sqlite.database', ':memory:');
+            DB::purge('sqlite');
+        } else {
+            Schema::dropIfExists('price_recalc_run_items');
+            Schema::dropIfExists('price_recalc_runs');
+            Schema::dropIfExists('products');
+            Schema::dropIfExists('prod_model');
+            Schema::dropIfExists('subcategories');
+            Schema::dropIfExists('categories');
+        }
 
         Schema::create('categories', function (Blueprint $table) {
             $table->id();
@@ -129,9 +138,12 @@ class MinPriceRecalcServiceTest extends TestCase
     public function test_process_batch_writes_run_items_and_skips_filled(): void
     {
         $this->seedBaseData();
+        $filledTimestamp = now()->subDay()->startOfSecond();
+        $filledProduct = $this->productRow(2, 1, 10, 100, 'P2', 999);
+        $filledProduct['min_price_updated_at'] = $filledTimestamp;
         Product::query()->insert([
             $this->productRow(1, 1, 10, 100, 'P1', null),
-            $this->productRow(2, 1, 10, 100, 'P2', 999),
+            $filledProduct,
             $this->productRow(3, 1, 10, 100, 'P3', null),
         ]);
 
@@ -171,15 +183,58 @@ class MinPriceRecalcServiceTest extends TestCase
         $this->assertTrue($items->contains('status', PriceRecalcRunItem::STATUS_UPDATED));
         $this->assertTrue($items->contains('status', PriceRecalcRunItem::STATUS_SKIPPED));
         $this->assertTrue($items->contains('status', PriceRecalcRunItem::STATUS_ERROR));
+        $filledProduct = Product::query()->findOrFail(2);
+        $this->assertSame(999, $filledProduct->min_price);
+        $this->assertTrue($filledProduct->min_price_updated_at->equalTo($filledTimestamp));
+    }
+
+    public function test_failed_overwrite_clears_the_existing_min_price_and_timestamp(): void
+    {
+        $this->seedBaseData();
+        $staleTimestamp = now()->subDay()->startOfSecond();
+        $product = $this->productRow(1, 1, 10, 100, 'P1', 999);
+        $product['min_price_updated_at'] = $staleTimestamp;
+        Product::query()->insert([$product]);
+
+        $this->app->instance(ProductMinPriceCalculator::class, new class extends ProductMinPriceCalculator {
+            public function calculate(array $payload): array
+            {
+                return ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND];
+            }
+        });
+
+        /** @var MinPriceRecalcService $service */
+        $service = $this->app->make(MinPriceRecalcService::class);
+        $run = $service->startRun([
+            'category_id' => 1,
+            'subcategory_id' => 10,
+            'model_ids' => [100],
+            'mode' => PriceRecalcRun::MODE_MANUAL,
+            'skip_filled' => false,
+            'overwrite_existing' => true,
+        ], 25);
+
+        $service->processNextBatch($run);
+
+        $product = Product::query()->findOrFail(1);
+        $this->assertNull($product->min_price);
+        $this->assertNull($product->min_price_updated_at);
+        $this->assertSame(ProductMinPriceCalculator::ERROR_PRICE_NOT_FOUND, $product->min_price_error);
+
+        $item = PriceRecalcRunItem::query()->where('run_id', $run->id)->sole();
+        $this->assertSame(PriceRecalcRunItem::STATUS_ERROR, $item->status);
+        $this->assertSame(999, $item->old_min_price);
+        $this->assertNull($item->new_min_price);
     }
 
     public function test_stop_run_marks_status_and_preserves_cursor(): void
     {
         $this->seedBaseData();
-        Product::query()->insert([
-            $this->productRow(1, 1, 10, 100, 'P1', null),
-            $this->productRow(2, 1, 10, 100, 'P2', null),
-        ]);
+        $products = [];
+        for ($id = 1; $id <= 26; $id++) {
+            $products[] = $this->productRow($id, 1, 10, 100, 'P' . $id, null);
+        }
+        Product::query()->insert($products);
 
         $this->app->instance(ProductMinPriceCalculator::class, new class extends ProductMinPriceCalculator {
             public function calculate(array $payload): array
@@ -194,7 +249,7 @@ class MinPriceRecalcServiceTest extends TestCase
             'category_id' => 1,
             'subcategory_id' => 10,
             'model_ids' => [100],
-        ], 1);
+        ], 25);
 
         $service->processNextBatch($run);
         $run->refresh();
@@ -230,6 +285,8 @@ class MinPriceRecalcServiceTest extends TestCase
             'min_width' => 500,
             'min_height' => 500,
             'min_price' => $minPrice,
+            'min_price_updated_at' => null,
+            'min_price_error' => null,
             'created_at' => now(),
             'updated_at' => now(),
         ];

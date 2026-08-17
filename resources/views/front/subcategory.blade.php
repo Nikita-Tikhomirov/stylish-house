@@ -388,6 +388,7 @@
                     </select> --}}
 
                         <input type="hidden" class="modelSelect" value="{{ $firstProduct->model_title }}">
+                        <input type="hidden" class="modelIdInput" value="{{ $firstProduct->model_id }}">
 
                         <input type="hidden" name="cloth" class="cloth" value="{{ $firstProduct->cloth }}">
                         <input type="hidden" class="discount" value="{{ $firstProduct->discount }}">
@@ -736,7 +737,7 @@
                                 setTimeout(() => {
                                     getPrice([prodWrap], product.model, product.cloth,
                                         product.min_width, product.min_height,
-                                        product.model_id)
+                                        product.model_id, product.title)
                                 }, 100);
                             })
                             .catch(error => {
@@ -748,15 +749,15 @@
             }
 
 
-            function getPrice(arr, modelFromRequest, clothRequest, prodWidth, prodHeight, medelId) {
+            function getPrice(arr, modelFromRequest, clothRequest, prodWidth, prodHeight, modelIdFromRequest, prodTitleFromRequest) {
                 arr.forEach(slide => {
                     const widthInput = slide.querySelector('.width-input');
                     const heightInput = slide.querySelector('.height-input');
                     const priceElement = slide.querySelector('.prodForm__price');
                     const modelSelect = slide.querySelector('.modelSelect');
-                    const modelId = medelId;
-                    const prodTitleTorequest = slide.querySelector('.prodForm__formTitle').innerText
-                    console.log(prodTitleTorequest);
+                    const modelId = modelIdFromRequest ?? slide.querySelector('.modelIdInput')?.value ?? '';
+                    const prodTitleToRequest = prodTitleFromRequest ??
+                        slide.querySelector('.prodForm__formTitle')?.innerText.trim() ?? '';
 
                     const controlInput = slide.querySelector('.control') || {
                         checked: false
@@ -813,9 +814,15 @@
                         // Опционально: индикатор загрузки, чтобы не показывало старое значение
                         priceElement.textContent = 'Расчёт...';
 
-                        fetch(
-                                `/sheet-names?width=${width}&height=${height}&model=${model}&control=${control}&cloth=${cloth}&modelId=${modelId}&prodTitle=${prodTitleTorequest}`
-                            )
+                        fetch(window.Shop.buildProductPriceRequestUrl({
+                                width,
+                                height,
+                                model,
+                                control,
+                                cloth,
+                                modelId,
+                                prodTitle: prodTitleToRequest,
+                            }))
                             .then(response => {
                                 if (!response.ok) {
                                     throw new Error(`Price request failed: ${response.status}`);

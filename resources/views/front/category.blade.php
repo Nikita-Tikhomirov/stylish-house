@@ -398,6 +398,7 @@
                         @endforeach
                     </select> --}}
                     <input type="hidden" class="modelSelect" value="{{ $firstProduct->model_title }}">
+                    <input type="hidden" class="modelIdInput" value="{{ $firstProduct->model_id }}">
                     <input type="hidden" class="discount" value="{{ $firstProduct->discount }}">
                     <input type="hidden" name="cloth" class="cloth" value="{{ $firstProduct->cloth }}">
                     {{-- <div class="prodForm__colorPickerWrap">
@@ -615,12 +616,15 @@
 
             }
 
-            function getPrice(arr, modelFromRequest, clothRequest, prodWidth, prodHeight) {
+            function getPrice(arr, modelFromRequest, clothRequest, prodWidth, prodHeight, modelIdFromRequest, prodTitleFromRequest) {
                 arr.forEach(slide => {
                     const widthInput = slide.querySelector('.width-input');
                     const heightInput = slide.querySelector('.height-input');
                     const priceElement = slide.querySelector('.prodForm__price');
                     const modelSelect = slide.querySelector('.modelSelect');
+                    const modelId = modelIdFromRequest ?? slide.querySelector('.modelIdInput')?.value ?? '';
+                    const prodTitleToRequest = prodTitleFromRequest ??
+                        slide.querySelector('.prodForm__formTitle')?.innerText.trim() ?? '';
                     const controlInput = slide.querySelector('.control') || {
                         checked: false
                     };
@@ -674,9 +678,15 @@
                         // Индикатор загрузки
                         priceElement.textContent = 'Расчёт...';
 
-                        fetch(
-                                `/sheet-names?width=${width}&height=${height}&model=${model}&control=${control}&cloth=${cloth}`
-                            )
+                        fetch(window.Shop.buildProductPriceRequestUrl({
+                                width,
+                                height,
+                                model,
+                                control,
+                                cloth,
+                                modelId,
+                                prodTitle: prodTitleToRequest,
+                            }))
                             .then(response => {
                                 if (!response.ok) {
                                     throw new Error(`Price request failed: ${response.status}`);
@@ -874,7 +884,7 @@
                                 setTimeout(() => {
                                     getPrice([prodWrap], product.model, product.cloth,
                                         product.min_width, product.min_height,
-                                        product.model_id)
+                                        product.model_id, product.title)
                                 }, 50);
                             })
                             .catch(error => {

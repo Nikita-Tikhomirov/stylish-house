@@ -2,9 +2,13 @@ import {
     collectCartOptions,
     collectConfiguration,
 } from './shop-options.js';
+import { initModalCloseDelegation } from './modal.js';
+import { buildProductPriceRequestUrl } from './product-price-request.js';
 import './header-navigation.js';
 import './lazy-yandex-map.js';
 import '../css/header-navigation.css';
+
+initModalCloseDelegation(document);
 
 const FAVORITES_KEY = 'stylish-house-favorites';
 let currentFavoriteIds = [];
@@ -113,6 +117,7 @@ const toggleFavorite = async (button) => {
 };
 
 window.Shop = {
+    buildProductPriceRequestUrl,
     collectCartOptions,
     collectConfiguration,
 };

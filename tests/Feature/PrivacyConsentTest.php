@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Contracts\Http\Kernel as HttpKernel;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Mockery;
 use Tests\TestCase;
@@ -11,9 +13,19 @@ class PrivacyConsentTest extends TestCase
     public function test_privacy_policy_is_publicly_available(): void
     {
         $this->get('/policy')
-            ->assertOk()
-            ->assertSee('<h1', false)
-            ->assertSee('Политика конфиденциальности');
+            ->assertMovedPermanently()
+            ->assertRedirect('http://localhost/policy/');
+
+        // Laravel's test URL helper trims trailing slashes, so send this
+        // request through the HTTP kernel without normalizing the URI.
+        $kernel = $this->app->make(HttpKernel::class);
+        $request = Request::create('/policy/', 'GET');
+        $response = $kernel->handle($request);
+        $kernel->terminate($request, $response);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertStringContainsString('<h1', $response->getContent());
+        $this->assertStringContainsString('Политика конфиденциальности', $response->getContent());
     }
 
     public function test_contact_form_rejects_missing_privacy_consent(): void

@@ -107,6 +107,8 @@
                                 <div class="cartPageProd__prodControls">
 
                                     <div class="cartPageProd__settings" data-key="{{ $key }}"
+                                        data-model-id="{{ $product?->model_id ?? '' }}"
+                                        data-prod-title="{{ $product?->h1 ?? ($item['productName'] ?? '') }}"
                                         data-modal="#popupProd"> <i class="fas fa-cog"></i></div>
 
                                     <div class="cartPageProd__remove" data-key="{{ $key }}">
@@ -259,12 +261,15 @@
 
             const buttonsEdit = document.querySelectorAll('.cartPageProd__settings')
 
-            function getPrice(arr, modelFromRequest, clothRequest, prodWidth, prodHeight) {
+            function getPrice(arr, modelFromRequest, clothRequest, prodWidth, prodHeight, modelIdFromRequest, prodTitleFromRequest) {
                 arr.forEach(slide => {
                     const widthInput = slide.querySelector('.width-input');
                     const heightInput = slide.querySelector('.height-input');
                     const priceElement = slide.querySelector('.prodForm__price');
                     const modelSelect = slide.querySelector('.modelSelect');
+                    const modelId = modelIdFromRequest ?? slide.querySelector('.modelIdInput')?.value ?? '';
+                    const prodTitleToRequest = prodTitleFromRequest ??
+                        slide.querySelector('.prodForm__formTitle')?.innerText.trim() ?? '';
                     const controlInput = slide.querySelector('.control') || {
                         checked: false
                     };
@@ -308,9 +313,15 @@
 
                         if (!width || !height) return;
 
-                        fetch(
-                                `/sheet-names?width=${width}&height=${height}&model=${model}&control=${control}&cloth=${cloth}`
-                            )
+                        fetch(window.Shop.buildProductPriceRequestUrl({
+                                width,
+                                height,
+                                model,
+                                control,
+                                cloth,
+                                modelId,
+                                prodTitle: prodTitleToRequest,
+                            }))
                             .then(response => {
                                 if (!response.ok) {
                                     throw new Error(`Price request failed: ${response.status}`);
@@ -489,7 +500,15 @@
                             console.log(discountInput);
 
                             setTimeout(() => {
-                                getPrice([popup], item.model, item.cloth)
+                                getPrice(
+                                    [popup],
+                                    item.model,
+                                    item.cloth,
+                                    item.width,
+                                    item.height,
+                                    element.dataset.modelId,
+                                    element.dataset.prodTitle,
+                                )
                             }, 50);
 
 

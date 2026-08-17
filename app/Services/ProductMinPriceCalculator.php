@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Cache;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
 class ProductMinPriceCalculator
 {
@@ -77,12 +78,17 @@ class ProductMinPriceCalculator
                 foreach ($row as $colIndex => $cellValue) {
                     $cleanedCellValue = trim(preg_replace('/\s+/', ' ', (string) $cellValue));
                     if (preg_match($materialPattern, $cleanedCellValue)) {
+                        if (!is_string($colIndex) || !preg_match('/^[A-Z]+$/i', $colIndex)) {
+                            continue;
+                        }
+
+                        $materialColumnIndex = Coordinate::columnIndexFromString($colIndex);
                         if (in_array($modelName, ['Комбо Уни-1 (белый)', 'Комбо УНИ-2 (белый)', 'Комбо УНИ-2 (лам)'], true)) {
-                            $startCol = chr(ord($colIndex) + 4);
-                            $startCollToHeights = chr(ord($colIndex) + 3);
+                            $startCol = Coordinate::stringFromColumnIndex($materialColumnIndex + 4);
+                            $startCollToHeights = Coordinate::stringFromColumnIndex($materialColumnIndex + 3);
                         } else {
-                            $startCol = chr(ord($colIndex) + 2);
-                            $startCollToHeights = chr(ord($colIndex) + 1);
+                            $startCol = Coordinate::stringFromColumnIndex($materialColumnIndex + 2);
+                            $startCollToHeights = Coordinate::stringFromColumnIndex($materialColumnIndex + 1);
                         }
                         $startRow = $rowIndex + 1;
                         $startRowToHeights = $rowIndex + 2;
@@ -92,32 +98,34 @@ class ProductMinPriceCalculator
             }
         }
 
-        $calcPrice = function (array $groups, string $productTitle, float $w, float $h): ?float {
-            foreach ($groups as [$numbers, $unitPrice]) {
-                foreach ($numbers as $number) {
-                    if (preg_match('/' . preg_quote((string) $number, '/') . '/u', $productTitle)) {
-                        return ($w / 1000) * ($h / 1000) * $unitPrice;
-                    }
-                }
+        $calcPrice = function (array $groups, string $productTitle, float $w, float $h, float $minimumArea): ?float {
+            $unitPrice = $this->findUnitPriceByProductCode($groups, $productTitle);
+            if ($unitPrice === null) {
+                return null;
             }
-            return null;
+
+            $area = max(($w / 1000) * ($h / 1000), $minimumArea);
+
+            return $area * $unitPrice;
         };
 
         if (in_array($modelName, ['Дерево, бамбук 50 мм АБСОЛЮТ'], true)) {
-            if ($modelId === 71) {
+            if ($modelId === 69) {
                 $groups = [
                     [range(301, 305), 13743.4],
                     [range(306, 310), 14378.2],
                     [range(201, 206), 12519.4],
                 ];
-            } else {
+            } elseif ($modelId === 71) {
                 $groups = [
                     [range(31, 44), 12690.5],
                     [range(51, 63), 12690.5],
                     [[10, 13, 15, 16, 20, 22, 23, 24], 11241.5],
                 ];
+            } else {
+                $groups = [];
             }
-            $price = $calcPrice($groups, $prodTitle, $width, $height);
+            $price = $calcPrice($groups, $prodTitle, $width, $height, 0.8);
             return $price === null
                 ? ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND]
                 : ['price' => $this->finalizePrice((float) $price, $prodTitle), 'error' => null];
@@ -126,7 +134,7 @@ class ProductMinPriceCalculator
         if (in_array($modelName, ['Дерево, бамбук 25 мм'], true)) {
             if ($modelId === 68) {
                 $groups = [
-                    [range(25, 71), 10787.5],
+                    [[31, 32, 33, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 52, 53, 56, 58, 59, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71], 10787.5],
                     [[10, 13, 15, 16, 20, 22, 23, 24], 9879.4],
                 ];
             } else {
@@ -134,7 +142,7 @@ class ProductMinPriceCalculator
                     [range(201, 206), 11242.9],
                 ];
             }
-            $price = $calcPrice($groups, $prodTitle, $width, $height);
+            $price = $calcPrice($groups, $prodTitle, $width, $height, 0.8);
             return $price === null
                 ? ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND]
                 : ['price' => $this->finalizePrice((float) $price, $prodTitle), 'error' => null];
@@ -160,7 +168,7 @@ class ProductMinPriceCalculator
                 ];
             }
 
-            $price = $calcPrice($groups, $prodTitle, $width, $height);
+            $price = $calcPrice($groups, $prodTitle, $width, $height, 1.0);
             return $price === null
                 ? ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND]
                 : ['price' => $this->finalizePrice((float) $price, $prodTitle), 'error' => null];
@@ -173,22 +181,9 @@ class ProductMinPriceCalculator
                 return ['price' => null, 'error' => self::ERROR_MISSING_TITLE_PART];
             }
 
-            $searchName = mb_strtolower($searchName);
-            $area = ($width / 1000) * ($height / 1000);
-            $pricePerM2 = null;
-
-            foreach ($sheetData as $row) {
-                foreach ($row as $colIndex => $cellValue) {
-                    if (mb_strtolower(trim((string) $cellValue)) === $searchName) {
-                        $nextColIndex = chr(ord($colIndex) + 1);
-                        $priceVal = $row[$nextColIndex] ?? null;
-                        if ($priceVal !== null) {
-                            $pricePerM2 = (float) str_replace(',', '.', (string) $priceVal);
-                            break 2;
-                        }
-                    }
-                }
-            }
+            $billableHeight = max($height / 1000, 1.0);
+            $area = max(($width / 1000) * $billableHeight, 1.0);
+            $pricePerM2 = $this->findVerticalUnitPrice($sheetData, $searchName);
 
             if ($pricePerM2 === null) {
                 return ['price' => null, 'error' => self::ERROR_PRICE_NOT_FOUND];
@@ -201,15 +196,23 @@ class ProductMinPriceCalculator
             return ['price' => null, 'error' => self::ERROR_MATERIAL_NOT_FOUND];
         }
 
-        $prodWidth = round($width / 1000, 1);
-        $prodHeight = round($height / 1000, 1);
+        $prodWidth = ceil($width / 100) / 10;
+        $prodHeight = ceil($height / 100) / 10;
 
         $rowValues = [];
-        $startColNumeric = ord($startCol) - ord('A');
-        $highestColumnIndex = count($sheetData[$startRow] ?? []) - 1;
+        $startColNumeric = Coordinate::columnIndexFromString($startCol);
+        $highestColumnIndex = 0;
+        foreach (array_keys($sheetData[$startRow] ?? []) as $columnName) {
+            if (is_string($columnName) && preg_match('/^[A-Z]+$/i', $columnName)) {
+                $highestColumnIndex = max(
+                    $highestColumnIndex,
+                    Coordinate::columnIndexFromString($columnName)
+                );
+            }
+        }
 
         for ($col = $startColNumeric; $col <= $highestColumnIndex; $col++) {
-            $colLetter = chr($col + ord('A'));
+            $colLetter = Coordinate::stringFromColumnIndex($col);
             $rowValues[$colLetter] = $sheetData[$startRow][$colLetter] ?? null;
         }
 
@@ -273,6 +276,92 @@ class ProductMinPriceCalculator
     {
         $multiplier = $this->hasDoubleKeyword($prodTitle) ? 2 : 1;
         return (int) round($basePrice) * $multiplier;
+    }
+
+    /**
+     * @param array<int,array{0:array<int,int>,1:float|int}> $groups
+     */
+    private function findUnitPriceByProductCode(array $groups, string $productTitle): ?float
+    {
+        $pricesByCode = [];
+        foreach ($groups as [$numbers, $unitPrice]) {
+            foreach ($numbers as $number) {
+                $pricesByCode[(string) $number] = (float) $unitPrice;
+            }
+        }
+
+        preg_match_all('/[-‐‑–—]\s*(\d+)(?!\d)/u', $productTitle, $explicitMatches);
+        $explicitCodes = array_reverse($explicitMatches[1] ?? []);
+        foreach ($explicitCodes as $code) {
+            if (array_key_exists($code, $pricesByCode)) {
+                return $pricesByCode[$code];
+            }
+        }
+
+        preg_match_all('/(?<!\d)(\d+)(?!\d)/u', $productTitle, $numericMatches, PREG_OFFSET_CAPTURE);
+        $numericTokens = array_reverse($numericMatches[1] ?? []);
+        foreach ($numericTokens as [$code, $offset]) {
+            $suffix = substr($productTitle, $offset + strlen($code));
+            if (preg_match('/^\s*мм\b/ui', $suffix)) {
+                continue;
+            }
+            if (array_key_exists($code, $pricesByCode)) {
+                return $pricesByCode[$code];
+            }
+        }
+
+        return null;
+    }
+
+    private function findVerticalUnitPrice(array $sheetData, string $searchName): ?float
+    {
+        $normalizedSearchName = $this->normalizeMaterialName($searchName);
+        $exactCandidates = [];
+        $prefixCandidates = [];
+
+        foreach ($sheetData as $row) {
+            foreach ($row as $colIndex => $cellValue) {
+                if (!is_string($colIndex) || !preg_match('/^[A-Z]+$/i', $colIndex)) {
+                    continue;
+                }
+
+                $nextColIndex = Coordinate::stringFromColumnIndex(
+                    Coordinate::columnIndexFromString($colIndex) + 1
+                );
+                $priceValue = str_replace(',', '.', trim((string) ($row[$nextColIndex] ?? '')));
+                if ($priceValue === '' || !is_numeric($priceValue)) {
+                    continue;
+                }
+
+                $normalizedCellValue = $this->normalizeMaterialName((string) $cellValue);
+                if ($normalizedCellValue === $normalizedSearchName) {
+                    $exactCandidates[] = (float) $priceValue;
+                    continue;
+                }
+
+                if (preg_match('/^' . preg_quote($normalizedSearchName, '/') . '(?:[\s(\/\-]|$)/u', $normalizedCellValue)) {
+                    $prefixCandidates[] = (float) $priceValue;
+                }
+            }
+        }
+
+        $exactCandidates = array_values(array_unique($exactCandidates, SORT_REGULAR));
+        $prefixCandidates = array_values(array_unique($prefixCandidates, SORT_REGULAR));
+        $candidates = array_values(array_unique(
+            array_merge($exactCandidates, $prefixCandidates),
+            SORT_REGULAR
+        ));
+
+        return count($candidates) === 1 ? $candidates[0] : null;
+    }
+
+    private function normalizeMaterialName(string $name): string
+    {
+        $normalized = mb_strtolower(trim($name));
+        $normalized = str_replace('ё', 'е', $normalized);
+        $normalized = preg_replace('/\s+/u', ' ', $normalized) ?? $normalized;
+
+        return $normalized === 'трафик' ? 'траффик' : $normalized;
     }
 
     private function isSantehRolletsProduct(string $prodTitle, string $modelName): bool

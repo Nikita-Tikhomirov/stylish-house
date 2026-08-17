@@ -47,8 +47,9 @@ class MinPriceRecalcService
             [$startId, $endId] = [$endId, $startId];
         }
 
-        $mode = in_array($params['mode'] ?? PriceRecalcRun::MODE_MANUAL, [PriceRecalcRun::MODE_AUTO, PriceRecalcRun::MODE_MANUAL], true)
-            ? $params['mode']
+        $requestedMode = $params['mode'] ?? PriceRecalcRun::MODE_MANUAL;
+        $mode = in_array($requestedMode, [PriceRecalcRun::MODE_AUTO, PriceRecalcRun::MODE_MANUAL], true)
+            ? $requestedMode
             : PriceRecalcRun::MODE_MANUAL;
 
         $run = PriceRecalcRun::create([
@@ -202,9 +203,21 @@ class MinPriceRecalcService
                 } else {
                     $errorCode = $result['error'] ?? ProductMinPriceCalculator::ERROR_PRICE_NOT_FOUND;
                     $errorMessage = 'Price not found';
-                    $product->min_price_error = $errorCode;
-                    $product->save();
+                    if (!$run->overwrite_existing) {
+                        $product->min_price_error = $errorCode;
+                        $product->save();
+                    }
                 }
+            }
+
+            if ($status !== PriceRecalcRunItem::STATUS_UPDATED
+                && $run->overwrite_existing
+                && $errorCode !== null
+                && $errorCode !== 'already_filled') {
+                $product->min_price = null;
+                $product->min_price_updated_at = null;
+                $product->min_price_error = $errorCode;
+                $product->save();
             }
 
             if ($status !== PriceRecalcRunItem::STATUS_UPDATED) {

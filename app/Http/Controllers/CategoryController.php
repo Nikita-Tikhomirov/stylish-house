@@ -37,6 +37,27 @@ class CategoryController extends Controller
         return PreviewCardData::fromProduct($product);
     }
 
+    protected function resolveCalculatorProduct(?int $configuredProductId, int $categoryId): ?Product
+    {
+        $query = Product::join('prod_model', 'products.model_id', '=', 'prod_model.id')
+            ->select('products.*', 'prod_model.title as model_title', 'prod_model.id as model_id');
+
+        if ($configuredProductId) {
+            $configuredProduct = (clone $query)
+                ->where('products.id', $configuredProductId)
+                ->first();
+
+            if ($configuredProduct) {
+                return $configuredProduct;
+            }
+        }
+
+        return $query->where('products.category_id', $categoryId)
+            ->orderByDesc('products.show_in_catalog')
+            ->orderBy('products.id')
+            ->first();
+    }
+
     public function show(Request $request, string $slug, $subcategorySlug = null)
     {
         $category = Category::where('slug', $slug)->firstOrFail();
@@ -125,13 +146,14 @@ class CategoryController extends Controller
             ->pluck('color');
         $cart = $request->session()->get('cart', []);
 
+        $firstProduct = $this->resolveCalculatorProduct(
+            $category->calc_prod ? (int) $category->calc_prod : null,
+            (int) $category->id
+        );
+        $sameModelProducts = collect();
+
         if ($category->calc_prod) {
             // Если calc_prod заполнен
-            $firstProduct = Product::leftJoin('prod_model', 'products.model_id', '=', 'prod_model.id')
-                ->select('products.*', 'prod_model.title as model_title', 'prod_model.id as model_id')
-                ->where('products.id', $category->calc_prod)
-                ->first();
-
             if ($firstProduct) {
                 $sameModelProducts = Product::where('model_id', $firstProduct->model_id)
                     ->where('id', '!=', $firstProduct->id) // Исключаем первый товар из выборки
@@ -145,8 +167,16 @@ class CategoryController extends Controller
                 $sameModelProducts = Product::inRandomOrder()->limit(4)->get();
             }
         } else {
-            // Если calc_prod не заполнен, получаем случайные товары
-            $sameModelProducts = Product::inRandomOrder()->limit(4)->get();
+            if ($firstProduct) {
+                $sameModelProducts = Product::where('category_id', $category->id)
+                    ->where('model_id', $firstProduct->model_id)
+                    ->where('id', '!=', $firstProduct->id)
+                    ->orderBy('id')
+                    ->limit(3)
+                    ->get();
+
+                $sameModelProducts->prepend($firstProduct);
+            }
         }
 
 

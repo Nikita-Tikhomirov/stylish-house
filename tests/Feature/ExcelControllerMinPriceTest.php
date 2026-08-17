@@ -11,8 +11,8 @@ class ExcelControllerMinPriceTest extends TestCase
     {
         Cache::put('sheet_Дерево, бамбук 25 мм', [['A' => 'stub']]);
 
-        $baseResponse = $this->getJson('/sheet-names?model=' . urlencode('Дерево, бамбук 25 мм') . '&modelId=68&cloth=' . urlencode('1 категория') . '&width=1000&height=1000&prodTitle=' . urlencode('Мини 25'));
-        $doubleResponse = $this->getJson('/sheet-names?model=' . urlencode('Дерево, бамбук 25 мм') . '&modelId=68&cloth=' . urlencode('1 категория') . '&width=1000&height=1000&prodTitle=' . urlencode('Дабл люкс 25'));
+        $baseResponse = $this->getJson('/sheet-names?model=' . urlencode('Дерево, бамбук 25 мм') . '&modelId=68&cloth=' . urlencode('1 категория') . '&width=1000&height=1000&prodTitle=' . urlencode('Мини 31'));
+        $doubleResponse = $this->getJson('/sheet-names?model=' . urlencode('Дерево, бамбук 25 мм') . '&modelId=68&cloth=' . urlencode('1 категория') . '&width=1000&height=1000&prodTitle=' . urlencode('Дабл люкс 31'));
 
         $baseResponse->assertOk();
         $doubleResponse->assertOk();

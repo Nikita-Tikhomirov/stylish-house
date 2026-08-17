@@ -43,6 +43,27 @@ class SubcategoryController extends Controller
         return PreviewCardData::fromProduct($product);
     }
 
+    protected function resolveCalculatorProduct(?int $configuredProductId, int $subcategoryId): ?Product
+    {
+        $query = Product::join('prod_model', 'products.model_id', '=', 'prod_model.id')
+            ->select('products.*', 'prod_model.title as model_title', 'prod_model.id as model_id');
+
+        if ($configuredProductId) {
+            $configuredProduct = (clone $query)
+                ->where('products.id', $configuredProductId)
+                ->first();
+
+            if ($configuredProduct) {
+                return $configuredProduct;
+            }
+        }
+
+        return $query->where('products.subcategory_id', $subcategoryId)
+            ->orderByDesc('products.show_in_catalog')
+            ->orderBy('products.id')
+            ->first();
+    }
+
     protected function resolveTemplateVariant(Subcategory $subcategory): int
     {
         $variant = (int) ($subcategory->template_variant ?? self::TEMPLATE_MIN_VARIANT);
@@ -183,16 +204,14 @@ class SubcategoryController extends Controller
 
         $cart = $request->session()->get('cart', []);
 
-        $firstProduct = null;
+        $firstProduct = $this->resolveCalculatorProduct(
+            $subcategory->calc_prod ? (int) $subcategory->calc_prod : null,
+            (int) $sourceSubcategoryId
+        );
         $sameModelProducts = collect();
 
         if ($subcategory->calc_prod) {
             // Если calc_prod заполнен
-            $firstProduct = Product::leftJoin('prod_model', 'products.model_id', '=', 'prod_model.id')
-                ->select('products.*', 'prod_model.title as model_title', 'prod_model.id as model_id')
-                ->where('products.id', $subcategory->calc_prod)
-                ->first();
-
             if ($firstProduct) {
                 $sameModelProducts = Product::where('subcategory_id', $sourceSubcategoryId)
                     ->where('model_id', $firstProduct->model_id)
@@ -210,11 +229,6 @@ class SubcategoryController extends Controller
                     ->get();
             }
         } else {
-            // Если calc_prod не заполнен, получаем случайный товар из этой подкатегории
-            $firstProduct = Product::where('subcategory_id', $sourceSubcategoryId)
-                ->inRandomOrder()
-                ->first();
-
             if ($firstProduct) {
                 $sameModelProducts = Product::where('subcategory_id', $sourceSubcategoryId)
                     ->where('model_id', $firstProduct->model_id)

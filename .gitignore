@@ -1,9 +1,11 @@
 /.phpunit.cache
+/harness/smoke_report.json
 /node_modules
 /public/build
 /public/hot
 /public/storage
 /storage/*.key
+/storage/framework/views/*.php
 /vendor
 .env
 .env.backup

@@ -329,8 +329,8 @@ Route::post('/cart/update-delivery', [CartController::class, 'updateDelivery'])-
 Route::get('/{category_slug}/{subcategory_slug}/{product_slug}', [ProductController::class, 'show'])->name('product.show');
 
 
-Route::get('/{category_slug}/{subcategory_slug}', [SubcategoryController::class, 'show'])->name('subcategory.show')->middleware('slashes');
-Route::get('/{slug}', [CategoryController::class, 'show'])->name('category.show')->middleware('slashes');
+Route::get('/{category_slug}/{subcategory_slug}', [SubcategoryController::class, 'show'])->name('subcategory.show');
+Route::get('/{slug}', [CategoryController::class, 'show'])->name('category.show');
 
 
 
