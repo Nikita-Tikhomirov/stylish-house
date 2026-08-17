@@ -113,14 +113,20 @@ class AuditContentMarkupTest extends TestCase
         $this->assertStringContainsString('fas fa-eye', $markup);
     }
 
-    public function test_product_popup_does_not_add_a_second_close_button_inside_its_content(): void
+    public function test_product_popup_has_one_isolated_empty_close_button(): void
     {
         $markup = $this->template('components/front/popups.blade.php');
         $componentStyles = file_get_contents(__DIR__.'/../../resources/css/front-components.css');
+        $closeButton = '<button class="prodPopup__close" type="button" data-modal-close aria-label="Закрыть"></button>';
 
-        $this->assertStringNotContainsString('prodPopup__close', $markup);
-        $this->assertStringNotContainsString('.modal:has(#popupProd)', $componentStyles);
-        $this->assertStringNotContainsString('.prodPopup__close', $componentStyles);
+        $this->assertSame(1, substr_count($markup, $closeButton));
+        $this->assertStringNotContainsString('prodPopup__close modal__close', $markup);
+        $this->assertStringNotContainsString('<span', $closeButton);
+        $this->assertStringNotContainsString('&times;', $closeButton);
+        $this->assertStringNotContainsString('<svg', $closeButton);
+        $this->assertStringContainsString('.modal:has(#popupProd) > .modal__container > .modal__close', $componentStyles);
+        $this->assertStringContainsString('#popupProd .prodPopup__close::before', $componentStyles);
+        $this->assertStringContainsString('#popupProd .prodPopup__close::after', $componentStyles);
     }
 
     public function test_home_markup_avoids_known_validator_regressions(): void

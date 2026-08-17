@@ -30,7 +30,7 @@
 - Consumes: modal DOM structure `.modal > .modal__container > popup` and close selector `[data-modal-close], .modal__close`.
 - Produces: `initModalCloseDelegation(documentRef, schedule)`, supporting close-control and direct-overlay clicks while ignoring popup-content clicks.
 
-- [ ] **Step 1: Write failing interaction tests**
+- [x] **Step 1: Write failing interaction tests**
 
 Add literal fake-DOM cases that dispatch:
 
@@ -41,7 +41,7 @@ const contentEvent = { target: popupContent };
 
 Assert that the overlay event removes the modal, restores the popup and scroll state, while the content event produces no fade, removal, scroll change, or prevented event.
 
-- [ ] **Step 2: Run the tests and verify RED**
+- [x] **Step 2: Run the tests and verify RED**
 
 Run:
 
@@ -51,7 +51,7 @@ node --test tests/js/modal.test.mjs
 
 Expected: the new overlay case fails because the current delegated handler only resolves a close control.
 
-- [ ] **Step 3: Implement the minimal delegated routing**
+- [x] **Step 3: Implement the minimal delegated routing**
 
 In `resources/js/modal.js`, resolve the close request with this contract:
 
@@ -67,7 +67,7 @@ if (!modal) {
 
 Reuse the existing fade, popup restoration, modal removal, and scroll restoration path unchanged.
 
-- [ ] **Step 4: Run the focused test and verify GREEN**
+- [x] **Step 4: Run the focused test and verify GREEN**
 
 Run:
 
@@ -90,7 +90,7 @@ Expected: all close-button, overlay, and inside-content cases pass.
 - Consumes: shared `[data-modal-close]` interaction contract from Task 1.
 - Produces: one empty `.prodPopup__close[data-modal-close]` button inside `#popupProd`, with no `.modal__close` class and no child markup.
 
-- [ ] **Step 1: Write the failing markup/style contract test**
+- [x] **Step 1: Write the failing markup/style contract test**
 
 Replace the previous no-inner-button assertion with assertions that require exactly this empty control:
 
@@ -100,7 +100,7 @@ Replace the previous no-inner-button assertion with assertions that require exac
 
 Also assert the popup button does not contain `modal__close`, `<span`, `&times;`, or an SVG.
 
-- [ ] **Step 2: Run the focused PHP test and verify RED**
+- [x] **Step 2: Run the focused PHP test and verify RED**
 
 Run the existing portable PHP executable against:
 
@@ -110,11 +110,11 @@ vendor/bin/phpunit tests/Unit/AuditContentMarkupTest.php --filter product_popup
 
 Expected: failure because the blue inner close control is absent.
 
-- [ ] **Step 3: Add minimal Blade markup**
+- [x] **Step 3: Add minimal Blade markup**
 
 Add the empty button as the first child of `#popupProd`. Do not add `.modal__close`; this prevents collision with the legacy global fixed white-cross styles.
 
-- [ ] **Step 4: Add isolated CSS**
+- [x] **Step 4: Add isolated CSS**
 
 Add:
 
@@ -125,7 +125,7 @@ Add:
 
 Style `.prodPopup__close` as a transparent, absolutely positioned button. Draw the blue X only with `::before` and `::after`, centered with `translate(-50%, -50%) rotate(45deg/-45deg)`. Add the specified desktop/mobile dimensions, darker-blue hover strokes, and a keyboard-only focus outline.
 
-- [ ] **Step 5: Run focused tests and verify GREEN**
+- [x] **Step 5: Run focused tests and verify GREEN**
 
 Run:
 
@@ -150,7 +150,7 @@ Expected: both suites pass.
 - Consumes: completed visual and interaction contract from Tasks 1–2.
 - Produces: tested production assets and an atomic production deployment with rollback files.
 
-- [ ] **Step 1: Run complete relevant automation**
+- [x] **Step 1: Run complete relevant automation**
 
 ```powershell
 npm run test:shop

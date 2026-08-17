@@ -12,7 +12,8 @@ export const initModalCloseDelegation = (
 ) => {
     documentRef.addEventListener('click', (event) => {
         const closeControl = event.target?.closest?.(MODAL_CLOSE_SELECTOR);
-        const modal = closeControl?.closest?.('.modal');
+        const clickedOverlay = event.target?.classList?.contains?.('modal') === true;
+        const modal = clickedOverlay ? event.target : closeControl?.closest?.('.modal');
 
         if (!modal) {
             return;

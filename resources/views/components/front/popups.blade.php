@@ -98,6 +98,7 @@
 </div>
 
 <div class="formWrapper prodPopup" id="popupProd">
+    <button class="prodPopup__close" type="button" data-modal-close aria-label="Закрыть"></button>
     <div class="prodForm">
 
         {{-- <div class="prodForm__galleryWrap">
