@@ -113,14 +113,14 @@ class AuditContentMarkupTest extends TestCase
         $this->assertStringContainsString('fas fa-eye', $markup);
     }
 
-    public function test_product_popup_has_an_accessible_inset_close_button(): void
+    public function test_product_popup_does_not_add_a_second_close_button_inside_its_content(): void
     {
         $markup = $this->template('components/front/popups.blade.php');
+        $componentStyles = file_get_contents(__DIR__.'/../../resources/css/front-components.css');
 
-        $this->assertMatchesRegularExpression(
-            '/<div class="formWrapper prodPopup" id="popupProd">\s*<button[^>]*class="modal__close prodPopup__close"[^>]*aria-label="Закрыть"/s',
-            $markup
-        );
+        $this->assertStringNotContainsString('prodPopup__close', $markup);
+        $this->assertStringNotContainsString('.modal:has(#popupProd)', $componentStyles);
+        $this->assertStringNotContainsString('.prodPopup__close', $componentStyles);
     }
 
     public function test_home_markup_avoids_known_validator_regressions(): void
