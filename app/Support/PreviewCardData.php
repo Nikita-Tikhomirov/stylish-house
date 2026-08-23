@@ -14,6 +14,8 @@ class PreviewCardData
     public static function fromProduct(Product $product, array $extra = []): array
     {
         $model = self::resolveProductModel($product);
+        $categorySlug = $product->category?->slug;
+        $subcategorySlug = $product->subcategory?->slug;
 
         return array_merge([
             'id' => $product->id,
@@ -26,8 +28,24 @@ class PreviewCardData
                 'titleh1' => $product->category?->titleh1,
             ],
             'subcategory' => [
-                'slug' => $product->subcategory?->slug,
+                'slug' => $subcategorySlug,
             ],
+            'category_url' => $categorySlug
+                ? CanonicalUrl::route('category.show', ['slug' => $categorySlug])
+                : null,
+            'subcategory_url' => $categorySlug && $subcategorySlug
+                ? CanonicalUrl::route('subcategory.show', [
+                    'category_slug' => $categorySlug,
+                    'subcategory_slug' => $subcategorySlug,
+                ])
+                : null,
+            'product_url' => $categorySlug && $subcategorySlug && $product->slug
+                ? CanonicalUrl::route('product.show', [
+                    'category_slug' => $categorySlug,
+                    'subcategory_slug' => $subcategorySlug,
+                    'product_slug' => $product->slug,
+                ])
+                : null,
             'price' => $product->price,
             'old_price' => $product->old_price,
             'discount' => $product->discount !== null ? (int) $product->discount : null,

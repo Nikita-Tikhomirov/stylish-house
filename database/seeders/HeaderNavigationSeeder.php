@@ -169,28 +169,28 @@ class HeaderNavigationSeeder extends Seeder
             [
                 'label' => 'На пластиковые окна',
                 'links' => [
-                    ['Мини', '/story/rulonnye-shtory-na-plastikovye-okna?model=43'],
-                    ['УНИ-1', '/story/rulonnye-shtory-na-plastikovye-okna?model=45'],
-                    ['УНИ-2', '/story/rulonnye-shtory-na-plastikovye-okna?model=46'],
-                    ['Комбо Мини Нью', '/story/kombo-den-noch-na-plastikovye-okna?model=49'],
-                    ['Комбо УНИ-1 белый', '/story/kombo-den-noch-na-plastikovye-okna?model=50'],
-                    ['Комбо УНИ-2 белый', '/story/kombo-den-noch-na-plastikovye-okna?model=51'],
-                    ['Комбо УНИ-2 ламинированный', '/story/kombo-den-noch-na-plastikovye-okna?model=52'],
+                    ['Мини', '/story/rulonnye-shtory-na-plastikovye-okna/?model=43'],
+                    ['УНИ-1', '/story/rulonnye-shtory-na-plastikovye-okna/?model=45'],
+                    ['УНИ-2', '/story/rulonnye-shtory-na-plastikovye-okna/?model=46'],
+                    ['Комбо Мини Нью', '/story/kombo-den-noch-na-plastikovye-okna/?model=49'],
+                    ['Комбо УНИ-1 белый', '/story/kombo-den-noch-na-plastikovye-okna/?model=50'],
+                    ['Комбо УНИ-2 белый', '/story/kombo-den-noch-na-plastikovye-okna/?model=51'],
+                    ['Комбо УНИ-2 ламинированный', '/story/kombo-den-noch-na-plastikovye-okna/?model=52'],
                 ],
             ],
             [
                 'label' => 'Свободновисящие',
                 'links' => [
-                    ['Все рулонные шторы', '/story/rulstori'],
-                    ['Стандарт', '/story/rulstori?model=33'],
-                    ['Гранд', '/story/rulstori?model=35'],
-                    ['Спринг', '/story/rulstori?model=36'],
-                    ['Кватро классик', '/story/rulstori?model=37'],
-                    ['Кватро люкс', '/story/rulstori?model=38'],
-                    ['Классик премиум', '/story/rulstori?model=39'],
-                    ['Дабл классик', '/story/rulstori?model=40'],
-                    ['Люкс премиум', '/story/rulstori?model=41'],
-                    ['Дабл люкс', '/story/rulstori?model=42'],
+                    ['Все рулонные шторы', '/story/rulstori/'],
+                    ['Стандарт', '/story/rulstori/?model=33'],
+                    ['Гранд', '/story/rulstori/?model=35'],
+                    ['Спринг', '/story/rulstori/?model=36'],
+                    ['Кватро классик', '/story/rulstori/?model=37'],
+                    ['Кватро люкс', '/story/rulstori/?model=38'],
+                    ['Классик премиум', '/story/rulstori/?model=39'],
+                    ['Дабл классик', '/story/rulstori/?model=40'],
+                    ['Люкс премиум', '/story/rulstori/?model=41'],
+                    ['Дабл люкс', '/story/rulstori/?model=42'],
                 ],
             ],
         ];
@@ -209,10 +209,10 @@ class HeaderNavigationSeeder extends Seeder
     private function utilityLinks(): array
     {
         return [
-            ['Рассчитать стоимость', '/shop-pages/rasschitat'],
-            ['Портфолио', '/shop-pages/portfolio'],
-            ['Оплата и доставка', '/shop-pages/oplata-i-dostavka'],
-            ['Контакты', '/shop-pages/kontakty'],
+            ['Рассчитать стоимость', '/shop-pages/rasschitat/'],
+            ['Портфолио', '/shop-pages/portfolio/'],
+            ['Оплата и доставка', '/shop-pages/oplata-i-dostavka/'],
+            ['Контакты', '/shop-pages/kontakty/'],
         ];
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\CanonicalUrl;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -62,8 +63,8 @@ class NavigationItem extends Model
             'category' => $this->categoryUrl(),
             'subcategory' => $this->subcategoryUrl(),
             'page' => $this->pageUrl(),
-            'custom' => $this->url ?: '#',
-            default => $this->url ?: '#',
+            'custom' => CanonicalUrl::to($this->url ?: '#'),
+            default => CanonicalUrl::to($this->url ?: '#'),
         };
     }
 
@@ -71,7 +72,7 @@ class NavigationItem extends Model
     {
         $category = $this->categorySource;
 
-        return $category ? route('category.show', ['slug' => $category->slug], false) : '#';
+        return $category ? CanonicalUrl::route('category.show', ['slug' => $category->slug], false) : '#';
     }
 
     private function subcategoryUrl(): string
@@ -83,7 +84,7 @@ class NavigationItem extends Model
             return '#';
         }
 
-        return route('subcategory.show', [
+        return CanonicalUrl::route('subcategory.show', [
             'category_slug' => $category->slug,
             'subcategory_slug' => $subcategory->slug,
         ], false);
@@ -93,6 +94,6 @@ class NavigationItem extends Model
     {
         $page = $this->pageSource;
 
-        return $page ? route('pages.index', ['slug' => $page->slug], false) : '#';
+        return $page ? CanonicalUrl::route('pages.index', ['slug' => $page->slug], false) : '#';
     }
 }

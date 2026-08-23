@@ -29,7 +29,7 @@
                                             fill="currentColor"></path>
                                     </svg></span><span>{{ $slide->description_end }}</span></div>
                             <a class="s-main__button"
-                                href="{{ route('product.show', ['category_slug' => $slide->product->category->slug, 'subcategory_slug' => $slide->product->subcategory->slug, 'product_slug' => $slide->product->slug]) }}/">
+                                href="{{ \App\Support\CanonicalUrl::route('product.show', ['category_slug' => $slide->product->category->slug, 'subcategory_slug' => $slide->product->subcategory->slug, 'product_slug' => $slide->product->slug]) }}">
                                 <span>Подробнее</span><i class="fas fa-arrow-right"></i></a>
                         </div>
                         <div class="prodForm calculator">
@@ -43,7 +43,7 @@
                                     <div class="prodForm__bar">
                                         @foreach ($slide->product->relatedProducts ?? [] as $relatedProduct)
                                         <a style="margin-bottom: 5px;display: block;"
-                                            href="{{ route('product.show', ['category_slug' => $relatedProduct->category->slug, 'subcategory_slug' => $relatedProduct->subcategory->slug, 'product_slug' => $relatedProduct->slug]) }}/">
+                                            href="{{ \App\Support\CanonicalUrl::route('product.show', ['category_slug' => $relatedProduct->category->slug, 'subcategory_slug' => $relatedProduct->subcategory->slug, 'product_slug' => $relatedProduct->slug]) }}">
                                             <img src="{{ Storage::url($relatedProduct->image_path) }}"
                                                 alt="{{ $relatedProduct->title }}" />
                                         </a>
@@ -657,8 +657,8 @@ tabs.forEach(tab => {
                                                 </div>
                                                     </div>
                                                     <div class="bigProdCard__info">
-                                                        <a class="bigProdCard__category" href="${categorySlug ? '/' + categorySlug : '#'}">${product.category ? product.category.titleh1 : 'Без категории'}</a>
-                                                        <a class="bigProdCard__title" href="${productSlug ? '/' + categorySlug + '/' + subcategorySlug + '/' + productSlug : '#'}">${product.h1}</a>
+                                                        <a class="bigProdCard__category" href="${product.category_url || '#'}">${product.category ? product.category.titleh1 : 'Без категории'}</a>
+                                                        <a class="bigProdCard__title" href="${product.product_url || '#'}">${product.h1}</a>
                         ${buildCardMinDimensions(product)}
                                                         <div class="bigProdCard__priceWrap">
                                                                              ${renderStaticCardPrice(product)}

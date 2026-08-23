@@ -13,7 +13,7 @@
             <div class="breadcrumbs">
                 <ul class="breadcrumbs__list">
                     <li class="breadcrumbs__item"><a class="breadcrumbs__link"
-                            href="{{ route('front.home') }}">Главная</a></li>
+                            href="{{ \App\Support\CanonicalUrl::route('front.home') }}">Главная</a></li>
                     <li class="breadcrumbs__item"><svg class="breadcrumbs__arrow" width="5" height="9"
                             viewBox="0 0 5 9" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path fill="#000"
@@ -155,7 +155,7 @@
                                     <li>
                                         <label class="filterSubcat" for="subcatid{{ $subcategory->id }}">
                                             <a
-                                                href="{{ route('subcategory.show', ['category_slug' => $subcatsForSlider->slug, 'subcategory_slug' => $subcategory->slug]) }}">{{ $subcategory->titleh1 }}</a>
+                                                href="{{ \App\Support\CanonicalUrl::route('subcategory.show', ['category_slug' => $subcatsForSlider->slug, 'subcategory_slug' => $subcategory->slug]) }}">{{ $subcategory->titleh1 }}</a>
 
                                             <input type="checkbox" name="subcatid" id="subcatid{{ $subcategory->id }}"
                                                 style="display: none">
@@ -540,12 +540,12 @@
                     <div class="accardion__title">Все категории</div>
                     <div class="accardion__content">
                         @foreach ($relatedCategories as $relatedCategory)
-                            <a href="{{ route('category.show', ['slug' => $relatedCategory->slug]) }}"
+                            <a href="{{ \App\Support\CanonicalUrl::route('category.show', ['slug' => $relatedCategory->slug]) }}"
                                 class="s-tags__tag">
                                 {{ $relatedCategory->titleh1 ?? $relatedCategory->title }}
                             </a>
                             @foreach ($relatedSubcategories as $relatedSubcategory)
-                                <a href="{{ route('subcategory.show', ['category_slug' => $relatedSubcategory->category->slug, 'subcategory_slug' => $relatedSubcategory->slug]) }}"
+                                <a href="{{ \App\Support\CanonicalUrl::route('subcategory.show', ['category_slug' => $relatedSubcategory->category->slug, 'subcategory_slug' => $relatedSubcategory->slug]) }}"
                                     class="s-tags__tag">
                                     {{ $relatedSubcategory->titleh1 ?? $relatedSubcategory->title }}
                                 </a>
@@ -1002,13 +1002,6 @@ function fetchProducts(url) {
                     .then(data => {
                         let productsContainer = document.querySelector('.popularsWithFilter__cards');
                         productsContainer.innerHTML = data.products.map(product => {
-                            let subcategoryPath = product.subcategory ? '/' + product.subcategory.slug :
-                                '';
-                            let productUrl = (product?.slug && product?.category?.slug && product
-                                    ?.subcategory?.slug) ?
-                                '/' + product.category.slug + '/' + product.subcategory.slug + '/' +
-                                product.slug :
-                                '#';
                             let mainImage = product.image_thumb_path || product.image_path;
                             let fabricImage = product.fabric_thumb_path || product.fabric_photo;
                             let normalizeImagePath = (path) => {
@@ -1042,8 +1035,8 @@ function fetchProducts(url) {
                         </div>
                     </div>
                     <div class="bigProdCard__info">
-                        <a class="bigProdCard__category" href="${product.category ? '/' + product.category.slug : '#'}">${product.category ? product.category.titleh1 : 'Без категории'}</a>
-                        <a class="bigProdCard__title" href="${productUrl}">${product.h1}</a>
+                        <a class="bigProdCard__category" href="${product.category_url || '#'}">${product.category ? product.category.titleh1 : 'Без категории'}</a>
+                        <a class="bigProdCard__title" href="${product.product_url || '#'}">${product.h1}</a>
                         ${buildCardMinDimensions(product)}
                         <div class="bigProdCard__priceWrap">
                             ${renderStaticCardPrice(product)}

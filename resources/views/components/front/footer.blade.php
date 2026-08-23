@@ -91,7 +91,7 @@
                         <ul>
                             @foreach ($curtainSubcats as $subcat)
                             <li>
-                                <a href="{{ route('subcategory.show', [$subcat->category->slug, $subcat->slug]) }}">
+                                <a href="{{ \App\Support\CanonicalUrl::route('subcategory.show', [$subcat->category->slug, $subcat->slug]) }}">
                                     {{ $subcat->titleh1 }}
                                 </a>
                             </li>
@@ -104,7 +104,7 @@
                         <ul>
                         @foreach ($blindSubcats as $subcat)
                             <li>
-                                <a href="{{ route('subcategory.show', [$subcat->category->slug, $subcat->slug]) }}">
+                                <a href="{{ \App\Support\CanonicalUrl::route('subcategory.show', [$subcat->category->slug, $subcat->slug]) }}">
                                     {{ $subcat->titleh1 }}
                                 </a>
                             </li>

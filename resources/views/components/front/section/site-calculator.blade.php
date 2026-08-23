@@ -4,6 +4,7 @@
             'id' => $category->id,
             'title' => $category->titleh1,
             'slug' => $category->slug,
+            'url' => \App\Support\CanonicalUrl::route('category.show', ['slug' => $category->slug]),
             'base' => [
                 'jaluzi' => 2500,
                 'story' => 2200,
@@ -17,7 +18,7 @@
             'subcategories' => $category->subcategories->map(fn ($subcategory) => [
                 'title' => $subcategory->titleh1,
                 'slug' => $subcategory->slug,
-                'url' => route('subcategory.show', [
+                'url' => \App\Support\CanonicalUrl::route('subcategory.show', [
                     'category_slug' => $category->slug,
                     'subcategory_slug' => $subcategory->slug,
                 ]),
@@ -137,7 +138,7 @@
 
             priceNode.textContent = `от ${formatPrice(price)}`;
             noteNode.textContent = `Расчет ориентировочный: ${activeCategory.title}, ${width} x ${height} мм, ${qty} шт. Точная стоимость зависит от материала, комплектации и замера.`;
-            linkNode.href = subcategorySelect.value || `/${activeCategory.slug}`;
+            linkNode.href = subcategorySelect.value || activeCategory.url;
         }
 
         tabs.addEventListener('click', function (event) {

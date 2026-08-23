@@ -146,13 +146,13 @@ class NavigationServiceTest extends TestCase
         $payload = app(NavigationService::class)->header();
 
         $this->assertSame('Жалюзи', $payload['tabs'][0]['label']);
-        $this->assertSame('/jaluzi', $payload['tabs'][0]['url']);
+        $this->assertSame('/jaluzi/', $payload['tabs'][0]['url']);
         $this->assertSame('Горизонтальные', $payload['tabs'][0]['sections'][0]['links'][0]['label']);
-        $this->assertSame('/jaluzi/gorizontalnye-zhalyuzi', $payload['tabs'][0]['sections'][0]['links'][0]['url']);
-        $this->assertSame('/shop-pages/kontakty', $payload['tabs'][0]['sections'][0]['links'][1]['url']);
+        $this->assertSame('/jaluzi/gorizontalnye-zhalyuzi/', $payload['tabs'][0]['sections'][0]['links'][0]['url']);
+        $this->assertSame('/shop-pages/kontakty/', $payload['tabs'][0]['sections'][0]['links'][1]['url']);
         $this->assertCount(2, $payload['tabs'][0]['sections'][0]['links']);
-        $this->assertSame('/jaluzi', $payload['quickLinks'][0]['url']);
-        $this->assertSame('/shop-pages/zamer', $payload['utilityLinks'][0]['url']);
+        $this->assertSame('/jaluzi/', $payload['quickLinks'][0]['url']);
+        $this->assertSame('/shop-pages/zamer/', $payload['utilityLinks'][0]['url']);
     }
 
     public function test_header_payload_is_reused_until_cache_is_forgotten(): void

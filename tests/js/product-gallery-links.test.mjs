@@ -13,7 +13,7 @@ for (const template of templates) {
         const gallery = source.match(/<div class="prodForm__bar">([\s\S]*?)<\/div>/)?.[1] ?? '';
 
         assert.match(gallery, /class="prodForm__productLink"/);
-        assert.match(gallery, /href="\{\{ route\('product\.show'/);
+        assert.match(gallery, /href="\{\{ \\App\\Support\\CanonicalUrl::route\('product\.show'/);
         assert.match(gallery, /aria-label="Открыть товар \{\{ \$sameProduct->h1 \}\}"/);
         assert.match(gallery, /<a[\s\S]*?<img[\s\S]*?<\/a>/);
     });

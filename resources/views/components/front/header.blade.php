@@ -1,11 +1,11 @@
 <noscript><img src="https://mc.yandex.ru/watch/100111431" style="position:absolute; left:-9999px;" alt="" /></noscript>
 <header class="header">
     <ul class="header__topMenu wrapper">
-        <li> <a href="/shop-pages/uslugi">Услуги </a></li>
-        <li> <a href="/shop-pages/rasschitat">Рассчитать </a></li>
-        <li> <a href="/shop-pages/portfolio">Портфолио </a></li>
-        <li> <a href="/shop-pages/oplata-i-dostavka">Оплата и Доставка </a></li>
-        <li> <a href="/shop-pages/kontakty">Контакты</a></li>
+        <li> <a href="/shop-pages/uslugi/">Услуги </a></li>
+        <li> <a href="/shop-pages/rasschitat/">Рассчитать </a></li>
+        <li> <a href="/shop-pages/portfolio/">Портфолио </a></li>
+        <li> <a href="/shop-pages/oplata-i-dostavka/">Оплата и Доставка </a></li>
+        <li> <a href="/shop-pages/kontakty/">Контакты</a></li>
     </ul>
     <div class="header__bottomMenu wrapper">
         <a class="header__logo" href="/">

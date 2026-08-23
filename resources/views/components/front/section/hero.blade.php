@@ -11,7 +11,7 @@
                     <div class="hero__text">
                         {{$slide->description}}
                     </div>
-                    <a href="{{$slide->link}}" class="hero__link btn"> <span>Подробнее</span><i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+                    <a href="{{ \App\Support\CanonicalUrl::to($slide->link) }}" class="hero__link btn"> <span>Подробнее</span><i class="fas fa-arrow-right" aria-hidden="true"></i></a>
                 </div>
             @endforeach
 

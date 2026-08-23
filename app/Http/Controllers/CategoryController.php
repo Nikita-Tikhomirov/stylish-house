@@ -16,6 +16,7 @@ use App\Models\ThrouElement;
 
 use App\Services\CartService;
 use App\Support\PreviewCardData;
+use App\Support\CanonicalUrl;
 
 
 
@@ -117,11 +118,11 @@ class CategoryController extends Controller
                 ->get();
         }
 
-        $filterProduts = Product::where('category_id', $category->id)
+        $filterProduts = CanonicalUrl::paginator(Product::where('category_id', $category->id)
             ->leftJoin('prod_model', 'products.model_id', '=', 'prod_model.id')
             ->select('products.*', 'prod_model.title as model_title')
             ->with(['category', 'subcategory'])
-            ->paginate(12);
+            ->paginate(12));
 
         $maxFilterPrice = (int) Product::where('category_id', $category->id)
             ->whereNotNull('min_price')
@@ -401,6 +402,7 @@ class CategoryController extends Controller
 
     public function filterProducts(Request $request, $id)
     {
+        $category = Category::findOrFail($id);
         $subcategories = $request->input('subcategories', []);
         $models = $request->input('models', []);
         $colors = $request->input('colors', []);
@@ -409,7 +411,7 @@ class CategoryController extends Controller
         $priceFilter = $this->normalizePriceFilter($request);
 
         $query = Product::with(['category', 'subcategory', 'model'])
-            ->where('category_id', $id);
+            ->where('category_id', $category->id);
 
         if (!empty($subcategories)) {
             $query->whereIn('subcategory_id', $subcategories);
@@ -429,7 +431,10 @@ class CategoryController extends Controller
 
         $this->applyMinPriceFilter($query, $priceFilter);
 
-        $products = $query->paginate(12, ['*'], 'page', $page);
+        $products = CanonicalUrl::paginator(
+            $query->paginate(12, ['*'], 'page', $page),
+            CanonicalUrl::route('category.show', ['slug' => $category->slug], false)
+        );
 
         $productsData = $products->getCollection()->map(fn (Product $product) => $this->serializePreviewProduct($product));
 

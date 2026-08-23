@@ -2,58 +2,14 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\CanonicalUrl;
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class TrailingSlashes
 {
-    private const EXCLUDED_PATHS = [
-        '/admin',
-        '/api',
-        '/_ignition',
-        '/login',
-        '/logout',
-        '/register',
-        '/password',
-        '/email',
-        '/sanctum',
-        '/cart',
-        '/checkout',
-        '/profile',
-        '/favorites',
-        '/sheet-names',
-        '/sheet-names-test',
-        '/popup',
-        '/products',
-        '/filter-cat-products',
-        '/filter-subcat-products',
-        '/category',
-        '/categories',
-        '/pages',
-        '/allpages',
-        '/header-info',
-        '/get-model-image',
-        '/colors',
-        '/sitemap.xml',
-        '/robots.txt',
-        '/favicon.ico',
-        '/index.php',
-        '/.well-known',
-        '/build',
-        '/assets',
-        '/css',
-        '/js',
-        '/images',
-        '/img',
-        '/fonts',
-        '/media',
-        '/storage',
-        '/vendor',
-    ];
-
     /**
      * Handle an incoming request.
      *
@@ -74,12 +30,7 @@ class TrailingSlashes
             ? $requestUriPath
             : $request->getPathInfo();
 
-        // Админку, API, служебные маршруты и статические файлы не переписываем.
-        if ($this->isExcludedPath($path)) {
-            return $next($request);
-        }
-
-        $canonicalPath = $path === '/' ? '/' : rtrim($path, '/').'/';
+        $canonicalPath = CanonicalUrl::path($path);
         if ($path !== $canonicalPath) {
             $queryString = parse_url($requestUri, PHP_URL_QUERY);
             if (! is_string($queryString)) {
@@ -96,16 +47,5 @@ class TrailingSlashes
         }
 
         return $next($request);
-    }
-
-    private function isExcludedPath(string $path): bool
-    {
-        foreach (self::EXCLUDED_PATHS as $excludedPath) {
-            if ($path === $excludedPath || Str::startsWith($path, $excludedPath.'/')) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

@@ -26,6 +26,10 @@ class PrivacyConsentTest extends TestCase
         $this->assertSame(200, $response->getStatusCode());
         $this->assertStringContainsString('<h1', $response->getContent());
         $this->assertStringContainsString('Политика конфиденциальности', $response->getContent());
+        $this->assertStringContainsString(
+            '<link rel="canonical" href="http://localhost/policy/"',
+            $response->getContent()
+        );
     }
 
     public function test_contact_form_rejects_missing_privacy_consent(): void

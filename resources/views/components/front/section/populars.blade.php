@@ -58,9 +58,9 @@
                                 </div>
                                 <div class="bigProdCard__info">
                                     <a class="bigProdCard__category"
-                                        href="{{ route('subcategory.show', ['category_slug' => $product->category->slug, 'subcategory_slug' => $product->subcategory->slug]) }}">{{ $product->category->titleh1 }}</a><a
+                                        href="{{ \App\Support\CanonicalUrl::route('subcategory.show', ['category_slug' => $product->category->slug, 'subcategory_slug' => $product->subcategory->slug]) }}">{{ $product->category->titleh1 }}</a><a
                                         class="bigProdCard__title"
-                                        href="{{ route('product.show', ['category_slug' => $product->category->slug, 'subcategory_slug' => $product->subcategory->slug, 'product_slug' => $product->slug]) }}/">{{ $product->h1 }}</a>
+                                        href="{{ \App\Support\CanonicalUrl::route('product.show', ['category_slug' => $product->category->slug, 'subcategory_slug' => $product->subcategory->slug, 'product_slug' => $product->slug]) }}">{{ $product->h1 }}</a>
 
                                         @if ($product->min_width || $product->min_height)
                                             <div class="bigProdCard__meta">

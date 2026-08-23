@@ -11,6 +11,7 @@ use App\Models\Category;
 use App\Models\ThrouElement;
 use App\Models\HomePage;
 use App\Models\IconCard;
+use App\Support\CanonicalUrl;
 use Illuminate\Support\Facades\Schema;
 
 
@@ -645,7 +646,7 @@ class ProductController extends Controller
             return [
                 'image' => $this->encodeImagePath($related->image_path),
                 'fabric_photo' => $this->encodeImagePath($related->fabric_photo),
-                'link' => route('product.show', [
+                'link' => CanonicalUrl::route('product.show', [
                     'category_slug' => $related->category->slug,
                     'subcategory_slug' => $related->subcategory->slug,
                     'product_slug' => $related->slug,

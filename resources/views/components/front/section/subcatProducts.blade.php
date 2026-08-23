@@ -10,11 +10,11 @@
             <div class="s-subcatProducts__block">
                 <div class="s-subcatProducts__header">
                     <h3 class="s-subcatProducts__subtitle">
-                        <a href="{{ route('subcategory.show', ['category_slug' => $category->slug, 'subcategory_slug' => $subcategory->slug]) }}/">
+                        <a href="{{ \App\Support\CanonicalUrl::route('subcategory.show', ['category_slug' => $category->slug, 'subcategory_slug' => $subcategory->slug]) }}">
                             {{ $subcategory->titleh1 }}
                         </a>
                     </h3>
-                    <a href="{{ route('subcategory.show', ['category_slug' => $category->slug, 'subcategory_slug' => $subcategory->slug]) }}/" 
+                    <a href="{{ \App\Support\CanonicalUrl::route('subcategory.show', ['category_slug' => $category->slug, 'subcategory_slug' => $subcategory->slug]) }}"
                        class="s-subcatProducts__link">
                         Смотреть все товары
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -65,11 +65,11 @@
                                             </div>
                                             <div class="bigProdCard__info">
                                                 <a class="bigProdCard__category"
-                                                   href="{{ route('subcategory.show', ['category_slug' => $product->category->slug, 'subcategory_slug' => $product->subcategory->slug]) }}">
+                                                   href="{{ \App\Support\CanonicalUrl::route('subcategory.show', ['category_slug' => $product->category->slug, 'subcategory_slug' => $product->subcategory->slug]) }}">
                                                     {{ $product->subcategory->titleh1 }}
                                                 </a>
                                                 <a class="bigProdCard__title"
-                                                   href="{{ route('product.show', ['category_slug' => $product->category->slug, 'subcategory_slug' => $product->subcategory->slug, 'product_slug' => $product->slug]) }}/">
+                                                   href="{{ \App\Support\CanonicalUrl::route('product.show', ['category_slug' => $product->category->slug, 'subcategory_slug' => $product->subcategory->slug, 'product_slug' => $product->slug]) }}">
                                                     {{ $product->h1 }}
                                                 </a>
 

@@ -18,6 +18,7 @@ use App\Models\SubcategoryInstallationType;
 use App\Services\CartService;
 use App\Support\CatalogModelSelection;
 use App\Support\PreviewCardData;
+use App\Support\CanonicalUrl;
 use App\Models\Fabric;
 use App\Models\ThrouElement;
 use Illuminate\Support\Facades\Storage;
@@ -259,7 +260,7 @@ class SubcategoryController extends Controller
         $headerInfo = ThrouElement::firstOrFail();
 
         // Обновляем фильтрацию
-        $filterProduts = Product::where('subcategory_id', $sourceSubcategoryId)
+        $filterProduts = CanonicalUrl::paginator(Product::where('subcategory_id', $sourceSubcategoryId)
             ->when(!empty($subcategory->start_material), function ($query) use ($subcategory) {
                 $query->where('material', $subcategory->start_material);
             })
@@ -272,7 +273,7 @@ class SubcategoryController extends Controller
             ->leftJoin('prod_model', 'products.model_id', '=', 'prod_model.id')
             ->select('products.*', 'prod_model.title as model_title')
             ->with(['category', 'subcategory'])
-            ->paginate(12);
+            ->paginate(12));
 
         $maxFilterPrice = (int) Product::where('subcategory_id', $sourceSubcategoryId)
             ->when(!empty($subcategory->start_material), function ($query) use ($subcategory) {
@@ -677,7 +678,7 @@ class SubcategoryController extends Controller
         $priceFilter = $this->normalizePriceFilter($request);
 
         // Определяем подкатегорию
-        $subcategory = Subcategory::findOrFail($id);
+        $subcategory = Subcategory::with('category:id,slug')->findOrFail($id);
 
         // Если указана клонируемая подкатегория, заменяем ID
         $targetSubcategoryId = $subcategory->clone_subcategory_id ?: $subcategory->id;
@@ -701,7 +702,13 @@ class SubcategoryController extends Controller
         // Пагинация
         $this->applyMinPriceFilter($query, $priceFilter);
 
-        $products = $query->paginate(12, ['*'], 'page', $page);
+        $products = CanonicalUrl::paginator(
+            $query->paginate(12, ['*'], 'page', $page),
+            CanonicalUrl::route('subcategory.show', [
+                'category_slug' => $subcategory->category->slug,
+                'subcategory_slug' => $subcategory->slug,
+            ], false)
+        );
         $productsData = $products->getCollection()->map(fn (Product $product) => $this->serializePreviewProduct($product));
 
 

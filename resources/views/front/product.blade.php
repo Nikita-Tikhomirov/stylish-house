@@ -187,14 +187,14 @@
                                 d="M3.4575 4.5L2.97878 5.0625L5.28601e-05 8.2125L0.744734 9L5.00005 4.5L0.744733 3.72007e-07L5.2211e-05 0.7875L2.97878 3.9375L3.4575 4.5Z">
                             </path>
                         </svg><a class="breadcrumbs__link"
-                            href="/{{ $product->category->slug }}">{{ $product->category->titleh1 }}</a></li>
+                            href="/{{ $product->category->slug }}/">{{ $product->category->titleh1 }}</a></li>
                     <li class="breadcrumbs__item"><svg class="breadcrumbs__arrow" width="5" height="9"
                             viewBox="0 0 5 9" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path fill="#000"
                                 d="M3.4575 4.5L2.97878 5.0625L5.28601e-05 8.2125L0.744734 9L5.00005 4.5L0.744733 3.72007e-07L5.2211e-05 0.7875L2.97878 3.9375L3.4575 4.5Z">
                             </path>
                         </svg><a class="breadcrumbs__link"
-                            href="/{{ $product->category->slug }}/{{ $product->subcategory->slug }}">{{ $product->subcategory->titleh1 }}</a>
+                            href="/{{ $product->category->slug }}/{{ $product->subcategory->slug }}/">{{ $product->subcategory->titleh1 }}</a>
                     </li>
                     <li class="breadcrumbs__item"><svg class="breadcrumbs__arrow" width="5" height="9"
                             viewBox="0 0 5 9" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -239,7 +239,7 @@
                                 @endphp
                                 @if ($sameProductImage)
                                     <a class="prodForm__productLink"
-                                        href="{{ route('product.show', [
+                                        href="{{ \App\Support\CanonicalUrl::route('product.show', [
                                             'category_slug' => $product->category->slug,
                                             'subcategory_slug' => $product->subcategory->slug,
                                             'product_slug' => $sameProduct->slug,
@@ -505,9 +505,9 @@
                                         </div>
                                         <div class="bigProdCard__info">
                                             <a class="bigProdCard__category"
-                                                href="">{{ $relatedProduct->category->titleh1 }}</a>
+                                                href="{{ \App\Support\CanonicalUrl::route('subcategory.show', [$relatedProduct->category->slug, $relatedProduct->subcategory->slug]) }}">{{ $relatedProduct->category->titleh1 }}</a>
                                             <a class="bigProdCard__title"
-                                                href="{{ route('product.show', [$relatedProduct->category->slug, $relatedProduct->subcategory->slug, $relatedProduct->slug]) }}/">
+                                                href="{{ \App\Support\CanonicalUrl::route('product.show', [$relatedProduct->category->slug, $relatedProduct->subcategory->slug, $relatedProduct->slug]) }}">
                                                 {{ $relatedProduct->h1 }}
                                             </a>
                                             @if ($relatedProduct->min_width || $relatedProduct->min_height)
@@ -610,9 +610,9 @@
                                         </div>
                                         <div class="bigProdCard__info">
                                             <a class="bigProdCard__category"
-                                                href="">{{ $altProduct->category->titleh1 }}</a>
+                                                href="{{ \App\Support\CanonicalUrl::route('subcategory.show', [$altProduct->category->slug, $altProduct->subcategory->slug]) }}">{{ $altProduct->category->titleh1 }}</a>
                                             <a class="bigProdCard__title"
-                                                href="{{ route('product.show', [$altProduct->category->slug, $altProduct->subcategory->slug, $altProduct->slug]) }}/">
+                                                href="{{ \App\Support\CanonicalUrl::route('product.show', [$altProduct->category->slug, $altProduct->subcategory->slug, $altProduct->slug]) }}">
                                                 {{ $altProduct->h1 }}
                                             </a>
                                             @if ($altProduct->min_width || $altProduct->min_height)

@@ -13,7 +13,7 @@
             <div class="breadcrumbs">
                 <ul class="breadcrumbs__list">
                     <li class="breadcrumbs__item"><a class="breadcrumbs__link"
-                            href="{{ route('front.home') }}">Главная</a></li>
+                            href="{{ \App\Support\CanonicalUrl::route('front.home') }}">Главная</a></li>
                     <li class="breadcrumbs__item"><svg class="breadcrumbs__arrow" width="5" height="9"
                             viewBox="0 0 5 9" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path fill="#000"
@@ -531,14 +531,6 @@ function fetchProducts(url) {
                     .then(data => {
                         let productsContainer = document.querySelector('.popularsWithFilter__cards');
                         productsContainer.innerHTML = data.products.map(product => {
-                            let subcategoryPath = product.subcategory ? '/' + product.subcategory.slug :
-                                '';
-                            let productUrl = (product?.slug && product?.category?.slug && product
-                                    ?.subcategory?.slug) ?
-                                '/' + product.category.slug + '/' + product.subcategory.slug + '/' +
-                                product.slug :
-                                '#';
-
                             return `
             <div class="bigProdCard card" id="prod${product.id}" data-modelId="${product.modelid}" data-model="${product.model}" data-cloth="${product.cloth}" data-discount="${product.discount}">
                 <div class="bigProdCard__wrap">
@@ -560,8 +552,8 @@ function fetchProducts(url) {
                         </div>
                     </div>
                     <div class="bigProdCard__info">
-                        <a class="bigProdCard__category" href="${product.category ? '/' + product.category.slug : '#'}">${product.category ? product.category.titleh1 : 'Без категории'}</a>
-                        <a class="bigProdCard__title" href="${productUrl}">${product.h1}</a>
+                        <a class="bigProdCard__category" href="${product.category_url || '#'}">${product.category ? product.category.titleh1 : 'Без категории'}</a>
+                        <a class="bigProdCard__title" href="${product.product_url || '#'}">${product.h1}</a>
                         ${buildCardMinDimensions(product)}
                         <div class="bigProdCard__priceWrap">
                             ${renderStaticCardPrice(product)}

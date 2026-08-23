@@ -101,11 +101,11 @@ class HeaderNavigationSeederTest extends TestCase
             $menu->items()->where('parent_id', $plasticSection->id)->orderBy('position')->pluck('label')->all()
         );
         $this->assertSame(
-            '/story/rulonnye-shtory-na-plastikovye-okna?model=45',
+            '/story/rulonnye-shtory-na-plastikovye-okna/?model=45',
             $menu->items()->where('parent_id', $plasticSection->id)->where('label', 'УНИ-1')->value('url')
         );
         $this->assertSame(
-            '/story/kombo-den-noch-na-plastikovye-okna?model=52',
+            '/story/kombo-den-noch-na-plastikovye-okna/?model=52',
             $menu->items()->where('parent_id', $plasticSection->id)->where('label', 'Комбо УНИ-2 ламинированный')->value('url')
         );
         $this->assertContains(

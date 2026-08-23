@@ -57,11 +57,11 @@
                                             </div>
                                             <div class="bigProdCard__info">
                                                 <a class="bigProdCard__category"
-                                                   href="{{ route('subcategory.show', ['category_slug' => $product->category->slug, 'subcategory_slug' => $product->subcategory->slug]) }}">
+                                                   href="{{ \App\Support\CanonicalUrl::route('subcategory.show', ['category_slug' => $product->category->slug, 'subcategory_slug' => $product->subcategory->slug]) }}">
                                                     {{ $product->subcategory->titleh1 }}
                                                 </a>
                                                 <a class="bigProdCard__title"
-                                                   href="{{ route('product.show', ['category_slug' => $product->category->slug, 'subcategory_slug' => $product->subcategory->slug, 'product_slug' => $product->slug]) }}/">
+                                                   href="{{ \App\Support\CanonicalUrl::route('product.show', ['category_slug' => $product->category->slug, 'subcategory_slug' => $product->subcategory->slug, 'product_slug' => $product->slug]) }}">
                                                     {{ $product->h1 }}
                                                 </a>
 
@@ -96,7 +96,7 @@
                         <i class="fas fa-ruler"></i>
                         Заказать Замер
                     </div>
-                    <a href="{{ route('subcategory.show', ['category_slug' => $category->slug, 'subcategory_slug' => $subcatData['subcategory']->slug]) }}/" class="s-subcatSections__button s-subcatSections__button--catalog">
+                    <a href="{{ \App\Support\CanonicalUrl::route('subcategory.show', ['category_slug' => $category->slug, 'subcategory_slug' => $subcatData['subcategory']->slug]) }}" class="s-subcatSections__button s-subcatSections__button--catalog">
                         <i class="fas fa-th"></i>
                         Каталог
                     </a>

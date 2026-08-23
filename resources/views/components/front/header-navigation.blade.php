@@ -56,7 +56,7 @@
                         @endforeach
                     </div>
 
-                    <a class="header-navigation__measure" href="/shop-pages/zamer">
+                    <a class="header-navigation__measure" href="/shop-pages/zamer/">
                         <span>Нужна помощь с выбором?</span>
                         <strong>Заказать бесплатный замер</strong>
                         <i class="fas fa-arrow-right" aria-hidden="true"></i>
@@ -124,7 +124,7 @@
                     @foreach ($navigation['utilityLinks'] as $link)
                         <a href="{{ $link['url'] }}">{{ $link['label'] }}</a>
                     @endforeach
-                    <a class="header-navigation__measure" href="/shop-pages/zamer">
+                    <a class="header-navigation__measure" href="/shop-pages/zamer/">
                         <strong>Заказать бесплатный замер</strong>
                         <i class="fas fa-arrow-right" aria-hidden="true"></i>
                     </a>

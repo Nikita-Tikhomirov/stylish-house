@@ -9,6 +9,7 @@
     <meta name="shop-authenticated" content="{{ auth()->check() ? '1' : '0' }}" />
     <title>{{ $title ?? 'Default Title' }}</title>
     <meta name="description" content="{{ $description ?? 'Default Title' }}" />
+    <link rel="canonical" href="{{ \App\Support\CanonicalUrl::current() }}" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

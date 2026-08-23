@@ -2,8 +2,8 @@
 
 <body class="p-index">
     <header class="policyHeader wrapper">
-        <a href="{{ route('front.home') }}" aria-label="На главную">Стильный Дом</a>
-        <a href="{{ route('front.home') }}">Вернуться на сайт</a>
+        <a href="{{ \App\Support\CanonicalUrl::route('front.home') }}" aria-label="На главную">Стильный Дом</a>
+        <a href="{{ \App\Support\CanonicalUrl::route('front.home') }}">Вернуться на сайт</a>
     </header>
 
     <main class="layout">

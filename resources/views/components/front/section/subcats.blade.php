@@ -10,7 +10,7 @@
 
                 @foreach ($subcats->subcategories as $subcategory)
                     @if($subcategory->show_in_more_cats)
-                        <a href="{{ route('subcategory.show', ['category_slug' => $subcats->slug, 'subcategory_slug' => $subcategory->slug]) }}"
+                        <a href="{{ \App\Support\CanonicalUrl::route('subcategory.show', ['category_slug' => $subcats->slug, 'subcategory_slug' => $subcategory->slug]) }}"
                             class="s-subcats__slide swiper-slide card">
                             <div class="bigProdCard bigCatCard">
                                 <div class="bigProdCard__wrap">

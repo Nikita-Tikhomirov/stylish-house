@@ -66,7 +66,7 @@
         <p class="errorPage__code" aria-hidden="true">404</p>
         <h1>Страница не найдена</h1>
         <p class="errorPage__text">Возможно, адрес изменился или в ссылке допущена ошибка. Вернитесь на главную страницу и продолжите выбор.</p>
-        <a class="errorPage__link" href="{{ route('front.home') }}">Вернуться на главную</a>
+        <a class="errorPage__link" href="{{ \App\Support\CanonicalUrl::route('front.home') }}">Вернуться на главную</a>
     </main>
 </body>
 </html>

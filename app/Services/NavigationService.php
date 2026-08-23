@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Cache;
 
 class NavigationService
 {
-    public const HEADER_CACHE_KEY = 'navigation:header-catalog:v1';
+    public const HEADER_CACHE_KEY = 'navigation:header-catalog:v2';
 
     public function header(): array
     {
