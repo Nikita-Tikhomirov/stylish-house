@@ -164,6 +164,19 @@ class AuditContentMarkupTest extends TestCase
         }
     }
 
+    public function test_public_section_ctas_do_not_use_empty_links(): void
+    {
+        $templates = [
+            'components/front/section/actions.blade.php',
+            'components/front/section/gallery.blade.php',
+            'components/front/section/subgallery.blade.php',
+        ];
+
+        foreach ($templates as $template) {
+            $this->assertStringNotContainsString('href=""', $this->template($template), $template);
+        }
+    }
+
     private function template(string $path): string
     {
         return file_get_contents(__DIR__.'/../../resources/views/'.$path);

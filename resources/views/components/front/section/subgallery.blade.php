@@ -4,7 +4,7 @@
                 viewBox="0 0 114 35" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M112 23.275C1.84952 -10.6834 -7.36586 1.48086 7.50443 32.9053" stroke="currentColor"
                     stroke-width="4" stroke-miterlimit="3.8637" stroke-linecap="round"></path>
-            </svg></h2><a class="s-gallery__more btn" href=""> <span>Подробнее</span><i
+            </svg></h2><a class="s-gallery__more btn" href="{{ \App\Support\CanonicalUrl::route('pages.index', ['slug' => 'portfolio']) }}"> <span>Подробнее</span><i
                 class="fas fa-arrow-right"></i></a>
     </div>
     <div class="s-gallery__cards">
