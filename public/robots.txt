@@ -9,8 +9,6 @@ Disallow: /profile
 Disallow: /favorites
 Disallow: /sheet-names
 Disallow: /popup/
-Disallow: /*?*
-Disallow: /?*
 
 User-agent: Yandex
 Disallow: /admin/*
@@ -23,8 +21,6 @@ Disallow: /profile
 Disallow: /favorites
 Disallow: /sheet-names
 Disallow: /popup/
-Disallow: /*?*
-Disallow: /?*
 
 Host: https://stylish-house.net/
 

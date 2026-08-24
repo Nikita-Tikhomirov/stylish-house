@@ -2,34 +2,19 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\IndexingPolicy;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class AddNoIndexHeader
 {
-    private const TECHNICAL_PATHS = [
-        'login',
-        'register',
-        'password/*',
-        'cart',
-        'cart/*',
-        'checkout',
-        'profile',
-        'profile/*',
-        'favorites',
-        'favorites/*',
-        'sheet-names',
-        'sheet-names-test',
-        'popup/*',
-    ];
-
     public function handle(Request $request, Closure $next): Response
     {
         $response = $next($request);
 
-        if ($request->is(self::TECHNICAL_PATHS)) {
-            $response->headers->set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+        if ($robots = IndexingPolicy::robots($request)) {
+            $response->headers->set('X-Robots-Tag', $robots);
         }
 
         return $response;

@@ -9,6 +9,9 @@
     <meta name="shop-authenticated" content="{{ auth()->check() ? '1' : '0' }}" />
     <title>{{ $title ?? 'Default Title' }}</title>
     <meta name="description" content="{{ $description ?? 'Default Title' }}" />
+    @if ($robots = \App\Support\IndexingPolicy::robots(request()))
+        <meta name="robots" content="{{ $robots }}" />
+    @endif
     <link rel="canonical" href="{{ \App\Support\CanonicalUrl::current() }}" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
