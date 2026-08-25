@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\CatalogAttribute;
 use App\Models\CatalogImportItem;
 use App\Models\CatalogImportRun;
+use App\Models\CatalogImportSource;
 use App\Models\Product;
 use App\Models\Subcategory;
 use Illuminate\Database\Migrations\Migration;
@@ -70,14 +71,14 @@ class CatalogImportSchemaTest extends TestCase
             'label' => 'Белые',
             'source_url' => 'https://rimskie.com/catalog/white',
             'target_slug' => 'white',
-            'status' => 'completed',
+            'status' => CatalogImportSource::STATUS_COMPLETED,
             'sort_order' => 1,
         ]);
         $office = $run->sources()->create([
             'label' => 'Для офиса',
             'source_url' => 'https://rimskie.com/catalog/office',
             'target_slug' => 'office',
-            'status' => 'completed',
+            'status' => CatalogImportSource::STATUS_COMPLETED,
             'sort_order' => 2,
         ]);
 
@@ -163,9 +164,9 @@ class CatalogImportSchemaTest extends TestCase
             'label' => 'Белые',
             'source_url' => 'https://rimskie.com/catalog/white',
             'target_slug' => 'white',
-            'status' => 'completed',
+            'status' => CatalogImportSource::STATUS_COMPLETED,
             'sort_order' => 1,
-            'review_status' => 'approved',
+            'review_status' => CatalogImportSource::REVIEW_APPROVED,
             'warnings' => ['title_was_short'],
             'published_subcategory_id' => $subcategory->id,
             'created_subcategory' => true,
@@ -218,6 +219,57 @@ class CatalogImportSchemaTest extends TestCase
         $this->assertSame([$value->id], $product->attributeValues()->pluck('catalog_attribute_values.id')->all());
     }
 
+    public function test_sqlite_import_run_foreign_keys_use_set_null(): void
+    {
+        if (DB::getDriverName() !== 'sqlite') {
+            $this->markTestSkipped('SQLite exposes foreign-key metadata through PRAGMA.');
+        }
+
+        foreach (['products', 'subcategories'] as $table) {
+            $foreignKey = collect(DB::select("PRAGMA foreign_key_list('$table')"))
+                ->first(static fn (object $key): bool => $key->from === 'import_run_id');
+
+            $this->assertNotNull($foreignKey, "Missing $table.import_run_id foreign key.");
+            $this->assertSame('catalog_import_runs', $foreignKey->table);
+            $this->assertSame('id', $foreignKey->to);
+            $this->assertSame('SET NULL', $foreignKey->on_delete);
+        }
+    }
+
+    public function test_deleting_an_import_run_nulls_production_ownership_without_deleting_rows(): void
+    {
+        $run = CatalogImportRun::create([
+            'provider' => 'rimskie.com',
+            'external_run_id' => 'run-001',
+            'status' => CatalogImportRun::STATUS_PUBLISHED,
+        ]);
+        $categoryId = DB::table('categories')->insertGetId([
+            'title' => 'Шторы',
+            'slug' => 'story',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $subcategory = Subcategory::create([
+            'category_id' => $categoryId,
+            'title' => 'Белые',
+            'slug' => 'white',
+            'is_import_collection' => true,
+            'import_run_id' => $run->id,
+        ]);
+        $product = Product::create([
+            'category_id' => $categoryId,
+            'subcategory_id' => $subcategory->id,
+            'title' => 'Римская штора',
+            'slug' => 'rimskaya-shtora-11889',
+            'import_run_id' => $run->id,
+        ]);
+
+        $run->delete();
+
+        $this->assertDatabaseHas('subcategories', ['id' => $subcategory->id, 'import_run_id' => null]);
+        $this->assertDatabaseHas('products', ['id' => $product->id, 'import_run_id' => null]);
+    }
+
     public function test_pivot_constraints_use_short_explicit_names(): void
     {
         if (DB::getDriverName() !== 'sqlite') {
@@ -244,6 +296,8 @@ class CatalogImportSchemaTest extends TestCase
 
     public function test_migrations_roll_back_without_removing_legacy_rows(): void
     {
+        $this->migrateDown();
+
         $categoryId = DB::table('categories')->insertGetId([
             'title' => 'Шторы',
             'slug' => 'story',
@@ -266,12 +320,26 @@ class CatalogImportSchemaTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        foreach ($this->migrations as $migration) {
+            $migration->up();
+        }
+        $this->migrationsAreUp = true;
+
+        $this->assertSame('Legacy product', DB::table('products')->where('id', $productId)->value('title'));
+        $this->assertSame(1, DB::table('products')->where('id', $productId)->value('calculator_enabled'));
+        $this->assertSame('Римские шторы', DB::table('subcategories')->where('id', $subcategoryId)->value('title'));
+        $this->assertSame(0, DB::table('subcategories')->where('id', $subcategoryId)->value('is_import_collection'));
+
         $this->migrateDown();
 
         $this->assertTrue(Schema::hasTable('products'));
         $this->assertTrue(Schema::hasTable('subcategories'));
-        $this->assertSame(1, DB::table('products')->where('id', $productId)->count());
-        $this->assertSame(1, DB::table('subcategories')->where('id', $subcategoryId)->count());
+        $this->assertSame('Legacy product', DB::table('products')->where('id', $productId)->value('title'));
+        $this->assertSame('legacy-product', DB::table('products')->where('id', $productId)->value('slug'));
+        $this->assertSame('Римские шторы', DB::table('subcategories')->where('id', $subcategoryId)->value('title'));
+        $this->assertSame('rimskieshtory', DB::table('subcategories')->where('id', $subcategoryId)->value('slug'));
+        $this->assertTrue(Schema::hasColumn('products', 'title'));
+        $this->assertTrue(Schema::hasColumn('subcategories', 'title'));
         $this->assertFalse(Schema::hasColumn('products', 'source_provider'));
         $this->assertFalse(Schema::hasColumn('products', 'calculator_enabled'));
         $this->assertFalse(Schema::hasColumn('subcategories', 'is_import_collection'));

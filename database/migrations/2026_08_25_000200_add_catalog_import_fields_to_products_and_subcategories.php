@@ -8,18 +8,17 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Laravel 10 cannot reverse foreign keys added to existing SQLite tables.
-        $supportsAlterTableForeignKeys = Schema::getConnection()->getDriverName() !== 'sqlite';
+        $usesSqlite = Schema::getConnection()->getDriverName() === 'sqlite';
 
-        Schema::table('products', function (Blueprint $table) use ($supportsAlterTableForeignKeys): void {
+        Schema::table('products', function (Blueprint $table) use ($usesSqlite): void {
             $table->string('source_provider', 64)->nullable();
             $table->string('source_external_id', 128)->nullable();
             $table->text('source_url')->nullable();
             $table->decimal('source_price', 12, 2)->nullable();
-            $table->unsignedBigInteger('import_run_id')->nullable();
             $table->boolean('calculator_enabled')->default(true);
 
-            if ($supportsAlterTableForeignKeys) {
+            if (! $usesSqlite) {
+                $table->unsignedBigInteger('import_run_id')->nullable();
                 $table->foreign('import_run_id', 'products_import_run_fk')
                     ->references('id')
                     ->on('catalog_import_runs')
@@ -31,17 +30,28 @@ return new class extends Migration
             );
         });
 
-        Schema::table('subcategories', function (Blueprint $table) use ($supportsAlterTableForeignKeys): void {
+        Schema::table('subcategories', function (Blueprint $table) use ($usesSqlite): void {
             $table->boolean('is_import_collection')->default(false);
-            $table->unsignedBigInteger('import_run_id')->nullable();
 
-            if ($supportsAlterTableForeignKeys) {
+            if (! $usesSqlite) {
+                $table->unsignedBigInteger('import_run_id')->nullable();
                 $table->foreign('import_run_id', 'subcategories_import_run_fk')
                     ->references('id')
                     ->on('catalog_import_runs')
                     ->nullOnDelete();
             }
         });
+
+        if ($usesSqlite) {
+            Schema::getConnection()->statement(
+                'ALTER TABLE "products" ADD COLUMN "import_run_id" INTEGER '
+                .'CONSTRAINT "products_import_run_fk" REFERENCES "catalog_import_runs" ("id") ON DELETE SET NULL'
+            );
+            Schema::getConnection()->statement(
+                'ALTER TABLE "subcategories" ADD COLUMN "import_run_id" INTEGER '
+                .'CONSTRAINT "subcategories_import_run_fk" REFERENCES "catalog_import_runs" ("id") ON DELETE SET NULL'
+            );
+        }
 
         Schema::create('catalog_collection_product', function (Blueprint $table): void {
             $table->unsignedBigInteger('subcategory_id');
