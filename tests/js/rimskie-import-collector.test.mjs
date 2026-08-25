@@ -713,6 +713,8 @@ function fakePlaywright({
     const context = {
         pages: () => [page],
         route: async (pattern, handler) => routes.push([pattern, handler]),
+        routeWebSocket: async () => {},
+        setOffline: async () => {},
         close: async () => {},
     };
     const chromium = {
@@ -740,6 +742,7 @@ test('playwright transport opens the supplied persistent profile in headed Chrom
             headless: false,
             executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
             serviceWorkers: 'block',
+            offline: true,
         },
     ]]);
     assert.equal(fake.routes.length, 1);
@@ -1125,27 +1128,117 @@ test('run lock rejects stopped runs and a second live collector', async (t) => {
     t.after(() => rm(rootDir, { recursive: true, force: true }));
     const control = new ControlFile(join(rootDir, 'control.json'), {
         isLiveProcess: (processId) => processId === 111,
+        processFingerprintLookup: async (processId) => `process-start-${processId}`,
     });
 
-    await control.write({ pause: false, stop: false, ownerPid: 111 });
+    await control.write({
+        pause: false,
+        stop: false,
+        ownerPid: 111,
+        ownerProcessFingerprint: 'process-start-111',
+    });
     await assert.rejects(control.claim(222), /collector is already running/i);
     await control.update({ stop: true });
     await assert.rejects(control.claim(222), /stopped run/i);
 });
 
-test('run owner identity prevents PID reuse from impersonating the collector', async (t) => {
+test('matching OS process fingerprint protects a live collector across callers', async (t) => {
     const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-owner-identity-'));
     t.after(() => rm(rootDir, { recursive: true, force: true }));
     const controlPath = join(rootDir, 'control.json');
+    const processFingerprintLookup = async () => 'same-process-start';
     const first = new ControlFile(controlPath, {
-        isLiveProcess: () => true, processIdentity: 'instance-first',
+        isLiveProcess: () => true,
+        processIdentity: 'instance-first',
+        processFingerprintLookup,
     });
     const reusedPid = new ControlFile(controlPath, {
-        isLiveProcess: () => true, processIdentity: 'instance-second',
+        isLiveProcess: () => true,
+        processIdentity: 'instance-second',
+        processFingerprintLookup,
     });
     await first.claim(4242);
 
     await assert.rejects(reusedPid.claim(4242), /instance|already running/i);
+});
+
+test('live reused PID with a different OS fingerprint does not block a new owner', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-owner-reuse-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const controlPath = join(rootDir, 'control.json');
+    let ownerFingerprint = 'original-process-start';
+    const processFingerprintLookup = async (processId) => processId === 4242
+        ? ownerFingerprint
+        : 'test-runner-start';
+    const first = new ControlFile(controlPath, {
+        isLiveProcess: () => true,
+        processIdentity: 'instance-first',
+        processFingerprintLookup,
+    });
+    const replacement = new ControlFile(controlPath, {
+        isLiveProcess: () => true,
+        processIdentity: 'instance-second',
+        processFingerprintLookup,
+    });
+    await first.claim(4242);
+    ownerFingerprint = 'replacement-process-start';
+
+    await replacement.claim(process.pid);
+
+    const current = await replacement.read();
+    assert.equal(current.ownerPid, process.pid);
+    assert.equal(current.ownerProcessFingerprint, 'test-runner-start');
+});
+
+test('live reused PID with a different OS fingerprint is reclaimed from a stale lock', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-lock-reuse-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const controlPath = join(rootDir, 'control.json');
+    const lockPath = `${controlPath}.lock`;
+    await writeFile(lockPath, JSON.stringify({
+        pid: 4242,
+        token: 'reused-pid-token',
+        processFingerprint: 'original-process-start',
+    }), 'utf8');
+    const control = new ControlFile(controlPath, {
+        isLiveProcess: () => true,
+        processIdentity: 'current-instance',
+        processFingerprintLookup: async (processId) => processId === 4242
+            ? 'replacement-process-start'
+            : 'test-runner-start',
+    });
+
+    await control.update({ pause: true });
+
+    assert.equal((await control.read()).pause, true);
+    assert.equal(
+        JSON.parse(await readFile(`${lockPath}.stale.reused-pid-token`, 'utf8')).processFingerprint,
+        'original-process-start',
+    );
+});
+
+test('live owner is protected when its OS process fingerprint cannot be verified', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-owner-unverified-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const control = new ControlFile(join(rootDir, 'control.json'), {
+        isLiveProcess: () => true,
+        processFingerprintLookup: async (processId) => processId === process.pid
+            ? 'test-runner-start'
+            : null,
+    });
+    await control.write({
+        pause: false,
+        stop: false,
+        ownerPid: 4242,
+        ownerIdentity: 'unknown-owner',
+        ownerProcessFingerprint: 'recorded-process-start',
+    });
+
+    await assert.rejects(
+        control.claim(process.pid),
+        /cannot verify collector process instance.*refusing ownership change/i,
+    );
+    assert.equal((await control.read()).ownerPid, 4242);
 });
 
 test('control exclusive operation blocks collector claim through manifest export', async (t) => {
@@ -1153,10 +1246,14 @@ test('control exclusive operation blocks collector claim through manifest export
     t.after(() => rm(rootDir, { recursive: true, force: true }));
     const controlPath = join(rootDir, 'control.json');
     const exporter = new ControlFile(controlPath, {
-        isLiveProcess: () => false, processIdentity: 'exporter',
+        isLiveProcess: () => false,
+        processIdentity: 'exporter',
+        processFingerprintLookup: async (processId) => `process-start-${processId}`,
     });
     const collector = new ControlFile(controlPath, {
-        isLiveProcess: () => false, processIdentity: 'collector',
+        isLiveProcess: () => false,
+        processIdentity: 'collector',
+        processFingerprintLookup: async (processId) => `process-start-${processId}`,
     });
     const order = [];
     let releaseExport;
@@ -1190,6 +1287,7 @@ test('control update recovers a lock left by a dead process', async (t) => {
     await writeFile(lockPath, JSON.stringify({
         pid: 999999,
         token: 'dead-token',
+        processFingerprint: 'dead-process-start',
     }), 'utf8');
 
     await control.update({ pause: true });
@@ -1198,6 +1296,7 @@ test('control update recovers a lock left by a dead process', async (t) => {
     assert.deepEqual(JSON.parse(await readFile(`${lockPath}.stale.dead-token`, 'utf8')), {
         pid: 999999,
         token: 'dead-token',
+        processFingerprint: 'dead-process-start',
     });
 });
 
@@ -1209,7 +1308,9 @@ test('concurrent stale-lock reclaimers cannot remove a newly acquired control lo
     const processCheck = (processId) => processId === process.pid;
     const first = new ControlFile(controlPath, { isLiveProcess: processCheck });
     const second = new ControlFile(controlPath, { isLiveProcess: processCheck });
-    await writeFile(lockPath, JSON.stringify({ pid: 999999, token: 'dead-token' }), 'utf8');
+    await writeFile(lockPath, JSON.stringify({
+        pid: 999999, token: 'dead-token', processFingerprint: 'dead-process-start',
+    }), 'utf8');
 
     await Promise.all([
         first.update({ pause: true }),
@@ -1224,7 +1325,9 @@ test('incomplete legacy control lock fails closed with a recovery instruction', 
     const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-control-'));
     t.after(() => rm(rootDir, { recursive: true, force: true }));
     const controlPath = join(rootDir, 'control.json');
-    const control = new ControlFile(controlPath);
+    const control = new ControlFile(controlPath, {
+        processFingerprintLookup: async () => 'test-runner-start',
+    });
     await writeFile(`${controlPath}.lock`, '', 'utf8');
 
     await assert.rejects(

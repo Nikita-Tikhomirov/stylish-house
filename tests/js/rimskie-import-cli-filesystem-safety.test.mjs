@@ -11,12 +11,44 @@ import {
     assertRunDirectorySafe,
     ControlFile,
     initializeRun,
+    isLiveProcess,
+    lookupProcessFingerprint,
     parseArguments,
     savedPolicyOptions,
 } from '../../scripts/rimskie-import/cli.mjs';
 import { configSchemaVersion, RunStore } from '../../scripts/rimskie-import/lib/run-store.mjs';
 
 const execFileAsync = promisify(execFile);
+
+test('Windows process fingerprint lookup uses hidden execFile with a validated integer PID', async () => {
+    const calls = [];
+    const fingerprint = await lookupProcessFingerprint(4242, {
+        platform: 'win32',
+        execFile: async (...args) => {
+            calls.push(args);
+            return { stdout: '638917281234567890\r\n', stderr: '' };
+        },
+    });
+
+    assert.equal(fingerprint, 'win32:638917281234567890');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0][0], 'powershell.exe');
+    assert.match(calls[0][1].join(' '), /Get-Process -Id 4242/);
+    assert.deepEqual(calls[0][2], { encoding: 'utf8', windowsHide: true });
+    assert.equal(await lookupProcessFingerprint('4242', {
+        platform: 'win32',
+        execFile: async () => { throw new Error('must not execute'); },
+    }), null);
+});
+
+test('process liveness treats permission denial as live and fails closed', () => {
+    assert.equal(isLiveProcess(4242, () => {
+        throw Object.assign(new Error('access denied'), { code: 'EPERM' });
+    }), true);
+    assert.equal(isLiveProcess(4242, () => {
+        throw Object.assign(new Error('missing'), { code: 'ESRCH' });
+    }), false);
+});
 
 test('CLI rejects Windows reserved names and ADS syntax in run IDs', () => {
     for (const runId of ['CON', 'nul.json', 'run:stream', '..hidden', 'trailing.']) {
@@ -169,6 +201,60 @@ test('run state stores and verifies the immutable config SHA-256 digest', async 
     await assert.rejects(initializeRun(store, options), /config.*digest/i);
 });
 
+test('resume rejects tampered immutable state source identity and order', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-state-source-identity-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const store = await RunStore.open({ rootDir, runId: 'run-001' });
+    const options = {
+        maxRequests: 3, maxProducts: 1,
+        maxRequestsExplicit: false, maxProductsExplicit: false,
+    };
+    const initialized = await initializeRun(store, options);
+    const mutations = [
+        (state) => { state.sources[0].sourceUrl = 'https://rimskie.com/catalog/rimskie-shtory/black'; },
+        (state) => { state.sources[0].sourceSlug = 'tampered'; },
+        (state) => { state.sources[0].label = 'Tampered'; },
+        (state) => { state.sources[0].enabled = false; },
+        (state) => { state.sources[0].sortOrder = 999; },
+        (state) => { state.sources.reverse(); },
+    ];
+
+    for (const mutate of mutations) {
+        const tampered = structuredClone(initialized.state);
+        mutate(tampered);
+        await store.checkpoint(tampered);
+
+        await assert.rejects(
+            initializeRun(store, options),
+            /state sources differ from immutable config/i,
+        );
+    }
+});
+
+test('resume allows mutable state source progress to differ from initial config', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-state-source-progress-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const store = await RunStore.open({ rootDir, runId: 'run-001' });
+    const options = {
+        maxRequests: 3, maxProducts: 1,
+        maxRequestsExplicit: false, maxProductsExplicit: false,
+    };
+    const initialized = await initializeRun(store, options);
+    const progressed = structuredClone(initialized.state);
+    progressed.sources[0].nextPageUrl = `${progressed.sources[0].sourceUrl}?page=2`;
+    progressed.sources[0].pendingProducts = [{
+        externalId: '11889',
+        url: 'https://rimskie.com/products/11889-example',
+    }];
+    progressed.sources[0].completed = false;
+    progressed.sources[0].pages = 1;
+    await store.checkpoint(progressed);
+
+    const resumed = await initializeRun(store, options);
+
+    assert.deepEqual(resumed.state.sources[0], progressed.sources[0]);
+});
+
 test('resumed request policy uses the validated saved limits', () => {
     const config = {
         limits: {
@@ -223,7 +309,9 @@ test('stale-lock EEXIST crash window is recovered only from the same hard link',
     const controlPath = join(rootDir, 'control.json');
     const lockPath = `${controlPath}.lock`;
     const stalePath = `${lockPath}.stale.dead-token`;
-    await writeFile(lockPath, JSON.stringify({ pid: 999999, token: 'dead-token' }), 'utf8');
+    await writeFile(lockPath, JSON.stringify({
+        pid: 999999, token: 'dead-token', processFingerprint: 'dead-process-start',
+    }), 'utf8');
     await link(lockPath, stalePath);
     const control = new ControlFile(controlPath, { isLiveProcess: () => false });
 
@@ -239,9 +327,12 @@ test('abandoned reclaim marker is identity-safely quarantined and recovered', as
     const controlPath = join(rootDir, 'control.json');
     const lockPath = `${controlPath}.lock`;
     const reclaimPath = `${lockPath}.reclaim`;
-    await writeFile(lockPath, JSON.stringify({ pid: 999999, token: 'dead-lock' }), 'utf8');
+    await writeFile(lockPath, JSON.stringify({
+        pid: 999999, token: 'dead-lock', processFingerprint: 'dead-lock-start',
+    }), 'utf8');
     await writeFile(reclaimPath, JSON.stringify({
         pid: 999998, token: 'abandoned-reclaim', identity: 'abandoned-instance',
+        processFingerprint: 'abandoned-process-start',
     }), 'utf8');
     const control = new ControlFile(controlPath, {
         isLiveProcess: () => false, processIdentity: 'current-instance',

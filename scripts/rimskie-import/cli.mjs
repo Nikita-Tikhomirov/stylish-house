@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { execFile as execFileCallback } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
 import {
@@ -17,6 +18,7 @@ import {
 import { basename, dirname, join, posix, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { promisify } from 'node:util';
 
 import { DEFAULT_LIMITS } from './lib/request-policy.mjs';
 import { configDigest, configSchemaVersion, RunStore } from './lib/run-store.mjs';
@@ -29,6 +31,7 @@ import {
 
 const commands = new Set(['start', 'status', 'pause', 'resume', 'stop', 'export', 'dry-run']);
 const valueOptions = new Set(['--run', '--data-root', '--chrome', '--max-requests', '--max-products']);
+const execFileAsync = promisify(execFileCallback);
 
 function positiveInteger(value, option) {
     const parsed = Number(value);
@@ -253,16 +256,61 @@ export async function assertRunDirectorySafe(dataRoot, runId, {
     return requestedRunDir;
 }
 
+// Returns an OS-issued process start identity without invoking a command shell.
+export async function lookupProcessFingerprint(processId, {
+    platform = process.platform,
+    execFile = execFileAsync,
+    readProcessFile = readFile,
+} = {}) {
+    if (!Number.isInteger(processId) || processId <= 0) return null;
+
+    try {
+        if (platform === 'win32') {
+            const command = `(Get-Process -Id ${processId} -ErrorAction Stop)`
+                + '.StartTime.ToUniversalTime().Ticks';
+            const { stdout } = await execFile('powershell.exe', [
+                '-NoProfile',
+                '-NonInteractive',
+                '-WindowStyle',
+                'Hidden',
+                '-Command',
+                command,
+            ], { encoding: 'utf8', windowsHide: true });
+            const startTicks = stdout.trim();
+            return /^\d+$/.test(startTicks) ? `win32:${startTicks}` : null;
+        }
+
+        if (platform === 'linux') {
+            const stat = await readProcessFile(`/proc/${processId}/stat`, 'utf8');
+            const commandEnd = stat.lastIndexOf(')');
+            const fieldsAfterCommand = stat.slice(commandEnd + 2).trim().split(/\s+/);
+            const startTicks = fieldsAfterCommand[19];
+            return /^\d+$/.test(startTicks) ? `linux:${startTicks}` : null;
+        }
+
+        const { stdout } = await execFile('ps', [
+            '-o', 'lstart=', '-p', String(processId),
+        ], { encoding: 'utf8', windowsHide: true });
+        const startIdentity = stdout.trim();
+        return startIdentity ? `${platform}:${startIdentity}` : null;
+    } catch {
+        return null;
+    }
+}
+
 export class ControlFile {
     constructor(path, {
         isLiveProcess: liveProcessCheck = isLiveProcess,
         processIdentity = randomUUID(),
+        processFingerprintLookup = lookupProcessFingerprint,
     } = {}) {
         this.path = path;
         this.rootDir = dirname(path);
         this.lockPath = `${path}.lock`;
         this.isLiveProcess = liveProcessCheck;
         this.processIdentity = processIdentity;
+        this.processFingerprintLookup = processFingerprintLookup;
+        this.ownProcessFingerprint = null;
     }
 
     async read() {
@@ -289,14 +337,34 @@ export class ControlFile {
         return this.#withLock(async () => operation(await this.read()));
     }
 
+    // Distinguishes the recorded process instance from a later process that reused its PID.
+    async ownerStatus(value = null) {
+        const current = value || await this.read();
+        if (!current.ownerPid) return 'none';
+        return this.#processRecordStatus(current.ownerPid, current.ownerProcessFingerprint);
+    }
+
     async claim(ownerPid, { resume = false } = {}) {
+        const ownerProcessFingerprint = await this.#requiredProcessFingerprint(
+            ownerPid,
+            'collector owner',
+        );
         await this.#withLock(async () => {
             const current = await this.read();
             if (current.stop) throw new Error('A stopped run cannot start or resume');
             const sameOwner = current.ownerPid === ownerPid
-                && current.ownerIdentity === this.processIdentity;
-            if (current.ownerPid && !sameOwner && this.isLiveProcess(current.ownerPid)) {
-                throw new Error(`Collector is already running with PID ${current.ownerPid}`);
+                && current.ownerIdentity === this.processIdentity
+                && current.ownerProcessFingerprint === ownerProcessFingerprint;
+            if (current.ownerPid && !sameOwner) {
+                const status = await this.ownerStatus(current);
+                if (status === 'live') {
+                    throw new Error(`Collector is already running with PID ${current.ownerPid}`);
+                }
+                if (status === 'unverified') {
+                    throw new Error(
+                        `Cannot verify collector process instance for PID ${current.ownerPid}; refusing ownership change`,
+                    );
+                }
             }
             if (current.pause && !resume) throw new Error('Run is paused; use the resume command');
             await this.#writeUnlocked({
@@ -305,6 +373,7 @@ export class ControlFile {
                 stop: false,
                 ownerPid,
                 ownerIdentity: this.processIdentity,
+                ownerProcessFingerprint,
             });
         });
     }
@@ -313,8 +382,50 @@ export class ControlFile {
         await this.#withLock(async () => {
             const current = await this.read();
             if (current.ownerPid !== ownerPid || current.ownerIdentity !== this.processIdentity) return;
-            await this.#writeUnlocked({ ...current, ownerPid: null, ownerIdentity: null });
+            const ownerProcessFingerprint = await this.#lookupProcessFingerprint(ownerPid);
+            if (!ownerProcessFingerprint
+                || current.ownerProcessFingerprint !== ownerProcessFingerprint) return;
+            await this.#writeUnlocked({
+                ...current,
+                ownerPid: null,
+                ownerIdentity: null,
+                ownerProcessFingerprint: null,
+            });
         });
+    }
+
+    async #lookupProcessFingerprint(processId) {
+        try {
+            const fingerprint = await this.processFingerprintLookup(processId);
+            return typeof fingerprint === 'string' && fingerprint ? fingerprint : null;
+        } catch {
+            return null;
+        }
+    }
+
+    async #requiredProcessFingerprint(processId, label) {
+        const fingerprint = processId === process.pid
+            ? await this.#ownProcessFingerprint()
+            : await this.#lookupProcessFingerprint(processId);
+        if (!fingerprint) {
+            throw new Error(`Cannot verify ${label} process instance for PID ${processId}`);
+        }
+        return fingerprint;
+    }
+
+    async #ownProcessFingerprint() {
+        if (!this.ownProcessFingerprint) {
+            this.ownProcessFingerprint = this.#lookupProcessFingerprint(process.pid);
+        }
+        return this.ownProcessFingerprint;
+    }
+
+    async #processRecordStatus(processId, recordedFingerprint) {
+        if (!this.isLiveProcess(processId)) return 'stale';
+        if (typeof recordedFingerprint !== 'string' || !recordedFingerprint) return 'unverified';
+        const currentFingerprint = await this.#lookupProcessFingerprint(processId);
+        if (!currentFingerprint) return 'unverified';
+        return currentFingerprint === recordedFingerprint ? 'live' : 'stale';
     }
 
     #merge(current, changes) {
@@ -349,9 +460,15 @@ export class ControlFile {
 
             const owner = await this.#readLockOwner();
             if (!owner) continue;
-            if (!this.isLiveProcess(owner.pid)) {
+            const ownerStatus = await this.#processRecordStatus(owner.pid, owner.processFingerprint);
+            if (ownerStatus === 'stale') {
                 await this.#quarantineStaleLock(owner);
                 continue;
+            }
+            if (ownerStatus === 'unverified') {
+                throw new Error(
+                    `Cannot verify control lock process instance for PID ${owner.pid}; refusing lock recovery`,
+                );
             }
             await sleep(5);
         }
@@ -362,10 +479,15 @@ export class ControlFile {
     async #tryClaimLock() {
         await assertSafeDirectoryPath(this.rootDir, this.rootDir);
         const token = randomUUID();
+        const processFingerprint = await this.#requiredProcessFingerprint(
+            process.pid,
+            'control lock owner',
+        );
         const claimPath = `${this.lockPath}.claim.${process.pid}.${token}`;
         await writeFile(claimPath, `${JSON.stringify({
             pid: process.pid,
             token,
+            processFingerprint,
         })}\n`, { encoding: 'utf8', flag: 'wx' });
         try {
             try {
@@ -391,7 +513,8 @@ export class ControlFile {
             }
             const owner = JSON.parse(await readFile(this.lockPath, 'utf8'));
             if (!Number.isInteger(owner?.pid) || owner.pid <= 0
-                || typeof owner?.token !== 'string' || !/^[a-z0-9-]+$/i.test(owner.token)) {
+                || typeof owner?.token !== 'string' || !/^[a-z0-9-]+$/i.test(owner.token)
+                || typeof owner?.processFingerprint !== 'string' || !owner.processFingerprint) {
                 throw new Error('invalid owner metadata');
             }
             return owner;
@@ -407,11 +530,16 @@ export class ControlFile {
     async #quarantineStaleLock(owner) {
         const reclaimPath = `${this.lockPath}.reclaim`;
         const reclaimToken = randomUUID();
+        const processFingerprint = await this.#requiredProcessFingerprint(
+            process.pid,
+            'stale-lock reclaimer',
+        );
         try {
             await writeFile(reclaimPath, `${JSON.stringify({
                 pid: process.pid,
                 token: reclaimToken,
                 identity: this.processIdentity,
+                processFingerprint,
             })}\n`, { encoding: 'utf8', flag: 'wx' });
         } catch (error) {
             if (error?.code !== 'EEXIST') throw error;
@@ -427,17 +555,24 @@ export class ControlFile {
             if (!Number.isInteger(recoveryOwner?.pid) || recoveryOwner.pid <= 0
                 || typeof recoveryOwner?.token !== 'string'
                 || !/^[a-z0-9-]+$/i.test(recoveryOwner.token)
-                || typeof recoveryOwner?.identity !== 'string' || !recoveryOwner.identity) {
+                || typeof recoveryOwner?.identity !== 'string' || !recoveryOwner.identity
+                || typeof recoveryOwner?.processFingerprint !== 'string'
+                || !recoveryOwner.processFingerprint) {
                 throw new Error(
                     `Incomplete stale-lock recovery at ${reclaimPath}; remove it manually after verifying no collector is running`,
                 );
             }
-            if (!this.isLiveProcess(recoveryOwner.pid)) {
+            const recoveryStatus = await this.#processRecordStatus(
+                recoveryOwner.pid,
+                recoveryOwner.processFingerprint,
+            );
+            if (recoveryStatus === 'stale') {
                 const currentText = await readFile(reclaimPath, 'utf8');
                 const currentOwner = JSON.parse(currentText);
                 if (currentOwner.pid !== recoveryOwner.pid
                     || currentOwner.token !== recoveryOwner.token
-                    || currentOwner.identity !== recoveryOwner.identity) {
+                    || currentOwner.identity !== recoveryOwner.identity
+                    || currentOwner.processFingerprint !== recoveryOwner.processFingerprint) {
                     return false;
                 }
                 let abandonedPath = `${reclaimPath}.stale.${recoveryOwner.token}`;
@@ -450,12 +585,18 @@ export class ControlFile {
                 await rename(reclaimPath, abandonedPath);
                 return false;
             }
+            if (recoveryStatus === 'unverified') {
+                throw new Error(
+                    `Cannot verify stale-lock reclaimer process instance for PID ${recoveryOwner.pid}`,
+                );
+            }
             return false;
         }
 
         try {
             const currentOwner = await this.#readLockOwner();
-            if (!currentOwner || currentOwner.pid !== owner.pid || currentOwner.token !== owner.token) {
+            if (!currentOwner || currentOwner.pid !== owner.pid || currentOwner.token !== owner.token
+                || currentOwner.processFingerprint !== owner.processFingerprint) {
                 return false;
             }
             const staleBase = `${this.lockPath}.stale.${owner.token}`;
@@ -480,7 +621,12 @@ export class ControlFile {
 
     async #releaseLock(token) {
         const owner = await this.#readLockOwner();
-        if (!owner || owner.pid !== process.pid || owner.token !== token) {
+        const processFingerprint = await this.#requiredProcessFingerprint(
+            process.pid,
+            'control lock owner',
+        );
+        if (!owner || owner.pid !== process.pid || owner.token !== token
+            || owner.processFingerprint !== processFingerprint) {
             throw new Error('Control lock ownership changed before release');
         }
         await unlink(this.lockPath);
@@ -515,6 +661,14 @@ function serializedLimit(value) {
 
 function runtimeLimit(value) {
     return value === null ? Number.POSITIVE_INFINITY : value;
+}
+
+function stateSourcesMatchConfig(stateSources, configSources) {
+    const immutableFields = ['sourceUrl', 'sourceSlug', 'label', 'enabled', 'sortOrder'];
+    return Array.isArray(stateSources) && stateSources.length === configSources.length
+        && stateSources.every((source, index) => immutableFields.every(
+            (field) => source?.[field] === configSources[index][field],
+        ));
 }
 
 export function savedPolicyOptions(config) {
@@ -567,6 +721,9 @@ export async function initializeRun(store, options) {
         if (existingState.configDigest !== digest) {
             throw new Error('Existing run state config digest does not match immutable config.json');
         }
+        if (!stateSourcesMatchConfig(existingState.sources, config.sources)) {
+            throw new Error('State sources differ from immutable config.json');
+        }
         return {
             state: existingState,
             config,
@@ -593,13 +750,13 @@ export async function initializeRun(store, options) {
     };
 }
 
-function isLiveProcess(processId) {
+export function isLiveProcess(processId, kill = process.kill) {
     if (!Number.isInteger(processId) || processId <= 0) return false;
     try {
-        process.kill(processId, 0);
+        kill(processId, 0);
         return true;
-    } catch {
-        return false;
+    } catch (error) {
+        return error?.code === 'EPERM';
     }
 }
 
@@ -645,10 +802,17 @@ async function runCollector(options, store, control) {
     if (options.command === 'resume' && currentControl.stop) {
         throw new Error('A stopped run cannot be resumed');
     }
-    if (options.command === 'resume' && currentControl.ownerPid !== process.pid
-        && isLiveProcess(currentControl.ownerPid)) {
-        await control.update({ pause: false });
-        return { status: 'resume-signaled', ownerPid: currentControl.ownerPid };
+    if (options.command === 'resume' && currentControl.ownerPid !== process.pid) {
+        const ownerStatus = await control.ownerStatus(currentControl);
+        if (ownerStatus === 'live') {
+            await control.update({ pause: false });
+            return { status: 'resume-signaled', ownerPid: currentControl.ownerPid };
+        }
+        if (ownerStatus === 'unverified') {
+            throw new Error(
+                `Cannot verify collector process instance for PID ${currentControl.ownerPid}; refusing resume signal`,
+            );
+        }
     }
 
     await control.claim(process.pid, { resume: options.command === 'resume' });
@@ -735,8 +899,14 @@ export async function main(argv = process.argv.slice(2)) {
     }
     if (options.command === 'export') {
         await control.exclusive(async (currentControl) => {
-            if (isLiveProcess(currentControl.ownerPid)) {
+            const ownerStatus = await control.ownerStatus(currentControl);
+            if (ownerStatus === 'live') {
                 throw new Error(`Cannot export while collector PID ${currentControl.ownerPid} is running`);
+            }
+            if (ownerStatus === 'unverified') {
+                throw new Error(
+                    `Cannot verify collector process instance for PID ${currentControl.ownerPid}; refusing export`,
+                );
             }
             await store.exportManifest();
         });

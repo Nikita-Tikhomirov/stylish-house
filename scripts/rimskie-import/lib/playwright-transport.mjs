@@ -163,12 +163,23 @@ export class PlaywrightTransport {
             headless: false,
             executablePath: browserPath,
             serviceWorkers: 'block',
+            offline: true,
         });
-        const page = context.pages()[0] || await context.newPage();
-        const transport = new PlaywrightTransport(context, page);
-        await context.route('**/*', (route) => transport.#route(route));
+        try {
+            const page = context.pages()[0] || await context.newPage();
+            const transport = new PlaywrightTransport(context, page);
+            await context.route('**/*', (route) => transport.#route(route));
+            await context.routeWebSocket('**/*', (webSocket) => webSocket.close({
+                code: 1008,
+                reason: 'WebSocket connections are disabled',
+            }));
+            await context.setOffline(false);
 
-        return transport;
+            return transport;
+        } catch (error) {
+            await context.close().catch(() => {});
+            throw error;
+        }
     }
 
     constructor(context, page) {

@@ -31,8 +31,9 @@ function fakePlaywright({
     image = validWebpBytes,
     contentType = 'image/webp',
 } = {}) {
-    const calls = { evaluate: [], goto: [] };
+    const calls = { evaluate: [], goto: [], setup: [] };
     const routes = [];
+    const webSocketRoutes = [];
     const page = {
         goto: async (url) => {
             calls.goto.push(url);
@@ -59,14 +60,25 @@ function fakePlaywright({
     };
     const context = {
         pages: () => [page],
-        route: async (pattern, handler) => routes.push([pattern, handler]),
+        route: async (pattern, handler) => {
+            calls.setup.push('http-route');
+            routes.push([pattern, handler]);
+        },
+        routeWebSocket: async (pattern, handler) => {
+            calls.setup.push('websocket-route');
+            webSocketRoutes.push([pattern, handler]);
+        },
+        setOffline: async (offline) => calls.setup.push(`offline:${offline}`),
         close: async () => {},
     };
     const chromium = {
-        launchPersistentContext: async () => context,
+        launchPersistentContext: async (...args) => {
+            calls.setup.push(`launch-offline:${args[1].offline}`);
+            return context;
+        },
     };
 
-    return { calls, chromium, routes };
+    return { calls, chromium, routes, webSocketRoutes };
 }
 
 async function openFakeTransport(options = {}) {
@@ -230,6 +242,30 @@ test('browser routing permits only the exact counted operation outside challenge
     }), false);
 });
 
+test('browser context blocks WebSockets before enabling network connectivity', async () => {
+    const { fake, transport } = await openFakeTransport();
+
+    assert.deepEqual(fake.calls.setup, [
+        'launch-offline:true',
+        'http-route',
+        'websocket-route',
+        'offline:false',
+    ]);
+    assert.equal(fake.webSocketRoutes.length, 1);
+    assert.equal(fake.webSocketRoutes[0][0], '**/*');
+
+    let closeOptions = null;
+    await fake.webSocketRoutes[0][1]({
+        close: async (options) => { closeOptions = options; },
+    });
+    assert.deepEqual(closeOptions, {
+        code: 1008,
+        reason: 'WebSocket connections are disabled',
+    });
+
+    await transport.close();
+});
+
 test('one HTML operation authorizes only its first exact document request', async () => {
     const decisions = [];
     let stopCalls = 0;
@@ -256,6 +292,8 @@ test('one HTML operation authorizes only its first exact document request', asyn
     const context = {
         pages: () => [page],
         route: async (_pattern, handler) => { routeHandler = handler; },
+        routeWebSocket: async () => {},
+        setOffline: async () => {},
         close: async () => {},
     };
     const transport = await PlaywrightTransport.open({
