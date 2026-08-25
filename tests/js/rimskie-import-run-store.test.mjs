@@ -129,6 +129,54 @@ test('export manifest requires every referenced product JSON and first image', a
     assert.equal(JSON.parse(await readFile(join(rootDir, 'run-003', 'export.json'), 'utf8')).run_id, 'run-003');
 });
 
+test('export accepts an empty Task 1 attributes record', async (t) => {
+    const rootDir = await temporaryRoot(t);
+    const store = await RunStore.open({ rootDir, runId: 'run-empty-attributes' });
+    await prepareCompletedRun(store);
+    await writeFile(join(store.imagesDir, '11889.webp'), validWebpBytes);
+
+    const manifest = await store.exportManifest();
+
+    assert.deepEqual(manifest.products[0].attributes, {});
+});
+
+test('export rejects malformed Task 1 attributes records without normalization', async (t) => {
+    const rootDir = await temporaryRoot(t);
+    const store = await RunStore.open({ rootDir, runId: 'run-invalid-attributes' });
+    await prepareCompletedRun(store);
+    await writeFile(join(store.imagesDir, '11889.webp'), validWebpBytes);
+    const baseProduct = await store.readProduct('11889');
+    const invalidAttributes = [
+        ['missing', undefined],
+        ['null', null],
+        ['array record', []],
+        ['scalar record', 'material'],
+        ['empty key', { '': ['cotton'] }],
+        ['unsafe key', { 'bad-key': ['cotton'] }],
+        ['uppercase key', { Material: ['cotton'] }],
+        ['double underscore key', { material__type: ['cotton'] }],
+        ['non-array values', { material: 'cotton' }],
+        ['empty values', { material: [] }],
+        ['duplicate values', { material: ['cotton', 'cotton'] }],
+        ['empty string value', { material: [''] }],
+        ['whitespace string value', { material: [' '] }],
+        ['non-string value', { material: [42] }],
+        ['untrimmed value', { material: [' cotton '] }],
+    ];
+
+    for (const [label, attributes] of invalidAttributes) {
+        const product = { ...baseProduct, attributes };
+        if (label === 'missing') delete product.attributes;
+        await store.saveProduct('11889', product);
+
+        await assert.rejects(
+            store.exportManifest(),
+            /attributes/i,
+            label,
+        );
+    }
+});
+
 test('export manifest rejects paths outside images directory even when target files exist', async (t) => {
     const rootDir = await temporaryRoot(t);
     const store = await RunStore.open({ rootDir, runId: 'run-004' });

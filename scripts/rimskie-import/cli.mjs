@@ -152,6 +152,7 @@ export async function assertRunDirectorySafe(dataRoot, runId, {
     realpath = fsRealpath,
     lstat = fsLstat,
     readdir = fsReaddir,
+    unlink: unlinkFile = unlink,
 } = {}) {
     assertSafeIdentifier(runId, 'run ID');
 
@@ -211,6 +212,165 @@ export async function assertRunDirectorySafe(dataRoot, runId, {
         }
     }
 
+    const sameFileIdentity = (left, right) => left.dev !== undefined && left.ino !== undefined
+        && left.dev === right.dev && left.ino === right.ino;
+    const uuidPattern = '[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
+    const createAliasPattern = new RegExp(`^config\\.json\\.${uuidPattern}\\.create$`, 'i');
+    const claimAliasPattern = new RegExp(`^control\\.json\\.lock\\.claim\\.([1-9][0-9]*)\\.(${uuidPattern})$`, 'i');
+    const staleLockPattern = new RegExp(`^control\\.json\\.lock\\.stale\\.(${uuidPattern})$`, 'i');
+    const duplicateStaleLockPattern = new RegExp(
+        `^control\\.json\\.lock\\.stale\\.(${uuidPattern})\\.(${uuidPattern})$`,
+        'i',
+    );
+    const verifiedHardLinkPaths = new Set();
+
+    async function removeRedundantAlias(aliasPath) {
+        try {
+            await unlinkFile(aliasPath);
+        } catch (error) {
+            if (error?.code !== 'ENOENT') throw error;
+        }
+    }
+
+    async function recoverPublishedConfigAlias(name) {
+        if (!createAliasPattern.test(name)) return;
+        const aliasPath = paths.join(requestedRunDir, name);
+        const targetPath = paths.join(requestedRunDir, 'config.json');
+        let aliasStats;
+        let targetStats;
+        try {
+            [aliasStats, targetStats] = await Promise.all([lstat(aliasPath), lstat(targetPath)]);
+        } catch (error) {
+            if (error?.code === 'ENOENT') return;
+            throw error;
+        }
+        if (!aliasStats.isFile?.() || aliasStats.isSymbolicLink?.() || aliasStats.nlink <= 1
+            || !targetStats.isFile?.() || targetStats.isSymbolicLink?.()
+            || !sameFileIdentity(aliasStats, targetStats)) return;
+        await removeRedundantAlias(aliasPath);
+    }
+
+    async function recoverPublishedClaimAlias(name) {
+        const match = claimAliasPattern.exec(name);
+        if (!match) return;
+        const aliasPath = paths.join(requestedRunDir, name);
+        let aliasStats;
+        try {
+            aliasStats = await lstat(aliasPath);
+        } catch (error) {
+            if (error?.code === 'ENOENT') return;
+            throw error;
+        }
+        if (!aliasStats.isFile?.() || aliasStats.isSymbolicLink?.() || aliasStats.nlink <= 1) return;
+
+        let metadata;
+        try {
+            metadata = JSON.parse(await readFile(aliasPath, 'utf8'));
+        } catch (error) {
+            if (error?.code === 'ENOENT' || error instanceof SyntaxError) return;
+            throw error;
+        }
+        if (metadata?.pid !== Number(match[1]) || metadata?.token !== match[2]) return;
+
+        const lockPath = paths.join(requestedRunDir, 'control.json.lock');
+        const targetPaths = [lockPath, `${lockPath}.stale.${match[2]}`];
+        for (const targetPath of targetPaths) {
+            let targetStats;
+            try {
+                targetStats = await lstat(targetPath);
+            } catch (error) {
+                if (error?.code === 'ENOENT') continue;
+                throw error;
+            }
+            if (targetStats.isFile?.() && !targetStats.isSymbolicLink?.()
+                && sameFileIdentity(aliasStats, targetStats)) {
+                await removeRedundantAlias(aliasPath);
+                return;
+            }
+        }
+    }
+
+    async function verifyStaleLockPair(name) {
+        const match = staleLockPattern.exec(name);
+        if (!match) return;
+        const lockPath = paths.join(requestedRunDir, 'control.json.lock');
+        const stalePath = paths.join(requestedRunDir, name);
+        let lockStats;
+        let staleStats;
+        try {
+            [lockStats, staleStats] = await Promise.all([lstat(lockPath), lstat(stalePath)]);
+        } catch (error) {
+            if (error?.code === 'ENOENT') return;
+            throw error;
+        }
+        if (!lockStats.isFile?.() || lockStats.isSymbolicLink?.() || lockStats.nlink !== 2
+            || !staleStats.isFile?.() || staleStats.isSymbolicLink?.() || staleStats.nlink !== 2
+            || !sameFileIdentity(lockStats, staleStats)) return;
+
+        let metadata;
+        try {
+            metadata = JSON.parse(await readFile(lockPath, 'utf8'));
+        } catch (error) {
+            if (error?.code === 'ENOENT' || error instanceof SyntaxError) return;
+            throw error;
+        }
+        if (metadata?.token !== match[1]) return;
+        verifiedHardLinkPaths.add(paths.resolve(lockPath));
+        verifiedHardLinkPaths.add(paths.resolve(stalePath));
+    }
+
+    async function recoverDuplicateStaleAlias(name) {
+        const match = duplicateStaleLockPattern.exec(name);
+        if (!match) return;
+        const redundantPath = paths.join(requestedRunDir, name);
+        const canonicalStalePath = paths.join(
+            requestedRunDir,
+            `control.json.lock.stale.${match[1]}`,
+        );
+        let redundantStats;
+        let canonicalStats;
+        try {
+            [redundantStats, canonicalStats] = await Promise.all([
+                lstat(redundantPath), lstat(canonicalStalePath),
+            ]);
+        } catch (error) {
+            if (error?.code === 'ENOENT') return;
+            throw error;
+        }
+        if (!redundantStats.isFile?.() || redundantStats.isSymbolicLink?.()
+            || redundantStats.nlink <= 1
+            || !canonicalStats.isFile?.() || canonicalStats.isSymbolicLink?.()
+            || !sameFileIdentity(redundantStats, canonicalStats)) return;
+
+        let metadata;
+        try {
+            metadata = JSON.parse(await readFile(canonicalStalePath, 'utf8'));
+        } catch (error) {
+            if (error?.code === 'ENOENT' || error instanceof SyntaxError) return;
+            throw error;
+        }
+        if (metadata?.token !== match[1]) return;
+        await removeRedundantAlias(redundantPath);
+    }
+
+    let topLevelEntries;
+    try {
+        topLevelEntries = await readdir(requestedRunDir, { withFileTypes: true });
+    } catch (error) {
+        if (error?.code === 'ENOENT') return requestedRunDir;
+        throw error;
+    }
+    for (const entry of topLevelEntries) {
+        const name = typeof entry === 'string' ? entry : entry.name;
+        await recoverPublishedConfigAlias(name);
+        await recoverPublishedClaimAlias(name);
+        await recoverDuplicateStaleAlias(name);
+    }
+    for (const entry of topLevelEntries) {
+        const name = typeof entry === 'string' ? entry : entry.name;
+        await verifyStaleLockPair(name);
+    }
+
     async function inspectRecursively(path) {
         let stats;
         try {
@@ -222,9 +382,7 @@ export async function assertRunDirectorySafe(dataRoot, runId, {
         if (stats.isSymbolicLink?.()) {
             throw new Error(`Nested run path must not use a junction or symbolic link: ${path}`);
         }
-        const leafName = paths.basename(path);
-        const knownLockRecoveryArtifact = leafName === 'control.json.lock'
-            || leafName.startsWith('control.json.lock.stale.');
+        const knownLockRecoveryArtifact = verifiedHardLinkPaths.has(paths.resolve(path));
         if (stats.isFile?.() && stats.nlink > 1 && !knownLockRecoveryArtifact) {
             throw new Error(`Nested run path contains an unsafe hard-linked file: ${path}`);
         }

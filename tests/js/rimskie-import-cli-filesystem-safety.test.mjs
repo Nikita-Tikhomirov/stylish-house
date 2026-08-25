@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { link, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import {
+    link, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, unlink, writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -381,6 +383,160 @@ test('recursive run safety rejects a real nested hard-linked file', async (t) =>
         assertRunDirectorySafe(dataRoot, 'run-001'),
         /hard-linked file/i,
     );
+});
+
+test('run safety recovers an exact published config create alias', async (t) => {
+    const dataRoot = `G:\\stylish-house-data\\rimskie-imports\\config-publish-${process.pid}-${Date.now()}`;
+    await mkdir(dataRoot, { recursive: true });
+    t.after(() => rm(dataRoot, { recursive: true, force: true }));
+    const store = await RunStore.open({ rootDir: dataRoot, runId: 'run-001' });
+    await initializeRun(store, {
+        maxRequests: 3, maxProducts: 1,
+        maxRequestsExplicit: false, maxProductsExplicit: false,
+    });
+    const createPath = `${store.configPath}.11111111-1111-4111-8111-111111111111.create`;
+    await link(store.configPath, createPath);
+    assert.equal((await lstat(store.configPath)).nlink, 2);
+
+    await assertRunDirectorySafe(dataRoot, 'run-001');
+
+    assert.equal((await lstat(store.configPath)).nlink, 1);
+    await assert.rejects(lstat(createPath), /ENOENT/);
+    assert.equal((await store.readConfig()).schema_version, configSchemaVersion);
+});
+
+test('run safety leaves an unpublished config create file in place', async (t) => {
+    const dataRoot = `G:\\stylish-house-data\\rimskie-imports\\config-prelink-${process.pid}-${Date.now()}`;
+    await mkdir(dataRoot, { recursive: true });
+    t.after(() => rm(dataRoot, { recursive: true, force: true }));
+    const store = await RunStore.open({ rootDir: dataRoot, runId: 'run-001' });
+    const createPath = `${store.configPath}.44444444-4444-4444-8444-444444444444.create`;
+    await writeFile(createPath, 'not-yet-published', 'utf8');
+
+    await assertRunDirectorySafe(dataRoot, 'run-001');
+
+    assert.equal(await readFile(createPath, 'utf8'), 'not-yet-published');
+    assert.equal((await lstat(createPath)).nlink, 1);
+});
+
+test('run safety tolerates creator cleanup racing exact alias recovery', async (t) => {
+    const dataRoot = `G:\\stylish-house-data\\rimskie-imports\\config-cleanup-race-${process.pid}-${Date.now()}`;
+    await mkdir(dataRoot, { recursive: true });
+    t.after(() => rm(dataRoot, { recursive: true, force: true }));
+    const store = await RunStore.open({ rootDir: dataRoot, runId: 'run-001' });
+    await writeFile(store.configPath, '{}\n', 'utf8');
+    const createPath = `${store.configPath}.88888888-8888-4888-8888-888888888888.create`;
+    await link(store.configPath, createPath);
+
+    await assertRunDirectorySafe(dataRoot, 'run-001', {
+        unlink: async (path) => {
+            await unlink(path);
+            await unlink(path);
+        },
+    });
+
+    assert.equal((await lstat(store.configPath)).nlink, 1);
+});
+
+test('run safety fails closed for a config create alias linked to a foreign node', async (t) => {
+    const dataRoot = `G:\\stylish-house-data\\rimskie-imports\\config-foreign-${process.pid}-${Date.now()}`;
+    await mkdir(dataRoot, { recursive: true });
+    t.after(() => rm(dataRoot, { recursive: true, force: true }));
+    const store = await RunStore.open({ rootDir: dataRoot, runId: 'run-001' });
+    await writeFile(store.configPath, '{}\n', 'utf8');
+    const foreignPath = join(dataRoot, 'foreign-config.json');
+    const createPath = `${store.configPath}.55555555-5555-4555-8555-555555555555.create`;
+    await writeFile(foreignPath, '{}\n', 'utf8');
+    await link(foreignPath, createPath);
+
+    await assert.rejects(assertRunDirectorySafe(dataRoot, 'run-001'), /hard-linked file/i);
+    assert.equal((await lstat(createPath)).nlink, 2);
+});
+
+test('run safety recovers an exact published control claim alias', async (t) => {
+    const dataRoot = `G:\\stylish-house-data\\rimskie-imports\\claim-publish-${process.pid}-${Date.now()}`;
+    await mkdir(dataRoot, { recursive: true });
+    t.after(() => rm(dataRoot, { recursive: true, force: true }));
+    const store = await RunStore.open({ rootDir: dataRoot, runId: 'run-001' });
+    const token = '22222222-2222-4222-8222-222222222222';
+    const lockPath = `${join(store.runDir, 'control.json')}.lock`;
+    const claimPath = `${lockPath}.claim.${process.pid}.${token}`;
+    await writeFile(claimPath, `${JSON.stringify({
+        pid: process.pid, token, processFingerprint: 'test-process-start',
+    })}\n`, 'utf8');
+    await link(claimPath, lockPath);
+
+    await assertRunDirectorySafe(dataRoot, 'run-001');
+
+    assert.equal((await lstat(lockPath)).nlink, 1);
+    await assert.rejects(lstat(claimPath), /ENOENT/);
+    assert.equal(JSON.parse(await readFile(lockPath, 'utf8')).token, token);
+});
+
+test('run safety recovers a claim alias linked to its exact stale-lock target', async (t) => {
+    const dataRoot = `G:\\stylish-house-data\\rimskie-imports\\claim-stale-${process.pid}-${Date.now()}`;
+    await mkdir(dataRoot, { recursive: true });
+    t.after(() => rm(dataRoot, { recursive: true, force: true }));
+    const store = await RunStore.open({ rootDir: dataRoot, runId: 'run-001' });
+    const token = '33333333-3333-4333-8333-333333333333';
+    const lockPath = `${join(store.runDir, 'control.json')}.lock`;
+    const claimPath = `${lockPath}.claim.${process.pid}.${token}`;
+    const stalePath = `${lockPath}.stale.${token}`;
+    await writeFile(claimPath, `${JSON.stringify({
+        pid: process.pid, token, processFingerprint: 'test-process-start',
+    })}\n`, 'utf8');
+    await link(claimPath, lockPath);
+    await rename(lockPath, stalePath);
+
+    await assertRunDirectorySafe(dataRoot, 'run-001');
+
+    assert.equal((await lstat(stalePath)).nlink, 1);
+    await assert.rejects(lstat(claimPath), /ENOENT/);
+    assert.equal(JSON.parse(await readFile(stalePath, 'utf8')).token, token);
+});
+
+test('run safety allows only an inode- and token-matched stale-lock pair', async (t) => {
+    const dataRoot = `G:\\stylish-house-data\\rimskie-imports\\lock-stale-${process.pid}-${Date.now()}`;
+    await mkdir(dataRoot, { recursive: true });
+    t.after(() => rm(dataRoot, { recursive: true, force: true }));
+    const store = await RunStore.open({ rootDir: dataRoot, runId: 'run-001' });
+    const token = '66666666-6666-4666-8666-666666666666';
+    const lockPath = `${join(store.runDir, 'control.json')}.lock`;
+    const stalePath = `${lockPath}.stale.${token}`;
+    await writeFile(lockPath, `${JSON.stringify({ pid: process.pid, token })}\n`, 'utf8');
+    await link(lockPath, stalePath);
+
+    await assertRunDirectorySafe(dataRoot, 'run-001');
+
+    const mismatchedPath = `${lockPath}.stale.77777777-7777-4777-8777-777777777777`;
+    await rename(stalePath, mismatchedPath);
+    await assert.rejects(assertRunDirectorySafe(dataRoot, 'run-001'), /hard-linked file/i);
+});
+
+test('stale-lock collision recovery converges to one token- and inode-matched alias', async (t) => {
+    const dataRoot = `G:\\stylish-house-data\\rimskie-imports\\lock-stale-converge-${process.pid}-${Date.now()}`;
+    await mkdir(dataRoot, { recursive: true });
+    t.after(() => rm(dataRoot, { recursive: true, force: true }));
+    const store = await RunStore.open({ rootDir: dataRoot, runId: 'run-001' });
+    const token = '99999999-9999-4999-8999-999999999999';
+    const controlPath = join(store.runDir, 'control.json');
+    const lockPath = `${controlPath}.lock`;
+    const stalePath = `${lockPath}.stale.${token}`;
+    await writeFile(lockPath, `${JSON.stringify({
+        pid: 999999, token, processFingerprint: 'dead-process-start',
+    })}\n`, 'utf8');
+    await link(lockPath, stalePath);
+    const control = new ControlFile(controlPath, { isLiveProcess: () => false });
+
+    await assertRunDirectorySafe(dataRoot, 'run-001');
+    await control.update({ pause: true });
+    await assertRunDirectorySafe(dataRoot, 'run-001');
+
+    const staleNames = (await readdir(store.runDir)).filter((name) => name.startsWith(
+        `control.json.lock.stale.${token}`,
+    ));
+    assert.deepEqual(staleNames, [`control.json.lock.stale.${token}`]);
+    assert.equal((await lstat(stalePath)).nlink, 1);
 });
 
 test('numeric product IDs and safe source slugs are mandatory for persisted paths', async (t) => {

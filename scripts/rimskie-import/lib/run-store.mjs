@@ -18,6 +18,7 @@ import { resolveDonorUrl } from './donor-url-policy.mjs';
 
 const manifestSchemaVersion = 'stylish-house.catalog-import/v1';
 const configSchemaVersion = 'stylish-house.catalog-import-run/v1';
+const normalizedAttributeKeyPattern = /^[a-z0-9]+(?:_[a-z0-9]+)*$/;
 
 function isMissingFile(error) {
     return error?.code === 'ENOENT';
@@ -25,6 +26,31 @@ function isMissingFile(error) {
 
 function stableJson(value) {
     return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+function validateProductAttributes(attributes, externalId) {
+    if (!attributes || typeof attributes !== 'object' || Array.isArray(attributes)) {
+        throw new Error(`Product ${externalId} attributes must be a record`);
+    }
+
+    for (const [key, values] of Object.entries(attributes)) {
+        if (!normalizedAttributeKeyPattern.test(key)) {
+            throw new Error(`Product ${externalId} attributes contain a non-normalized key`);
+        }
+        if (!Array.isArray(values) || values.length === 0) {
+            throw new Error(`Product ${externalId} attributes must contain non-empty value arrays`);
+        }
+        const uniqueValues = new Set();
+        for (const value of values) {
+            if (typeof value !== 'string' || !value.trim() || value !== value.trim()) {
+                throw new Error(`Product ${externalId} attributes contain an invalid value`);
+            }
+            if (uniqueValues.has(value)) {
+                throw new Error(`Product ${externalId} attributes contain duplicate values`);
+            }
+            uniqueValues.add(value);
+        }
+    }
 }
 
 function canonicalize(value) {
@@ -424,6 +450,7 @@ export class RunStore {
                     throw new Error(`Product ${externalId} requires ${field}`);
                 }
             }
+            validateProductAttributes(product.attributes, externalId);
             if (!/^\d+(?:\.\d{2})$/.test(product.sourcePrice)) {
                 throw new Error(`Product ${externalId} sourcePrice must be an exact donor amount`);
             }
