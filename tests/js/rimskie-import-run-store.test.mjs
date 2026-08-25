@@ -63,6 +63,21 @@ test('export manifest requires every referenced product JSON and first image', a
     assert.equal(JSON.parse(await readFile(join(rootDir, 'run-003', 'export.json'), 'utf8')).run_id, 'run-003');
 });
 
+test('export manifest rejects paths outside images directory even when target files exist', async (t) => {
+    const rootDir = await temporaryRoot(t);
+    const store = await RunStore.open({ rootDir, runId: 'run-004' });
+    const runDir = join(rootDir, 'run-004');
+
+    await store.checkpoint({ status: 'running' });
+    await store.saveSource('white', { label: 'Белые', target_slug: 'white' });
+    await store.appendMembership({ sourceSlug: 'white', externalId: '11889' });
+
+    for (const firstImagePath of ['images/../state.json', 'state.json', join(runDir, 'state.json')]) {
+        await store.saveProduct('11889', { externalId: '11889', firstImagePath });
+        await assert.rejects(store.exportManifest(), /first image path/i);
+    }
+});
+
 test('run store rejects traversal in run, source, and product identifiers', async (t) => {
     const rootDir = await temporaryRoot(t);
 

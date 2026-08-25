@@ -1,5 +1,5 @@
-import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
-import { join, relative, sep } from 'node:path';
+import { lstat, mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
+import { isAbsolute, join, relative, sep } from 'node:path';
 
 const manifestSchemaVersion = 'stylish-house.catalog-import/v1';
 
@@ -40,6 +40,23 @@ async function readJsonDirectory(directory) {
         .sort();
 
     return Promise.all(fileNames.map((fileName) => readJson(join(directory, fileName))));
+}
+
+function resolveFirstImagePath(runDir, imagesDir, imagePath, externalId) {
+    const requestedPath = imagePath || `images/${externalId}.webp`;
+    const pathParts = typeof requestedPath === 'string' ? requestedPath.split(/[\\/]+/) : [];
+    if (!requestedPath || isAbsolute(requestedPath) || pathParts.includes('..')) {
+        throw new Error(`Product ${externalId} first image path traversal is not allowed`);
+    }
+
+    const resolvedPath = join(runDir, requestedPath);
+    const imageRelativePath = relative(imagesDir, resolvedPath);
+    if (isAbsolute(imageRelativePath) || imageRelativePath === '..'
+        || imageRelativePath.startsWith(`..${sep}`)) {
+        throw new Error(`Product ${externalId} first image path must be inside images directory`);
+    }
+
+    return resolvedPath;
 }
 
 export class RunStore {
@@ -133,15 +150,19 @@ export class RunStore {
                 throw error;
             }
 
-            const imagePath = product.firstImagePath || product.first_image_path || `images/${externalId}.webp`;
-            const resolvedImagePath = join(this.runDir, imagePath);
-            const imageRelativePath = relative(this.runDir, resolvedImagePath);
-            if (imageRelativePath.startsWith(`..${sep}`) || imageRelativePath === '..') {
-                throw new Error(`Product ${externalId} first image path traversal is not allowed`);
-            }
+            const imagePath = product.firstImagePath || product.first_image_path;
+            const resolvedImagePath = resolveFirstImagePath(
+                this.runDir,
+                this.imagesDir,
+                imagePath,
+                externalId,
+            );
 
             try {
-                await readFile(resolvedImagePath);
+                const imageStats = await lstat(resolvedImagePath);
+                if (!imageStats.isFile()) {
+                    throw new Error(`Product ${externalId} first image must be a regular file`);
+                }
             } catch (error) {
                 if (isMissingFile(error)) {
                     throw new Error(`Missing first image for ${externalId}`);

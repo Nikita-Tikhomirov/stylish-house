@@ -44,6 +44,7 @@ test('rimskie import parser product keeps the first gallery photo and factual at
         attributes: {
             material: ['полиэстер'],
             color: ['белый'],
+            svetopronitsaemost: ['40%'],
         },
     });
 });

@@ -5,6 +5,14 @@ const attributeKeys = new Map([
     ['цвет', 'color'],
 ]);
 
+const cyrillicTransliteration = new Map([
+    ['а', 'a'], ['б', 'b'], ['в', 'v'], ['г', 'g'], ['д', 'd'], ['е', 'e'], ['ё', 'e'],
+    ['ж', 'zh'], ['з', 'z'], ['и', 'i'], ['й', 'i'], ['к', 'k'], ['л', 'l'], ['м', 'm'],
+    ['н', 'n'], ['о', 'o'], ['п', 'p'], ['р', 'r'], ['с', 's'], ['т', 't'], ['у', 'u'],
+    ['ф', 'f'], ['х', 'kh'], ['ц', 'ts'], ['ч', 'ch'], ['ш', 'sh'], ['щ', 'shch'], ['ъ', ''],
+    ['ы', 'y'], ['ь', ''], ['э', 'e'], ['ю', 'yu'], ['я', 'ya'],
+]);
+
 function normalizedText(node) {
     return node?.textContent?.replace(/\s+/g, ' ').trim() || '';
 }
@@ -33,8 +41,14 @@ function externalIdFromDocument(document, pageUrl) {
 function attributeKey(label) {
     const normalizedLabel = label.replace(/\s+/g, ' ').trim().toLowerCase();
 
-    return attributeKeys.get(normalizedLabel) || normalizedLabel
-        .replace(/[^a-z0-9]+/g, '_')
+    if (attributeKeys.has(normalizedLabel)) return attributeKeys.get(normalizedLabel);
+
+    return [...normalizedLabel]
+        .map((character) => cyrillicTransliteration.get(character) ?? character)
+        .join('')
+        .normalize('NFKD')
+        .replace(/\p{Mark}/gu, '')
+        .replace(/[^\p{Letter}\p{Number}]+/gu, '_')
         .replace(/^_+|_+$/g, '');
 }
 
