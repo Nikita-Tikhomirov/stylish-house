@@ -21,6 +21,30 @@ Laravel is a web application framework with expressive, elegant syntax. We belie
 
 Laravel is accessible, powerful, and provides tools required for large, robust applications.
 
+## Private Rimskie catalog collection
+
+The collector creates a private, non-publishing import bundle. It does not modify the public catalog or publish donor content. Node.js 22+ and an installed Chrome, Edge, or Chromium browser are required; `playwright-core` does not download a browser.
+
+Runtime data must use an explicit absolute writable root outside Windows drive `C:`. On this workstation use `G:\stylish-house-data\rimskie-imports`. You can pass it on every command or set `RIMSKIE_IMPORT_DATA_ROOT`. The CLI rejects relative paths, unwritable directories, and every root that resolves to drive `C:`.
+
+```powershell
+$env:RIMSKIE_IMPORT_DATA_ROOT = 'G:\stylish-house-data\rimskie-imports'
+node scripts/rimskie-import/cli.mjs start --run 2026-08-25 --data-root 'G:\stylish-house-data\rimskie-imports' --chrome 'C:\Program Files\Google\Chrome\Application\chrome.exe'
+node scripts/rimskie-import/cli.mjs status --run 2026-08-25 --data-root 'G:\stylish-house-data\rimskie-imports'
+node scripts/rimskie-import/cli.mjs status --run 2026-08-25 --data-root 'G:\stylish-house-data\rimskie-imports' --json
+node scripts/rimskie-import/cli.mjs pause --run 2026-08-25 --data-root 'G:\stylish-house-data\rimskie-imports'
+node scripts/rimskie-import/cli.mjs resume --run 2026-08-25 --data-root 'G:\stylish-house-data\rimskie-imports' --chrome 'C:\Program Files\Google\Chrome\Application\chrome.exe'
+node scripts/rimskie-import/cli.mjs stop --run 2026-08-25 --data-root 'G:\stylish-house-data\rimskie-imports'
+node scripts/rimskie-import/cli.mjs export --run 2026-08-25 --data-root 'G:\stylish-house-data\rimskie-imports'
+node scripts/rimskie-import/cli.mjs dry-run --run 2026-08-25-smoke --data-root 'G:\stylish-house-data\rimskie-imports' --max-requests 3 --max-products 1 --chrome 'C:\Program Files\Google\Chrome\Application\chrome.exe'
+```
+
+Each run is stored entirely below `<data-root>\<run-id>`: `state.json`, the separate atomic `control.json`, `events.ndjson`, source and product JSON, actual first-photo bytes in `images`, the persistent authenticated browser `profile`, and `export.json`. No runtime files or profile data use project `storage/app`.
+
+Collection is strictly sequential (`concurrency: 1`). HTML waits are randomized between 20–40 seconds, image waits between 10–20 seconds, and the rolling budget is 120 requests per hour. Consecutive `403`/`429` failures back off for 2, 5, and 15 minutes; the third failure pauses the run and no fourth retry is automatic. A successful request resets the failure counter. A dry run defaults to three requests and one product when its limits are omitted.
+
+The browser is always visible and uses the run-local persistent profile. Complete authentication manually. If BotHunt or another challenge appears, the collector pauses and keeps that visible browser available. Only make a click when it is explicitly authorized, then run `resume`; the collector never automates or bypasses a challenge. `pause` and `stop` only atomically update `control.json`, which is checked before every donor request, so they cannot race `state.json` checkpoints. `status`, `pause`, `stop`, and `export` never access the donor. A stopped run cannot be resumed.
+
 ## Learning Laravel
 
 Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
