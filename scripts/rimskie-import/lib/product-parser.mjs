@@ -1,5 +1,7 @@
 import { JSDOM } from 'jsdom';
 
+import { resolveDonorUrl } from './donor-url-policy.mjs';
+
 const attributeKeys = new Map([
     ['материал', 'material'],
     ['цвет', 'color'],
@@ -69,17 +71,25 @@ function readAttributes(document) {
 }
 
 export function parseProductPage(html, pageUrl) {
-    const document = new JSDOM(html, { url: pageUrl }).window.document;
+    const approvedPageUrl = resolveDonorUrl(pageUrl, {
+        kind: 'html',
+        label: 'product page URL',
+    });
+    const document = new JSDOM(html, { url: approvedPageUrl }).window.document;
     const firstImage = document.querySelector('.product-gallery img, [data-gallery] img, .gallery img');
 
     return {
-        externalId: externalIdFromDocument(document, pageUrl),
-        sourceUrl: pageUrl,
+        externalId: externalIdFromDocument(document, approvedPageUrl),
+        sourceUrl: approvedPageUrl,
         sourceTitle: normalizedText(document.querySelector('h1')),
         sourceDescription: normalizedText(document.querySelector('.product-description, [itemprop="description"]')),
         sourcePrice: normalizeMoney(document.querySelector('meta[itemprop="price"]')?.getAttribute('content')),
         firstImageUrl: firstImage?.getAttribute('src')
-            ? new URL(firstImage.getAttribute('src'), pageUrl).href
+            ? resolveDonorUrl(firstImage.getAttribute('src'), {
+                baseUrl: approvedPageUrl,
+                kind: 'image',
+                label: 'first image URL',
+            })
             : null,
         attributes: readAttributes(document),
     };

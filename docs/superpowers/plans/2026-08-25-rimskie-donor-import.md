@@ -16,9 +16,9 @@
 - Default HTML delay is random `20–40` seconds; default image delay is random `10–20` seconds.
 - Default donor-origin ceiling is `120` requests per rolling hour.
 - A visible BotHunt/challenge pauses immediately. Ordinary `403`, `429`, timeout, and network failures use `2`, `5`, then `15` minute backoff; the third consecutive failure requires an explicit resume and cannot cause a fourth automatic request after restart.
-- A completed URL or downloaded image is never requested again when resuming a run.
+- A parsed URL or downloaded image with a durable artifact/checkpoint is never requested again. A process death after receiving HTML but before that durable write may repeat the URL, while the prior reservation remains counted.
 - Only the actual WebP bytes of the first product photo are saved; URL-only records and gallery images are not collected.
-- Local collector state, browser profile, checkpoints, JSON/NDJSON, export, and downloaded photos must use the explicit root `G:\stylish-house-data\rimskie-imports`; the CLI requires `--data-root` or `RIMSKIE_IMPORT_DATA_ROOT` and rejects drive `C:` before writing.
+- Local collector state, browser profile, checkpoints, JSON/NDJSON, export, and downloaded photos must use the explicit root `G:\stylish-house-data\rimskie-imports`; the CLI rejects drive `C:`, recursively rejects existing reparse points, and revalidates atomic write targets.
 - Donor price and raw donor copy remain private staging data and never appear on public pages.
 - One donor product is stored once and may belong to any number of the 46 SEO collections.
 - Rewritten copy may use only facts present in source data, must remove donor branding, and suspicious output is marked `needs_review`.
@@ -36,7 +36,7 @@
 - `config/rimskie-import-sources.json` — single versioned source of truth for the 46 labels, donor URLs, target slugs, enable flags, and order.
 - `scripts/rimskie-import/lib/category-parser.mjs` — pure category HTML parser.
 - `scripts/rimskie-import/lib/product-parser.mjs` — pure product HTML parser and attribute normalization input.
-- `scripts/rimskie-import/lib/run-store.mjs` — atomic checkpoints, NDJSON append, resumable queues, and package export.
+- `scripts/rimskie-import/lib/run-store.mjs` — exclusive atomic checkpoints, immutable run config, resumable queues, existing-run open, and completed-package export validation.
 - `scripts/rimskie-import/lib/request-policy.mjs` — delay, rolling hourly budget, backoff, and auto-pause decisions.
 - `scripts/rimskie-import/lib/playwright-transport.mjs` — persistent headed Chrome profile and donor-only resource policy.
 - `scripts/rimskie-import/lib/collector.mjs` — category/product/image state machine.
@@ -349,7 +349,7 @@ Expected: FAIL because `Collector` and transport contracts do not exist.
 
 Run: `npm install --save-dev playwright-core`
 
-The transport uses `chromium.launchPersistentContext(profileDir, { headless: false, executablePath })`, discovers Chrome/Edge paths on Windows and common Chromium paths on Linux, and keeps the profile inside the validated `G:` run directory. After an authenticated session exists, it aborts stylesheets, fonts, media, analytics hosts, and every image except the exact first-image download request. It detects ordinary `403`/`429` as retryable typed failures, but any visible BotHunt/challenge page—including HTML returned to an image request—pauses immediately and disarms resource blocking. It accepts only matching `image/webp` bytes for the `.webp` destination, does not inspect or export cookies, and never tries to defeat a challenge; the visible browser remains available for the already-authorized human click.
+The transport uses `chromium.launchPersistentContext(profileDir, { headless: false, executablePath })`, discovers Chrome/Edge paths on Windows and common Chromium paths on Linux, and keeps the profile inside the validated `G:` run directory. Parser, queued, redirect, and image URLs must remain HTTPS on the exact approved `rimskie.com` origin and path families. During collection it permits only the exact counted main document or exact first-image request; all off-origin and unbudgeted subrequests are aborted. It detects ordinary `403`/`429` as retryable typed failures, but any visible BotHunt/challenge page—including HTML-shaped bytes returned to an image request regardless of MIME—pauses immediately and permits only same-origin challenge resources. It accepts only structurally valid `image/webp` bytes for the `.webp` destination, does not inspect or export cookies, and never tries to defeat a challenge; the visible browser remains available for the already-authorized human click.
 
 - [ ] **Step 7: Implement the collector state machine**
 

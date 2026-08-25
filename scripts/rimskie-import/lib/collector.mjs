@@ -2,17 +2,11 @@ import { join } from 'node:path';
 
 import { parseCategoryPage } from './category-parser.mjs';
 import { parseProductPage } from './product-parser.mjs';
-import { validateImageFile } from './playwright-transport.mjs';
+import { assertNumericExternalId } from './safe-filesystem.mjs';
+import { validateImageFile } from './webp.mjs';
 
 const terminalStatuses = new Set(['completed', 'stopped']);
 const retryableFailureKinds = new Set(['network', 'timeout', 'http_403', 'http_429']);
-
-function assertSafeId(value, label) {
-    if (typeof value !== 'string' || !value || value === '.' || value === '..'
-        || value.includes('/') || value.includes('\\') || value.includes('..')) {
-        throw new Error(`${label} path traversal is not allowed`);
-    }
-}
 
 function sourceRecord(source, status = source.completed ? 'completed' : 'running') {
     return {
@@ -53,10 +47,12 @@ export class Collector {
         maxRequests = Number.POSITIVE_INFINITY,
         maxProducts = Number.POSITIVE_INFINITY,
         acknowledgeFailurePause = false,
+        acknowledgeError = false,
     }) {
         const state = await store.readState();
         if (!state) throw new Error('Run state does not exist');
         if (terminalStatuses.has(state.status)) return snapshot(state);
+        if (state.status === 'error' && !acknowledgeError) return snapshot(state);
 
         const context = {
             store,
@@ -73,6 +69,7 @@ export class Collector {
         state.requestPolicy = policy.snapshot();
         policy.connect({
             beforeReserve: async () => !await this.#mustHalt(context),
+            onEvent: (event) => this.#appendEvent(context, event),
             persistState: async (policyState, reason) => {
                 state.requestPolicy = policyState;
                 if (reason === 'reservation') {
@@ -88,10 +85,12 @@ export class Collector {
                 const isNewPause = state.status !== 'paused' || state.pauseReason !== pauseReason;
                 state.status = 'paused';
                 state.pauseReason = pauseReason;
-                if (isNewPause) {
-                    await store.appendEvent({ type: 'pause', reason: pauseReason, recovered: true });
-                }
                 await store.checkpoint(state);
+                if (isNewPause) {
+                    await this.#appendEvent(context, {
+                        type: 'pause', reason: pauseReason, recovered: true,
+                    });
+                }
                 return snapshot(state);
             }
             await policy.resumePendingBackoff();
@@ -102,10 +101,10 @@ export class Collector {
         const previousStatus = state.status;
         state.status = 'running';
         delete state.pauseReason;
-        if (previousStatus === 'paused' || previousStatus === 'limited') {
-            await store.appendEvent({ type: 'resume', previousStatus });
-        }
         await store.checkpoint(state);
+        if (previousStatus === 'paused' || previousStatus === 'limited' || previousStatus === 'error') {
+            await this.#appendEvent(context, { type: 'resume', previousStatus });
+        }
 
         try {
             for (const source of state.sources) {
@@ -115,21 +114,23 @@ export class Collector {
 
             if (state.status === 'running') {
                 state.status = state.sources.every((source) => source.completed) ? 'completed' : 'limited';
-                await store.appendEvent({
+                if (state.status === 'limited') state.pauseReason = 'limit';
+                else delete state.pauseReason;
+                await store.checkpoint(state);
+                await this.#appendEvent(context, {
                     type: state.status === 'completed' ? 'completion' : 'pause',
                     reason: state.status === 'limited' ? 'limit' : undefined,
                 });
-                await store.checkpoint(state);
             }
         } catch (error) {
             state.status = 'error';
             delete state.pauseReason;
-            await store.appendEvent({
+            await store.checkpoint(state);
+            await this.#appendEvent(context, {
                 type: 'error',
                 kind: 'collector',
                 message: error?.message || String(error),
             });
-            await store.checkpoint(state);
         }
 
         return snapshot(state);
@@ -153,7 +154,7 @@ export class Collector {
 
             const page = parseCategoryPage(html, pageUrl);
             for (const product of page.products) {
-                assertSafeId(product.externalId, 'product external ID');
+                assertNumericExternalId(product.externalId);
                 await context.store.appendMembership({
                     sourceSlug: source.sourceSlug,
                     externalId: product.externalId,
@@ -207,7 +208,7 @@ export class Collector {
 
                 const parsedProduct = parseProductPage(html, card.sourceUrl);
                 const parsedExternalId = parsedProduct.externalId || card.externalId;
-                assertSafeId(parsedExternalId, 'product external ID');
+                assertNumericExternalId(parsedExternalId);
                 card.draft = {
                     ...parsedProduct,
                     externalId: parsedExternalId,
@@ -221,7 +222,7 @@ export class Collector {
 
             const product = card.draft;
             const externalId = product.externalId;
-            assertSafeId(externalId, 'product external ID');
+            assertNumericExternalId(externalId);
             if (!product.firstImageUrl) {
                 await this.#setError(context, 'missing_first_image', card.sourceUrl);
                 return;
@@ -275,17 +276,18 @@ export class Collector {
                 if (error?.code === 'request_cancelled') return null;
                 const isHourlyBudget = error?.code === 'hourly_budget_exhausted';
                 context.state.status = isHourlyBudget ? 'paused' : 'error';
-                context.state.pauseReason = isHourlyBudget ? 'hourly-budget' : undefined;
-                await context.store.appendEvent({
+                if (isHourlyBudget) context.state.pauseReason = 'hourly-budget';
+                else delete context.state.pauseReason;
+                await context.store.checkpoint(context.state);
+                await this.#appendEvent(context, {
                     type: 'error',
                     kind: isHourlyBudget ? 'hourly_budget' : 'policy',
                     url,
                     message: error?.message || String(error),
                 });
                 if (isHourlyBudget) {
-                    await context.store.appendEvent({ type: 'pause', reason: 'hourly-budget' });
+                    await this.#appendEvent(context, { type: 'pause', reason: 'hourly-budget' });
                 }
-                await context.store.checkpoint(context.state);
                 return null;
             }
             if (await this.#mustHalt(context)) return null;
@@ -302,28 +304,29 @@ export class Collector {
                     message: error?.message || String(error),
                 };
                 if (failureKind === 'challenge') {
-                    await context.store.appendEvent(errorEvent);
                     context.state.status = 'paused';
                     context.state.pauseReason = 'challenge';
-                    await context.store.appendEvent({ type: 'pause', reason: 'challenge' });
                     await context.store.checkpoint(context.state);
+                    await this.#appendEvent(context, errorEvent);
+                    await this.#appendEvent(context, { type: 'pause', reason: 'challenge' });
                     return null;
                 }
                 if (!retryableFailureKinds.has(failureKind)) {
-                    await context.store.appendEvent(errorEvent);
                     context.state.status = 'error';
+                    delete context.state.pauseReason;
                     await context.store.checkpoint(context.state);
+                    await this.#appendEvent(context, errorEvent);
                     return null;
                 }
 
                 const action = await context.policy.recordFailure(failureKind, {
-                    afterPersist: () => context.store.appendEvent(errorEvent),
+                    afterPersist: () => this.#appendEvent(context, errorEvent),
                 });
                 if (action === 'pause') {
                     context.state.status = 'paused';
                     context.state.pauseReason = failureKind;
-                    await context.store.appendEvent({ type: 'pause', reason: failureKind });
                     await context.store.checkpoint(context.state);
+                    await this.#appendEvent(context, { type: 'pause', reason: failureKind });
                     return null;
                 }
             }
@@ -338,15 +341,15 @@ export class Collector {
         if (flags.stop) {
             context.state.status = 'stopped';
             delete context.state.pauseReason;
-            await context.store.appendEvent({ type: 'stop', reason: 'operator' });
             await context.store.checkpoint(context.state);
+            await this.#appendEvent(context, { type: 'stop', reason: 'operator' });
             return true;
         }
         if (flags.pause) {
             context.state.status = 'paused';
             context.state.pauseReason = 'operator';
-            await context.store.appendEvent({ type: 'pause', reason: 'operator' });
             await context.store.checkpoint(context.state);
+            await this.#appendEvent(context, { type: 'pause', reason: 'operator' });
             return true;
         }
 
@@ -356,14 +359,26 @@ export class Collector {
     async #setLimited(context, reason) {
         context.state.status = 'limited';
         context.state.pauseReason = reason;
-        await context.store.appendEvent({ type: 'pause', reason });
         await context.store.checkpoint(context.state);
+        await this.#appendEvent(context, { type: 'pause', reason });
     }
 
     async #setError(context, kind, url) {
         context.state.status = 'error';
         delete context.state.pauseReason;
-        await context.store.appendEvent({ type: 'error', kind, url });
         await context.store.checkpoint(context.state);
+        await this.#appendEvent(context, { type: 'error', kind, url });
+    }
+
+    async #appendEvent(context, event) {
+        try {
+            await context.store.appendEvent(event);
+        } catch (error) {
+            context.state.eventLogError = {
+                eventType: event?.type || 'unknown',
+                message: error?.message || String(error),
+            };
+            await context.store.checkpoint(context.state);
+        }
     }
 }

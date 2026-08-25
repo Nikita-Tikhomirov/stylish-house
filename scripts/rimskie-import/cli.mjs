@@ -5,18 +5,27 @@ import { constants } from 'node:fs';
 import {
     access as fsAccess,
     link as fsLink,
+    lstat as fsLstat,
     mkdir as fsMkdir,
     readFile,
+    readdir as fsReaddir,
     realpath as fsRealpath,
     rename,
     unlink,
     writeFile,
 } from 'node:fs/promises';
-import { basename, join, posix, win32 } from 'node:path';
+import { basename, dirname, join, posix, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 
-import { RunStore } from './lib/run-store.mjs';
+import { DEFAULT_LIMITS } from './lib/request-policy.mjs';
+import { configSchemaVersion, RunStore } from './lib/run-store.mjs';
+import {
+    assertSafeDirectoryPath,
+    assertSafeIdentifier,
+    readSafeFile,
+    writeFileAtomically,
+} from './lib/safe-filesystem.mjs';
 
 const commands = new Set(['start', 'status', 'pause', 'resume', 'stop', 'export', 'dry-run']);
 const valueOptions = new Set(['--run', '--data-root', '--chrome', '--max-requests', '--max-products']);
@@ -53,6 +62,7 @@ export function parseArguments(argv, environment = process.env) {
     const dataRoot = values.get('--data-root') || environment.RIMSKIE_IMPORT_DATA_ROOT;
     if (!runId) throw new Error('--run is required');
     if (!dataRoot) throw new Error('--data-root or RIMSKIE_IMPORT_DATA_ROOT is required');
+    assertSafeIdentifier(runId, 'run ID');
 
     return {
         command,
@@ -66,6 +76,8 @@ export function parseArguments(argv, environment = process.env) {
         maxProducts: values.has('--max-products')
             ? positiveInteger(values.get('--max-products'), '--max-products')
             : command === 'dry-run' ? 1 : Number.POSITIVE_INFINITY,
+        maxRequestsExplicit: values.has('--max-requests'),
+        maxProductsExplicit: values.has('--max-products'),
     };
 }
 
@@ -117,13 +129,14 @@ async function resolveThroughExistingAncestor(value, platform, realpath) {
 
 export async function resolveDataRoot(value, {
     platform = process.platform,
+    create = true,
     mkdir = fsMkdir,
     access = fsAccess,
     realpath = fsRealpath,
 } = {}) {
     assertAllowedRoot(value, platform);
     const safeTarget = await resolveThroughExistingAncestor(value, platform, realpath);
-    await mkdir(safeTarget, { recursive: true });
+    if (create) await mkdir(safeTarget, { recursive: true });
     await access(safeTarget, constants.W_OK);
     const resolved = await realpath(safeTarget);
     assertAllowedRoot(resolved, platform);
@@ -134,11 +147,10 @@ export async function resolveDataRoot(value, {
 export async function assertRunDirectorySafe(dataRoot, runId, {
     platform = process.platform,
     realpath = fsRealpath,
+    lstat = fsLstat,
+    readdir = fsReaddir,
 } = {}) {
-    if (typeof runId !== 'string' || !runId || runId === '.' || runId === '..'
-        || runId.includes('/') || runId.includes('\\') || runId.includes('..')) {
-        throw new Error('Run ID path traversal is not allowed');
-    }
+    assertSafeIdentifier(runId, 'run ID');
 
     const paths = pathApi(platform);
     const requestedRunDir = paths.join(dataRoot, runId);
@@ -159,6 +171,7 @@ export async function assertRunDirectorySafe(dataRoot, runId, {
         'products',
         'images',
         'profile',
+        'config.json',
         'state.json',
         'control.json',
         'control.json.lock',
@@ -186,19 +199,65 @@ export async function assertRunDirectorySafe(dataRoot, runId, {
         }
     }
 
+    function assertSafeLeafName(name) {
+        if (typeof name !== 'string' || !name || name === '.' || name === '..'
+            || name.includes('/') || name.includes('\\') || name.includes(':')
+            || /[. ]$/.test(name)
+            || /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i.test(name)) {
+            throw new Error(`Unsafe nested run path name: ${name}`);
+        }
+    }
+
+    async function inspectRecursively(path) {
+        let stats;
+        try {
+            stats = await lstat(path);
+        } catch (error) {
+            if (error?.code === 'ENOENT') return;
+            throw error;
+        }
+        if (stats.isSymbolicLink?.()) {
+            throw new Error(`Nested run path must not use a junction or symbolic link: ${path}`);
+        }
+        let actual;
+        try {
+            actual = await realpath(path);
+        } catch (error) {
+            if (error?.code === 'ENOENT') return;
+            throw error;
+        }
+        assertAllowedRoot(actual, platform);
+        const requested = paths.resolve(path);
+        const resolved = paths.resolve(actual);
+        const same = platform === 'win32'
+            ? requested.toLowerCase() === resolved.toLowerCase()
+            : requested === resolved;
+        if (!same) throw new Error(`Nested run path resolves through a junction: ${path}`);
+
+        if (!stats.isDirectory?.()) return;
+        for (const entry of await readdir(path, { withFileTypes: true })) {
+            const name = typeof entry === 'string' ? entry : entry.name;
+            assertSafeLeafName(name);
+            await inspectRecursively(paths.join(path, name));
+        }
+    }
+
+    await inspectRecursively(requestedRunDir);
+
     return requestedRunDir;
 }
 
 export class ControlFile {
     constructor(path, { isLiveProcess: liveProcessCheck = isLiveProcess } = {}) {
         this.path = path;
+        this.rootDir = dirname(path);
         this.lockPath = `${path}.lock`;
         this.isLiveProcess = liveProcessCheck;
     }
 
     async read() {
         try {
-            return JSON.parse(await readFile(this.path, 'utf8'));
+            return JSON.parse(await readSafeFile(this.rootDir, this.path, 'utf8'));
         } catch (error) {
             if (error?.code === 'ENOENT') return { pause: false, stop: false };
             throw error;
@@ -252,9 +311,12 @@ export class ControlFile {
     }
 
     async #writeUnlocked(value) {
-        const temporaryPath = `${this.path}.${process.pid}.tmp`;
-        await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
-        await rename(temporaryPath, this.path);
+        await writeFileAtomically(
+            this.rootDir,
+            this.path,
+            `${JSON.stringify(value, null, 2)}\n`,
+            'utf8',
+        );
     }
 
     async #withLock(operation) {
@@ -281,6 +343,7 @@ export class ControlFile {
     }
 
     async #tryClaimLock() {
+        await assertSafeDirectoryPath(this.rootDir, this.rootDir);
         const token = randomUUID();
         const claimPath = `${this.lockPath}.claim.${process.pid}.${token}`;
         await writeFile(claimPath, `${JSON.stringify({
@@ -304,6 +367,11 @@ export class ControlFile {
 
     async #readLockOwner() {
         try {
+            await assertSafeDirectoryPath(this.rootDir, this.rootDir);
+            const lockStats = await fsLstat(this.lockPath);
+            if (!lockStats.isFile() || lockStats.isSymbolicLink()) {
+                throw new Error('lock is not a regular file');
+            }
             const owner = JSON.parse(await readFile(this.lockPath, 'utf8'));
             if (!Number.isInteger(owner?.pid) || owner.pid <= 0
                 || typeof owner?.token !== 'string' || !/^[a-z0-9-]+$/i.test(owner.token)) {
@@ -320,16 +388,55 @@ export class ControlFile {
     }
 
     async #quarantineStaleLock(owner) {
-        const stalePath = `${this.lockPath}.stale.${owner.token}`;
+        const reclaimPath = `${this.lockPath}.reclaim`;
+        const reclaimToken = randomUUID();
         try {
-            await fsLink(this.lockPath, stalePath);
+            await writeFile(reclaimPath, `${JSON.stringify({
+                pid: process.pid,
+                token: reclaimToken,
+            })}\n`, { encoding: 'utf8', flag: 'wx' });
         } catch (error) {
-            if (['ENOENT', 'EEXIST'].includes(error?.code)) return false;
-            throw error;
+            if (error?.code !== 'EEXIST') throw error;
+            let recoveryOwner;
+            try {
+                recoveryOwner = JSON.parse(await readFile(reclaimPath, 'utf8'));
+            } catch (readError) {
+                throw new Error(
+                    `Incomplete stale-lock recovery at ${reclaimPath}; remove it manually after verifying no collector is running`,
+                    { cause: readError },
+                );
+            }
+            if (!this.isLiveProcess(recoveryOwner?.pid)) {
+                throw new Error(
+                    `Abandoned stale-lock recovery at ${reclaimPath}; remove it manually after verifying no collector is running`,
+                );
+            }
+            return false;
         }
-        await unlink(this.lockPath);
 
-        return true;
+        try {
+            const currentOwner = await this.#readLockOwner();
+            if (!currentOwner || currentOwner.pid !== owner.pid || currentOwner.token !== owner.token) {
+                return false;
+            }
+            const staleBase = `${this.lockPath}.stale.${owner.token}`;
+            let stalePath = staleBase;
+            try {
+                await fsLstat(staleBase);
+                stalePath = `${staleBase}.${randomUUID()}`;
+            } catch (error) {
+                if (error?.code !== 'ENOENT') throw error;
+            }
+            await rename(this.lockPath, stalePath);
+            return true;
+        } catch (error) {
+            if (error?.code === 'ENOENT') return false;
+            throw error;
+        } finally {
+            await unlink(reclaimPath).catch((error) => {
+                if (error?.code !== 'ENOENT') throw error;
+            });
+        }
     }
 
     async #releaseLock(token) {
@@ -363,19 +470,70 @@ async function loadSources() {
         }));
 }
 
-async function initializeState(store) {
-    const existing = await store.readState();
-    if (existing) return existing;
+function serializedLimit(value) {
+    return Number.isFinite(value) ? value : null;
+}
 
+function runtimeLimit(value) {
+    return value === null ? Number.POSITIVE_INFINITY : value;
+}
+
+async function initializeRun(store, options) {
+    const existingState = await store.readState();
+    let config;
+    try {
+        config = await store.readConfig();
+    } catch (error) {
+        if (error?.code !== 'ENOENT') throw error;
+        if (existingState) {
+            throw new Error('Existing run is missing immutable config.json and cannot be resumed safely');
+        }
+        const sources = await loadSources();
+        config = {
+            schema_version: configSchemaVersion,
+            sources,
+            limits: {
+                html_delay_ms: DEFAULT_LIMITS.htmlDelayMs,
+                image_delay_ms: DEFAULT_LIMITS.imageDelayMs,
+                hourly_requests: DEFAULT_LIMITS.hourlyLimit,
+                backoff_ms: DEFAULT_LIMITS.backoffMs,
+                concurrency: DEFAULT_LIMITS.concurrency,
+                max_requests: serializedLimit(options.maxRequests),
+                max_products: serializedLimit(options.maxProducts),
+            },
+        };
+        await store.initializeConfig(config);
+    }
+
+    const configuredMaxRequests = runtimeLimit(config.limits.max_requests);
+    const configuredMaxProducts = runtimeLimit(config.limits.max_products);
+    if (options.maxRequestsExplicit && options.maxRequests !== configuredMaxRequests) {
+        throw new Error('Run max-request limit is immutable and differs from config.json');
+    }
+    if (options.maxProductsExplicit && options.maxProducts !== configuredMaxProducts) {
+        throw new Error('Run max-product limit is immutable and differs from config.json');
+    }
+
+    if (existingState) {
+        return {
+            state: existingState,
+            maxRequests: configuredMaxRequests,
+            maxProducts: configuredMaxProducts,
+        };
+    }
     const state = {
         status: 'ready',
         requestCount: 0,
         completedProductIds: [],
-        sources: await loadSources(),
+        sources: structuredClone(config.sources),
     };
     await store.checkpoint(state);
 
-    return state;
+    return {
+        state,
+        maxRequests: configuredMaxRequests,
+        maxProducts: configuredMaxProducts,
+    };
 }
 
 function isLiveProcess(processId) {
@@ -426,10 +584,6 @@ async function runCollector(options, store, control) {
         import('./lib/playwright-transport.mjs'),
         import('./lib/request-policy.mjs'),
     ]);
-    const state = await initializeState(store);
-    if (state.status === 'stopped') throw new Error('A stopped run cannot be resumed');
-    if (state.status === 'completed') return printableSnapshot(state, await control.read());
-
     const currentControl = await control.read();
     if (options.command === 'resume' && currentControl.stop) {
         throw new Error('A stopped run cannot be resumed');
@@ -445,6 +599,12 @@ async function runCollector(options, store, control) {
     let result;
 
     try {
+        const initialized = await initializeRun(store, options);
+        const { state } = initialized;
+        if (state.status === 'stopped') throw new Error('A stopped run cannot be resumed');
+        if (state.status === 'completed') {
+            return printableSnapshot(state, await control.read());
+        }
         transport = await PlaywrightTransport.open({
             profileDir: join(store.runDir, 'profile'),
             headed: true,
@@ -458,9 +618,10 @@ async function runCollector(options, store, control) {
                 transport,
                 policy,
                 control,
-                maxRequests: options.maxRequests,
-                maxProducts: options.maxProducts,
+                maxRequests: initialized.maxRequests,
+                maxProducts: initialized.maxProducts,
                 acknowledgeFailurePause: options.command === 'resume',
+                acknowledgeError: options.command === 'resume',
             });
             if (result.status !== 'paused' || result.pauseReason !== 'challenge') break;
 
@@ -484,9 +645,13 @@ async function runCollector(options, store, control) {
 
 export async function main(argv = process.argv.slice(2)) {
     const options = parseArguments(argv);
-    const dataRoot = await resolveDataRoot(options.dataRoot);
+    const mayCreateRun = options.command === 'start' || options.command === 'dry-run';
+    const dataRoot = await resolveDataRoot(options.dataRoot, { create: mayCreateRun });
     await assertRunDirectorySafe(dataRoot, options.runId);
-    const store = await RunStore.open({ rootDir: dataRoot, runId: options.runId });
+    const store = mayCreateRun
+        ? await RunStore.open({ rootDir: dataRoot, runId: options.runId })
+        : await RunStore.openExisting({ rootDir: dataRoot, runId: options.runId });
+    await assertRunDirectorySafe(dataRoot, options.runId);
     const control = new ControlFile(join(store.runDir, 'control.json'));
 
     if (options.command === 'status') {
@@ -504,6 +669,10 @@ export async function main(argv = process.argv.slice(2)) {
         return;
     }
     if (options.command === 'export') {
+        const currentControl = await control.read();
+        if (isLiveProcess(currentControl.ownerPid)) {
+            throw new Error(`Cannot export while collector PID ${currentControl.ownerPid} is running`);
+        }
         await store.exportManifest();
         await print(store.exportPath);
         return;

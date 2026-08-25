@@ -20,7 +20,7 @@ import {
     PlaywrightTransport,
 } from '../../scripts/rimskie-import/lib/playwright-transport.mjs';
 import { RequestPolicy } from '../../scripts/rimskie-import/lib/request-policy.mjs';
-import { RunStore } from '../../scripts/rimskie-import/lib/run-store.mjs';
+import { configSchemaVersion, RunStore } from '../../scripts/rimskie-import/lib/run-store.mjs';
 
 const whiteUrl = 'https://rimskie.com/catalog/rimskie-shtory/white';
 const greyUrl = 'https://rimskie.com/catalog/rimskie-shtory/grey';
@@ -28,7 +28,10 @@ const productUrl = 'https://rimskie.com/products/11889-example';
 const secondProductUrl = 'https://rimskie.com/products/11900-example';
 const imageUrl = 'https://rimskie.com/media/output/first.webp';
 const firstImageBytes = Buffer.from([
-    0x52, 0x49, 0x46, 0x46, 0x04, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
+    0x52, 0x49, 0x46, 0x46, 0x16, 0x00, 0x00, 0x00,
+    0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38, 0x58,
+    0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ]);
 const execFileAsync = promisify(execFile);
 
@@ -270,6 +273,7 @@ test('resume after durable product HTML stage skips a second product request', a
         store,
         transport: resumedTransport,
         policy: createPolicy(store),
+        acknowledgeError: true,
     });
 
     assert.equal(crashed.status, 'error');
@@ -312,6 +316,7 @@ test('resume recovers a saved product draft when the process dies before its sta
         store,
         transport: resumedTransport,
         policy: createPolicy(store),
+        acknowledgeError: true,
     });
 
     assert.deepEqual(firstTransport.calls, [['html', whiteUrl], ['html', productUrl]]);
@@ -341,6 +346,7 @@ test('resume after image bytes reach disk validates them and skips a second down
         store,
         transport: resumedTransport,
         policy: createPolicy(store),
+        acknowledgeError: true,
     });
 
     assert.equal(crashed.status, 'error');
@@ -574,7 +580,7 @@ test('third failure marker is durable before writing its error event', async (t)
         transport: firstTransport,
         policy: createPolicy(store),
     });
-    assert.equal(crashed.status, 'error');
+    assert.equal(crashed.status, 'paused');
     assert.equal((await store.readState()).requestPolicy.pauseRequired, true);
 
     const resumedTransport = new FakeTransport(new Map([[whiteUrl, categoryHtml([])]]));
@@ -717,7 +723,7 @@ test('browser discovery checks Windows Chrome and Edge installations without dow
     assert.equal(checked.some((candidate) => candidate.endsWith('Google\\Chrome\\Application\\chrome.exe')), true);
 });
 
-test('playwright transport aborts heavy resources, analytics, and unrelated images', async () => {
+test('playwright transport denies uncounted resources and only opens same-origin challenge assets', async () => {
     const fake = fakePlaywright();
     const transport = await PlaywrightTransport.open({
         profileDir: 'profile',
@@ -736,18 +742,19 @@ test('playwright transport aborts heavy resources, analytics, and unrelated imag
         return decision;
     }
 
-    assert.equal(await routeDecision('stylesheet', 'https://rimskie.com/app.css'), 'continue');
-    assert.equal(await routeDecision('script', 'https://mc.yandex.ru/metrika/tag.js'), 'continue');
-    assert.equal(await routeDecision('image', 'https://rimskie.com/other.webp'), 'continue');
+    assert.equal(await routeDecision('stylesheet', 'https://rimskie.com/app.css'), 'abort');
+    assert.equal(await routeDecision('script', 'https://mc.yandex.ru/metrika/tag.js'), 'abort');
+    assert.equal(await routeDecision('image', 'https://rimskie.com/other.webp'), 'abort');
     await transport.getHtml(whiteUrl);
     assert.equal(await routeDecision('stylesheet', 'https://rimskie.com/app.css'), 'abort');
     assert.equal(await routeDecision('script', 'https://mc.yandex.ru/metrika/tag.js'), 'abort');
     assert.equal(await routeDecision('image', 'https://rimskie.com/other.webp'), 'abort');
-    assert.equal(await routeDecision('document', whiteUrl), 'continue');
+    assert.equal(await routeDecision('document', whiteUrl), 'abort');
     fake.page.goto = async () => ({ status: () => 403 });
     fake.page.content = async () => '<html><body>BotHunt verification</body></html>';
     await assert.rejects(transport.getHtml(whiteUrl), (error) => error.kind === 'challenge');
     assert.equal(await routeDecision('stylesheet', 'https://rimskie.com/challenge.css'), 'continue');
+    assert.equal(await routeDecision('script', 'https://evil.example/challenge.js'), 'abort');
     await transport.close();
 });
 
@@ -1022,6 +1029,8 @@ test('dry-run parser requires a data root and defaults to three requests and one
         json: false,
         maxRequests: 3,
         maxProducts: 1,
+        maxRequestsExplicit: false,
+        maxProductsExplicit: false,
     });
     assert.throws(() => parseArguments(['status', '--run', 'run-001']), /data-root/i);
 });
@@ -1126,6 +1135,29 @@ test('status pause stop and export CLI commands never open the donor transport',
     const runDir = join(dataRoot, runId);
     t.after(() => rm(runDir, { recursive: true, force: true }));
     const cliPath = fileURLToPath(new URL('../../scripts/rimskie-import/cli.mjs', import.meta.url));
+    const store = await RunStore.open({ rootDir: dataRoot, runId });
+    const completedSource = {
+        ...source('white', whiteUrl),
+        nextPageUrl: null,
+        completed: true,
+    };
+    await store.initializeConfig({
+        schema_version: configSchemaVersion,
+        sources: [completedSource],
+        limits: { max_requests: null, max_products: null },
+    });
+    await store.checkpoint({
+        status: 'completed',
+        requestCount: 3,
+        completedProductIds: ['11889'],
+        sources: [completedSource],
+    });
+    await store.saveSource('white', { status: 'completed', target_slug: 'white' });
+    await store.saveProduct('11889', {
+        externalId: '11889', firstImagePath: 'images/11889.webp',
+    });
+    await store.appendMembership({ sourceSlug: 'white', externalId: '11889' });
+    await writeFile(join(store.imagesDir, '11889.webp'), firstImageBytes);
     const common = [
         '--run', runId,
         '--data-root', dataRoot,

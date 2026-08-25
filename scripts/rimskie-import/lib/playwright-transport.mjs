@@ -1,9 +1,18 @@
-import { access as fsAccess, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { access as fsAccess, mkdir } from 'node:fs/promises';
+import { dirname, extname, join } from 'node:path';
 
 import { chromium as defaultChromium } from 'playwright-core';
 
-const blockedResourceTypes = new Set(['stylesheet', 'font', 'media']);
+import {
+    isApprovedDonorOriginUrl,
+    isApprovedDonorUrl,
+    resolveDonorUrl,
+} from './donor-url-policy.mjs';
+import { writeFileAtomically } from './safe-filesystem.mjs';
+import { detectImageFormat, validateImageFile } from './webp.mjs';
+
+export { detectImageFormat, validateImageFile } from './webp.mjs';
+
 const analyticsHosts = [
     'google-analytics.com',
     'googletagmanager.com',
@@ -12,29 +21,7 @@ const analyticsHosts = [
     'analytics.yandex.ru',
 ];
 const challengePattern = /bothunt|captcha|challenge-platform|cf-chl-|verify you are human|подтвердите[^<]{0,40}человек/i;
-
-export function detectImageFormat(bytes) {
-    if (!Buffer.isBuffer(bytes)) return null;
-    if (bytes.length >= 12 && bytes.subarray(0, 4).equals(Buffer.from('RIFF'))
-        && bytes.subarray(8, 12).equals(Buffer.from('WEBP'))) return 'webp';
-    if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'jpeg';
-    if (bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([
-        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-    ]))) return 'png';
-
-    return null;
-}
-
-export async function validateImageFile(path, expectedFormat = null) {
-    try {
-        const detectedFormat = detectImageFormat(await readFile(path));
-        return expectedFormat ? detectedFormat === expectedFormat : Boolean(detectedFormat);
-    } catch (error) {
-        if (error?.code === 'ENOENT') return false;
-        throw error;
-    }
-}
-
+const htmlDocumentPattern = /^\s*(?:<!doctype\s+html\b|<html\b|<head\b|<body\b)/i;
 export class DonorRequestError extends Error {
     constructor(kind, message, details = {}) {
         super(message);
@@ -97,6 +84,52 @@ function isAnalyticsUrl(value) {
     return analyticsHosts.some((host) => hostname === host || hostname.endsWith(`.${host}`));
 }
 
+function donorRequestError(error, label, value) {
+    return new DonorRequestError('invalid_url', error?.message || `${label} is not approved`, {
+        url: value,
+    });
+}
+
+function approvedUrl(value, { kind, label }) {
+    try {
+        return resolveDonorUrl(value, { kind, label });
+    } catch (error) {
+        throw donorRequestError(error, label, value);
+    }
+}
+
+function redirectedFromCountedTarget(request, targetUrl) {
+    if (request.url() === targetUrl) return true;
+    let previous = request.redirectedFrom?.();
+    while (previous) {
+        if (previous.url() === targetUrl) return true;
+        previous = previous.redirectedFrom?.();
+    }
+
+    return false;
+}
+
+export function shouldAllowBrowserRequest({
+    routeMode,
+    activeOperation,
+    resourceType,
+    url,
+    redirectsFromActive = false,
+}) {
+    if (!isApprovedDonorOriginUrl(url) || isAnalyticsUrl(url)) return false;
+    if (routeMode === 'challenge') return true;
+
+    if (activeOperation?.kind === 'html' && resourceType === 'document'
+        && isApprovedDonorUrl(url, { kind: 'html' })) {
+        return url === activeOperation.url || redirectsFromActive;
+    }
+    if (activeOperation?.kind === 'image' && url === activeOperation.url) {
+        return ['fetch', 'xhr', 'image'].includes(resourceType);
+    }
+
+    return false;
+}
+
 function statusFailure(status, url) {
     if (status === 403 || status === 429) {
         return new DonorRequestError(`http_${status}`, `Donor returned HTTP ${status}`, { status, url });
@@ -133,72 +166,110 @@ export class PlaywrightTransport {
     constructor(context, page) {
         this.context = context;
         this.page = page;
-        this.allowedImageUrl = null;
-        this.routingArmed = false;
+        this.activeOperation = null;
+        this.routeMode = 'idle';
     }
 
     async #route(route) {
         const request = route.request();
         const resourceType = request.resourceType();
         const url = request.url();
-        if (!this.routingArmed) {
-            await route.continue();
-            return;
-        }
-        const isUnrelatedImage = resourceType === 'image' && url !== this.allowedImageUrl;
 
-        if (blockedResourceTypes.has(resourceType) || isAnalyticsUrl(url) || isUnrelatedImage) {
+        const allowed = shouldAllowBrowserRequest({
+            routeMode: this.routeMode,
+            activeOperation: this.activeOperation,
+            resourceType,
+            url,
+            redirectsFromActive: this.activeOperation?.kind === 'html'
+                && redirectedFromCountedTarget(request, this.activeOperation.url),
+        });
+        if (allowed) {
+            await route.continue();
+        } else {
             await route.abort();
-            return;
         }
-        await route.continue();
     }
 
     async getHtml(url) {
+        const requestedUrl = approvedUrl(url, { kind: 'html', label: 'queued donor HTML URL' });
+        this.activeOperation = { kind: 'html', url: requestedUrl };
+        this.routeMode = 'collecting';
         let response;
         try {
-            response = await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+            response = await this.page.goto(requestedUrl, { waitUntil: 'domcontentloaded' });
         } catch (error) {
             const kind = error?.name === 'TimeoutError' ? 'timeout' : 'network';
-            throw new DonorRequestError(kind, error?.message || `Failed to navigate to ${url}`, { url });
+            throw new DonorRequestError(kind, error?.message || `Failed to navigate to ${requestedUrl}`, {
+                url: requestedUrl,
+            });
         }
         if (!response) {
-            throw new DonorRequestError('network', 'Donor navigation returned no response', { url });
+            throw new DonorRequestError('network', 'Donor navigation returned no response', {
+                url: requestedUrl,
+            });
         }
+        const finalUrl = approvedUrl(response.url?.() || requestedUrl, {
+            kind: 'html',
+            label: 'final donor HTML URL',
+        });
         let html;
         try {
             html = await this.page.content();
         } catch (error) {
             const kind = error?.name === 'TimeoutError' ? 'timeout' : 'network';
-            throw new DonorRequestError(kind, error?.message || `Failed to read donor DOM at ${url}`, { url });
+            throw new DonorRequestError(kind, error?.message || `Failed to read donor DOM at ${finalUrl}`, {
+                url: finalUrl,
+            });
         }
         if (challengePattern.test(html)) {
-            this.routingArmed = false;
+            this.routeMode = 'challenge';
+            this.activeOperation = null;
             throw new DonorRequestError(
                 'challenge',
                 'BotHunt/challenge requires an explicitly authorized click in the visible browser',
-                { url },
+                { url: finalUrl },
             );
         }
-        const failure = statusFailure(response.status(), url);
+        const failure = statusFailure(response.status(), finalUrl);
         if (failure) throw failure;
 
-        this.routingArmed = true;
+        this.routeMode = 'idle';
+        this.activeOperation = null;
 
         return html;
     }
 
     async downloadFirstImage(url, destination) {
-        this.allowedImageUrl = url;
+        const requestedUrl = approvedUrl(url, { kind: 'image', label: 'queued donor image URL' });
+        if (extname(destination).toLowerCase() !== '.webp') {
+            throw new DonorRequestError(
+                'invalid_destination',
+                'First-image destination must use the .webp extension',
+                { url: requestedUrl, destination },
+            );
+        }
+        this.activeOperation = { kind: 'image', url: requestedUrl };
+        this.routeMode = 'collecting';
         try {
-            const responsePromise = this.page.waitForResponse((response) => response.url() === url);
+            const responsePromise = this.page.waitForResponse((response) => response.url() === requestedUrl);
             const [, response] = await Promise.all([
                 this.page.evaluate(async (imageUrl) => {
                     const result = await fetch(imageUrl, { credentials: 'include' });
                     await result.arrayBuffer();
-                }, url),
+                }, requestedUrl),
                 responsePromise,
             ]);
+            const finalUrl = approvedUrl(response.url(), {
+                kind: 'image',
+                label: 'final donor image URL',
+            });
+            if (finalUrl !== requestedUrl) {
+                throw new DonorRequestError(
+                    'invalid_url',
+                    'First-image redirects are outside the exact counted request boundary',
+                    { url: finalUrl },
+                );
+            }
             const status = response.status();
             const bytes = await response.body();
             const contentType = (await response.headerValue('content-type') || '')
@@ -206,39 +277,43 @@ export class PlaywrightTransport {
                 .trim()
                 .toLowerCase();
             const bodyPrefix = bytes.subarray(0, 2_048).toString('utf8');
-            if (contentType === 'text/html' || challengePattern.test(bodyPrefix)) {
-                this.routingArmed = false;
+            if (contentType === 'text/html' || htmlDocumentPattern.test(bodyPrefix)
+                || challengePattern.test(bodyPrefix)) {
+                this.routeMode = 'challenge';
                 throw new DonorRequestError(
                     'challenge',
                     'HTML challenge was returned for the first-image request',
-                    { status, url },
+                    { status, url: finalUrl },
                 );
             }
             if (status < 200 || status >= 300) {
-                throw statusFailure(status, url)
-                    || new DonorRequestError('http_error', `Donor returned HTTP ${status}`, { status, url });
+                throw statusFailure(status, finalUrl)
+                    || new DonorRequestError('http_error', `Donor returned HTTP ${status}`, {
+                        status, url: finalUrl,
+                    });
             }
             const declaredFormat = contentType === 'image/webp' ? 'webp' : null;
             const detectedFormat = detectImageFormat(bytes);
             if (!declaredFormat || detectedFormat !== declaredFormat) {
                 throw new DonorRequestError('invalid_image', 'First-image response must be valid WebP data', {
                     status,
-                    url,
+                    url: finalUrl,
                     contentType,
                 });
             }
             await mkdir(dirname(destination), { recursive: true });
-            const temporaryPath = `${destination}.${process.pid}.tmp`;
-            await writeFile(temporaryPath, bytes);
-            await rename(temporaryPath, destination);
+            await writeFileAtomically(dirname(destination), destination, bytes);
 
             return bytes;
         } catch (error) {
             if (error instanceof DonorRequestError) throw error;
             const kind = error?.name === 'TimeoutError' ? 'timeout' : 'network';
-            throw new DonorRequestError(kind, error?.message || 'First-image request failed', { url });
+            throw new DonorRequestError(kind, error?.message || 'First-image request failed', {
+                url: requestedUrl,
+            });
         } finally {
-            this.allowedImageUrl = null;
+            this.activeOperation = null;
+            if (this.routeMode !== 'challenge') this.routeMode = 'idle';
         }
     }
 

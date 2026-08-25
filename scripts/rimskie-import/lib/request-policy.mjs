@@ -76,9 +76,10 @@ export class RequestPolicy {
             : null;
     }
 
-    connect({ persistState, beforeReserve } = {}) {
+    connect({ persistState, beforeReserve, onEvent } = {}) {
         if (persistState) this.persistState = persistState;
         if (beforeReserve) this.beforeReserve = beforeReserve;
+        if (onEvent) this.onEvent = onEvent;
     }
 
     snapshot() {
