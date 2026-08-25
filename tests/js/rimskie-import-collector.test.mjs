@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
 
 import {
+    assertRunDirectorySafe,
     ControlFile,
     parseArguments,
     resolveDataRoot,
@@ -23,6 +27,10 @@ const greyUrl = 'https://rimskie.com/catalog/rimskie-shtory/grey';
 const productUrl = 'https://rimskie.com/products/11889-example';
 const secondProductUrl = 'https://rimskie.com/products/11900-example';
 const imageUrl = 'https://rimskie.com/media/output/first.webp';
+const firstImageBytes = Buffer.from([
+    0x52, 0x49, 0x46, 0x46, 0x04, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
+]);
+const execFileAsync = promisify(execFile);
 
 function categoryHtml(products) {
     return `<!doctype html><html><body>${products.map(({ externalId, url }) => `
@@ -102,7 +110,7 @@ class FakeTransport {
 
     async downloadFirstImage(url, destination) {
         this.calls.push(['image', url]);
-        const image = Buffer.from('first-image');
+        const image = firstImageBytes;
         await writeFile(destination, image);
 
         return image;
@@ -135,6 +143,9 @@ test('category page is checkpointed before product HTML and first-image work', a
     };
     const originalGetHtml = fakeTransport.getHtml.bind(fakeTransport);
     fakeTransport.getHtml = async (url) => {
+        if (url === whiteUrl) {
+            assert.equal((await store.readState()).requestPolicy.requestTimes.length, 1);
+        }
         if (url === productUrl) {
             assert.equal(checkpoints.at(-1).sources[0].pendingProducts[0].externalId, '11889');
             assert.equal((await store.readMemberships()).length, 1);
@@ -155,7 +166,7 @@ test('category page is checkpointed before product HTML and first-image work', a
     ]);
     assert.equal(snapshot.uniqueProducts, 1);
     assert.equal(snapshot.status, 'completed');
-    assert.deepEqual(await readFile(join(store.imagesDir, '11889.webp')), Buffer.from('first-image'));
+    assert.deepEqual(await readFile(join(store.imagesDir, '11889.webp')), firstImageBytes);
     assert.equal(fakeTransport.calls.filter(([kind]) => kind === 'image').length, 1);
     const savedSource = JSON.parse(await readFile(join(store.sourcesDir, 'white.json'), 'utf8'));
     assert.equal(savedSource.source_url, whiteUrl);
@@ -233,6 +244,208 @@ test('maxRequests=3 checkpoints a clean limited state before a fourth request', 
     assert.equal((await store.readState()).status, 'limited');
 });
 
+test('resume after durable product HTML stage skips a second product request', async (t) => {
+    const store = await createStore(t, initialState([source('white', whiteUrl)]));
+    const firstTransport = new FakeTransport(new Map([
+        [whiteUrl, categoryHtml([{ externalId: '11889', url: productUrl }])],
+        [productUrl, productHtml('11889')],
+    ]));
+    const checkpoint = store.checkpoint.bind(store);
+    let injectedCrash = false;
+    store.checkpoint = async (state) => {
+        await checkpoint(state);
+        if (!injectedCrash && state.sources[0].pendingProducts[0]?.stage === 'html-complete') {
+            injectedCrash = true;
+            throw new Error('simulated crash after product HTML checkpoint');
+        }
+    };
+
+    const crashed = await new Collector().run({
+        store,
+        transport: firstTransport,
+        policy: createPolicy(store),
+    });
+    const resumedTransport = new FakeTransport(new Map());
+    const resumed = await new Collector().run({
+        store,
+        transport: resumedTransport,
+        policy: createPolicy(store),
+    });
+
+    assert.equal(crashed.status, 'error');
+    assert.deepEqual(firstTransport.calls, [['html', whiteUrl], ['html', productUrl]]);
+    assert.deepEqual(resumedTransport.calls, [['image', imageUrl]]);
+    assert.equal(resumed.status, 'completed');
+});
+
+test('resume recovers a saved product draft when the process dies before its state checkpoint', async (t) => {
+    const store = await createStore(t, initialState([source('white', whiteUrl)]));
+    const firstTransport = new FakeTransport(new Map([
+        [whiteUrl, categoryHtml([{ externalId: '11889', url: productUrl }])],
+        [productUrl, productHtml('11889')],
+    ]));
+    const saveProduct = store.saveProduct.bind(store);
+    const checkpoint = store.checkpoint.bind(store);
+    let processDied = false;
+    store.saveProduct = async (externalId, product) => {
+        await saveProduct(externalId, product);
+        if (product.collectionStage === 'html-complete') {
+            processDied = true;
+            throw new Error('simulated process death after durable product draft');
+        }
+    };
+    store.checkpoint = async (state) => {
+        if (processDied) throw new Error('dead process cannot write an error checkpoint');
+        return checkpoint(state);
+    };
+
+    await assert.rejects(new Collector().run({
+        store,
+        transport: firstTransport,
+        policy: createPolicy(store),
+    }), /dead process/);
+    store.saveProduct = saveProduct;
+    store.checkpoint = checkpoint;
+
+    const resumedTransport = new FakeTransport(new Map());
+    const resumed = await new Collector().run({
+        store,
+        transport: resumedTransport,
+        policy: createPolicy(store),
+    });
+
+    assert.deepEqual(firstTransport.calls, [['html', whiteUrl], ['html', productUrl]]);
+    assert.deepEqual(resumedTransport.calls, [['image', imageUrl]]);
+    assert.equal(resumed.status, 'completed');
+});
+
+test('resume after image bytes reach disk validates them and skips a second download', async (t) => {
+    const store = await createStore(t, initialState([source('white', whiteUrl)]));
+    const firstTransport = new FakeTransport(new Map([
+        [whiteUrl, categoryHtml([{ externalId: '11889', url: productUrl }])],
+        [productUrl, productHtml('11889')],
+    ]));
+    const download = firstTransport.downloadFirstImage.bind(firstTransport);
+    firstTransport.downloadFirstImage = async (...args) => {
+        await download(...args);
+        throw Object.assign(new Error('simulated crash after atomic image rename'), { kind: 'process_crash' });
+    };
+
+    const crashed = await new Collector().run({
+        store,
+        transport: firstTransport,
+        policy: createPolicy(store),
+    });
+    const resumedTransport = new FakeTransport(new Map());
+    const resumed = await new Collector().run({
+        store,
+        transport: resumedTransport,
+        policy: createPolicy(store),
+    });
+
+    assert.equal(crashed.status, 'error');
+    assert.equal(firstTransport.calls.filter(([kind]) => kind === 'image').length, 1);
+    assert.deepEqual(resumedTransport.calls, []);
+    assert.equal(resumed.status, 'completed');
+    assert.deepEqual(await readFile(join(store.imagesDir, '11889.webp')), firstImageBytes);
+});
+
+test('resume re-downloads an invalid file despite an image-complete checkpoint', async (t) => {
+    const store = await createStore(t, initialState([source('white', whiteUrl)]));
+    const firstTransport = new FakeTransport(new Map([
+        [whiteUrl, categoryHtml([{ externalId: '11889', url: productUrl }])],
+        [productUrl, productHtml('11889')],
+    ]));
+    const limited = await new Collector().run({
+        store,
+        transport: firstTransport,
+        policy: createPolicy(store),
+        maxRequests: 2,
+    });
+    const staged = await store.readState();
+    staged.sources[0].pendingProducts[0].stage = 'image-complete';
+    await store.checkpoint(staged);
+    await writeFile(join(store.imagesDir, '11889.webp'), Buffer.from('corrupt image'));
+
+    const resumedTransport = new FakeTransport(new Map());
+    const resumed = await new Collector().run({
+        store, transport: resumedTransport, policy: createPolicy(store),
+    });
+
+    assert.equal(limited.status, 'limited');
+    assert.deepEqual(resumedTransport.calls, [['image', imageUrl]]);
+    assert.equal(resumed.status, 'completed');
+    assert.deepEqual(await readFile(join(store.imagesDir, '11889.webp')), firstImageBytes);
+});
+
+test('pause requested during delay prevents request reservation and transport access', async (t) => {
+    const store = await createStore(t, initialState([source('white', whiteUrl)]));
+    const fakeTransport = new FakeTransport(new Map([[whiteUrl, categoryHtml([])]]));
+    const flags = { pause: false, stop: false };
+    const policy = new RequestPolicy({
+        htmlDelayMs: [1, 1],
+        imageDelayMs: [1, 1],
+        sleep: async () => { flags.pause = true; },
+        onEvent: (event) => store.appendEvent(event),
+    });
+
+    const snapshot = await new Collector().run({
+        store,
+        transport: fakeTransport,
+        policy,
+        control: { read: async () => ({ ...flags }) },
+    });
+
+    assert.equal(snapshot.status, 'paused');
+    assert.deepEqual(fakeTransport.calls, []);
+    assert.deepEqual(snapshot.requestPolicy.requestTimes, []);
+});
+
+test('pause arriving during request reservation checkpoint prevents transport access', async (t) => {
+    const store = await createStore(t, initialState([source('white', whiteUrl)]));
+    const fakeTransport = new FakeTransport(new Map([[whiteUrl, categoryHtml([])]]));
+    const flags = { pause: false, stop: false };
+    const checkpoint = store.checkpoint.bind(store);
+    store.checkpoint = async (state) => {
+        await checkpoint(state);
+        if (state.requestPolicy?.requestTimes?.length === 1) flags.pause = true;
+    };
+
+    const snapshot = await new Collector().run({
+        store,
+        transport: fakeTransport,
+        policy: createPolicy(store),
+        control: { read: async () => ({ ...flags }) },
+    });
+
+    assert.equal(snapshot.status, 'paused');
+    assert.deepEqual(fakeTransport.calls, []);
+    assert.equal(snapshot.requestPolicy.requestTimes.length, 1);
+});
+
+test('stop requested during delay prevents request reservation and transport access', async (t) => {
+    const store = await createStore(t, initialState([source('white', whiteUrl)]));
+    const fakeTransport = new FakeTransport(new Map([[whiteUrl, categoryHtml([])]]));
+    const flags = { pause: false, stop: false };
+    const policy = new RequestPolicy({
+        htmlDelayMs: [1, 1],
+        imageDelayMs: [1, 1],
+        sleep: async () => { flags.stop = true; },
+        onEvent: (event) => store.appendEvent(event),
+    });
+
+    const snapshot = await new Collector().run({
+        store,
+        transport: fakeTransport,
+        policy,
+        control: { read: async () => ({ ...flags }) },
+    });
+
+    assert.equal(snapshot.status, 'stopped');
+    assert.deepEqual(fakeTransport.calls, []);
+    assert.deepEqual(snapshot.requestPolicy.requestTimes, []);
+});
+
 test('exhausted rolling budget pauses cleanly without transport access', async (t) => {
     const store = await createStore(t, initialState([source('white', whiteUrl)]));
     const fakeTransport = new FakeTransport(new Map());
@@ -274,22 +487,180 @@ test('challenge writes an event and checkpoints the run as paused', async (t) =>
     assert.equal(events.some((event) => event.type === 'pause' && event.reason === 'challenge'), true);
 });
 
-function fakePlaywright({ status = 200, html = '<html>ok</html>', image = Buffer.from('first-image') } = {}) {
+test('network and timeout failures use durable backoff and pause on the third attempt', async (t) => {
+    const store = await createStore(t, initialState([source('white', whiteUrl)]));
+    const failures = ['network', 'timeout', 'http_403'];
+    const fakeTransport = new FakeTransport(new Map());
+    fakeTransport.getHtml = async (url) => {
+        fakeTransport.calls.push(['html', url]);
+        throw Object.assign(new Error(`typed ${failures[0]} failure`), { kind: failures.shift() });
+    };
+    const sleeps = [];
+    const policy = new RequestPolicy({
+        htmlDelayMs: [0, 0],
+        imageDelayMs: [0, 0],
+        backoffMs: [120_000, 300_000, 900_000],
+        sleep: async (milliseconds) => sleeps.push(milliseconds),
+        onEvent: (event) => store.appendEvent(event),
+    });
+
+    const snapshot = await new Collector().run({ store, transport: fakeTransport, policy });
+
+    assert.equal(snapshot.status, 'paused');
+    assert.equal(snapshot.requestPolicy.consecutiveFailures, 3);
+    assert.equal(snapshot.requestPolicy.pauseRequired, true);
+    assert.equal(fakeTransport.calls.length, 3);
+    assert.deepEqual(sleeps, [0, 120_000, 0, 300_000, 0, 900_000]);
+});
+
+test('restart during the third failure backoff cannot make a fourth automatic request', async (t) => {
+    const state = initialState([source('white', whiteUrl)]);
+    state.status = 'running';
+    state.requestPolicy = {
+        requestTimes: [],
+        consecutiveFailures: 3,
+        pauseRequired: true,
+        lastFailureKind: 'network',
+    };
+    const store = await createStore(t, state);
+    const fakeTransport = new FakeTransport(new Map([[whiteUrl, categoryHtml([])]]));
+
+    const recovered = await new Collector().run({
+        store,
+        transport: fakeTransport,
+        policy: createPolicy(store),
+    });
+
+    assert.equal(recovered.status, 'paused');
+    assert.equal(recovered.pauseReason, 'network');
+    assert.deepEqual(fakeTransport.calls, []);
+
+    const resumed = await new Collector().run({
+        store,
+        transport: fakeTransport,
+        policy: createPolicy(store),
+        acknowledgeFailurePause: true,
+    });
+    assert.equal(resumed.status, 'completed');
+    assert.deepEqual(fakeTransport.calls, [['html', whiteUrl]]);
+});
+
+test('third failure marker is durable before writing its error event', async (t) => {
+    const state = initialState([source('white', whiteUrl)]);
+    state.requestPolicy = {
+        requestTimes: [],
+        consecutiveFailures: 2,
+        pauseRequired: false,
+        lastFailureKind: 'timeout',
+    };
+    const store = await createStore(t, state);
+    const firstTransport = new FakeTransport(new Map());
+    firstTransport.getHtml = async (url) => {
+        firstTransport.calls.push(['html', url]);
+        throw Object.assign(new Error('third network failure'), { kind: 'network' });
+    };
+    const appendEvent = store.appendEvent.bind(store);
+    let eventWriteCrashed = false;
+    store.appendEvent = async (event) => {
+        if (!eventWriteCrashed && event.type === 'error' && event.kind === 'network') {
+            eventWriteCrashed = true;
+            throw new Error('simulated process death before error event');
+        }
+        return appendEvent(event);
+    };
+
+    const crashed = await new Collector().run({
+        store,
+        transport: firstTransport,
+        policy: createPolicy(store),
+    });
+    assert.equal(crashed.status, 'error');
+    assert.equal((await store.readState()).requestPolicy.pauseRequired, true);
+
+    const resumedTransport = new FakeTransport(new Map([[whiteUrl, categoryHtml([])]]));
+    const recovered = await new Collector().run({
+        store,
+        transport: resumedTransport,
+        policy: createPolicy(store),
+    });
+    assert.equal(recovered.status, 'paused');
+    assert.deepEqual(resumedTransport.calls, []);
+});
+
+test('category parser failure appends a diagnostic event and checkpoints error state', async (t) => {
+    const store = await createStore(t, initialState([source('white', whiteUrl)]));
+    const fakeTransport = new FakeTransport(new Map([[
+        whiteUrl,
+        categoryHtml([{ externalId: '11889', url: 'http://[' }]),
+    ]]));
+
+    const snapshot = await new Collector().run({
+        store, transport: fakeTransport, policy: createPolicy(store),
+    });
+
+    assert.equal(snapshot.status, 'error');
+    assert.equal((await store.readState()).status, 'error');
+    assert.equal((await readEvents(store)).some((event) => event.type === 'error'
+        && event.kind === 'collector' && /invalid url/i.test(event.message)), true);
+});
+
+test('storage failure appends a diagnostic event and checkpoints error state', async (t) => {
+    const store = await createStore(t, initialState([source('white', whiteUrl)]));
+    const fakeTransport = new FakeTransport(new Map([[whiteUrl, categoryHtml([])]]));
+    const saveSource = store.saveSource.bind(store);
+    let failOnce = true;
+    store.saveSource = async (...args) => {
+        if (failOnce) {
+            failOnce = false;
+            throw new Error('simulated source persistence failure');
+        }
+        return saveSource(...args);
+    };
+
+    const snapshot = await new Collector().run({
+        store, transport: fakeTransport, policy: createPolicy(store),
+    });
+
+    assert.equal(snapshot.status, 'error');
+    assert.equal((await store.readState()).status, 'error');
+    assert.equal((await readEvents(store)).some((event) => event.type === 'error'
+        && /source persistence failure/i.test(event.message)), true);
+});
+
+function fakePlaywright({
+    status = 200,
+    html = '<html>ok</html>',
+    image = firstImageBytes,
+    contentType = 'image/webp',
+    gotoError = null,
+    contentError = null,
+    imageError = null,
+} = {}) {
     const launchCalls = [];
     const routes = [];
     const page = {
-        goto: async () => ({ status: () => status }),
-        content: async () => html,
+        goto: async () => {
+            if (gotoError) throw gotoError;
+            return { status: () => status };
+        },
+        content: async () => {
+            if (contentError) throw contentError;
+            return html;
+        },
         waitForResponse: async (predicate) => {
             const response = {
                 url: () => imageUrl,
                 status: () => status,
                 body: async () => image,
+                headerValue: async (name) => name.toLowerCase() === 'content-type' ? contentType : null,
             };
             assert.equal(predicate(response), true);
             return response;
         },
-        evaluate: async () => ({ ok: true }),
+        evaluate: async () => {
+            if (imageError) throw imageError;
+            return { ok: true };
+        },
     };
     const context = {
         pages: () => [page],
@@ -365,10 +736,18 @@ test('playwright transport aborts heavy resources, analytics, and unrelated imag
         return decision;
     }
 
+    assert.equal(await routeDecision('stylesheet', 'https://rimskie.com/app.css'), 'continue');
+    assert.equal(await routeDecision('script', 'https://mc.yandex.ru/metrika/tag.js'), 'continue');
+    assert.equal(await routeDecision('image', 'https://rimskie.com/other.webp'), 'continue');
+    await transport.getHtml(whiteUrl);
     assert.equal(await routeDecision('stylesheet', 'https://rimskie.com/app.css'), 'abort');
     assert.equal(await routeDecision('script', 'https://mc.yandex.ru/metrika/tag.js'), 'abort');
     assert.equal(await routeDecision('image', 'https://rimskie.com/other.webp'), 'abort');
     assert.equal(await routeDecision('document', whiteUrl), 'continue');
+    fake.page.goto = async () => ({ status: () => 403 });
+    fake.page.content = async () => '<html><body>BotHunt verification</body></html>';
+    await assert.rejects(transport.getHtml(whiteUrl), (error) => error.kind === 'challenge');
+    assert.equal(await routeDecision('stylesheet', 'https://rimskie.com/challenge.css'), 'continue');
     await transport.close();
 });
 
@@ -394,6 +773,71 @@ test('playwright transport reports typed 403 and visible challenge failures', as
         challengeTransport.getHtml(whiteUrl),
         (error) => error instanceof DonorRequestError && error.kind === 'challenge',
     );
+
+    const forbiddenChallengeFake = fakePlaywright({
+        status: 403,
+        html: '<html><body>BotHunt verification</body></html>',
+    });
+    const forbiddenChallengeTransport = await PlaywrightTransport.open({
+        profileDir: 'profile',
+        executablePath: 'chrome.exe',
+        chromium: forbiddenChallengeFake.chromium,
+    });
+    await assert.rejects(
+        forbiddenChallengeTransport.getHtml(whiteUrl),
+        (error) => error instanceof DonorRequestError && error.kind === 'challenge',
+    );
+});
+
+test('playwright transport reports typed timeout and network navigation failures', async () => {
+    const timeoutFake = fakePlaywright({ gotoError: Object.assign(new Error('navigation timed out'), {
+        name: 'TimeoutError',
+    }) });
+    const timeoutTransport = await PlaywrightTransport.open({
+        profileDir: 'profile',
+        executablePath: 'chrome.exe',
+        chromium: timeoutFake.chromium,
+    });
+    await assert.rejects(
+        timeoutTransport.getHtml(whiteUrl),
+        (error) => error instanceof DonorRequestError && error.kind === 'timeout',
+    );
+
+    const networkFake = fakePlaywright({ gotoError: new Error('net::ERR_CONNECTION_RESET') });
+    const networkTransport = await PlaywrightTransport.open({
+        profileDir: 'profile',
+        executablePath: 'chrome.exe',
+        chromium: networkFake.chromium,
+    });
+    await assert.rejects(
+        networkTransport.getHtml(whiteUrl),
+        (error) => error instanceof DonorRequestError && error.kind === 'network',
+    );
+
+    const contentFake = fakePlaywright({ contentError: new Error('Target page closed while reading DOM') });
+    const contentTransport = await PlaywrightTransport.open({
+        profileDir: 'profile', executablePath: 'chrome.exe', chromium: contentFake.chromium,
+    });
+    await assert.rejects(
+        contentTransport.getHtml(whiteUrl),
+        (error) => error instanceof DonorRequestError && error.kind === 'network',
+    );
+});
+
+test('playwright transport reports a typed network image failure without writing', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-transport-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const destination = join(rootDir, 'images', '11889.webp');
+    const fake = fakePlaywright({ imageError: new Error('net::ERR_CONNECTION_RESET') });
+    const transport = await PlaywrightTransport.open({
+        profileDir: 'profile', executablePath: 'chrome.exe', chromium: fake.chromium,
+    });
+
+    await assert.rejects(
+        transport.downloadFirstImage(imageUrl, destination),
+        (error) => error instanceof DonorRequestError && error.kind === 'network',
+    );
+    await assert.rejects(readFile(destination), /ENOENT/);
 });
 
 test('playwright transport writes the exact first-image response to destination', async (t) => {
@@ -409,30 +853,142 @@ test('playwright transport writes the exact first-image response to destination'
 
     await transport.downloadFirstImage(imageUrl, destination);
 
-    assert.deepEqual(await readFile(destination), Buffer.from('first-image'));
+    assert.deepEqual(await readFile(destination), firstImageBytes);
+});
+
+test('playwright transport rejects 403 HTML challenge bytes without writing an image', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-transport-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const destination = join(rootDir, 'images', '11889.webp');
+    const fake = fakePlaywright({
+        status: 403,
+        image: Buffer.from('<html><body>Access verification required</body></html>'),
+        contentType: 'text/html; charset=utf-8',
+    });
+    const transport = await PlaywrightTransport.open({
+        profileDir: 'profile', executablePath: 'chrome.exe', chromium: fake.chromium,
+    });
+
+    await assert.rejects(
+        transport.downloadFirstImage(imageUrl, destination),
+        (error) => error instanceof DonorRequestError && error.kind === 'challenge',
+    );
+    await assert.rejects(readFile(destination), /ENOENT/);
+});
+
+test('playwright transport rejects non-2xx and invalid image signatures without writing', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-transport-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const destination = join(rootDir, 'images', '11889.webp');
+    const redirectedFake = fakePlaywright({ status: 302 });
+    const redirected = await PlaywrightTransport.open({
+        profileDir: 'profile', executablePath: 'chrome.exe', chromium: redirectedFake.chromium,
+    });
+    await assert.rejects(
+        redirected.downloadFirstImage(imageUrl, destination),
+        (error) => error instanceof DonorRequestError && error.kind === 'http_error',
+    );
+
+    const invalidFake = fakePlaywright({ image: Buffer.from('not-an-image') });
+    const invalid = await PlaywrightTransport.open({
+        profileDir: 'profile', executablePath: 'chrome.exe', chromium: invalidFake.chromium,
+    });
+    await assert.rejects(
+        invalid.downloadFirstImage(imageUrl, destination),
+        (error) => error instanceof DonorRequestError && error.kind === 'invalid_image',
+    );
+    await assert.rejects(readFile(destination), /ENOENT/);
+});
+
+test('playwright transport rejects JPEG bytes instead of saving them under a WebP name', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-transport-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const destination = join(rootDir, 'images', '11889.webp');
+    const jpegFake = fakePlaywright({
+        image: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+        contentType: 'image/jpeg',
+    });
+    const transport = await PlaywrightTransport.open({
+        profileDir: 'profile', executablePath: 'chrome.exe', chromium: jpegFake.chromium,
+    });
+
+    await assert.rejects(
+        transport.downloadFirstImage(imageUrl, destination),
+        (error) => error instanceof DonorRequestError && error.kind === 'invalid_image',
+    );
+    await assert.rejects(readFile(destination), /ENOENT/);
 });
 
 test('data root rejects Windows C drive before creating runtime files', async () => {
     let filesystemTouched = false;
+    const forbiddenRoots = [
+        'C:\\rimskie-imports',
+        'c:/rimskie-imports',
+        '\\\\?\\C:\\rimskie-imports',
+        '//?/c:/rimskie-imports',
+        '\\\\.\\C:\\rimskie-imports',
+        '//./c:/rimskie-imports',
+        '\\??\\C:\\rimskie-imports',
+        '\\\\??\\c:\\rimskie-imports',
+    ];
 
-    await assert.rejects(resolveDataRoot('C:\\rimskie-imports', {
-        platform: 'win32',
-        mkdir: async () => { filesystemTouched = true; },
-        access: async () => { filesystemTouched = true; },
-        realpath: async (value) => value,
-    }), /must not use Windows drive C:/i);
-    await assert.rejects(resolveDataRoot('\\\\?\\C:\\rimskie-imports', {
-        platform: 'win32',
-        mkdir: async () => { filesystemTouched = true; },
-        access: async () => { filesystemTouched = true; },
-        realpath: async (value) => value,
-    }), /must not use Windows drive C:/i);
+    for (const forbiddenRoot of forbiddenRoots) {
+        await assert.rejects(resolveDataRoot(forbiddenRoot, {
+            platform: 'win32',
+            mkdir: async () => { filesystemTouched = true; },
+            access: async () => { filesystemTouched = true; },
+            realpath: async (value) => value,
+        }), /must not use Windows drive C:/i);
+    }
     await assert.rejects(resolveDataRoot('rimskie-imports', {
         platform: 'win32',
         mkdir: async () => { filesystemTouched = true; },
         access: async () => { filesystemTouched = true; },
         realpath: async (value) => value,
     }), /absolute/i);
+
+    assert.equal(filesystemTouched, false);
+});
+
+test('existing run junction cannot escape the validated G data root', async () => {
+    const dataRoot = 'G:\\stylish-house-data\\rimskie-imports';
+    const runDir = `${dataRoot}\\run-001`;
+
+    await assert.rejects(assertRunDirectorySafe(dataRoot, 'run-001', {
+        platform: 'win32',
+        realpath: async (value) => value === runDir ? 'C:\\escaped-run' : value,
+    }), /run directory.*data root|drive C:/i);
+});
+
+test('existing run child junction cannot redirect image writes to C', async () => {
+    const dataRoot = 'G:\\stylish-house-data\\rimskie-imports';
+    const runDir = `${dataRoot}\\run-001`;
+    const missing = () => Object.assign(new Error('missing'), { code: 'ENOENT' });
+
+    await assert.rejects(assertRunDirectorySafe(dataRoot, 'run-001', {
+        platform: 'win32',
+        realpath: async (value) => {
+            if (value === runDir) return value;
+            if (value === `${runDir}\\images`) return 'C:\\escaped-images';
+            throw missing();
+        },
+    }), /run child.*junction|drive C:/i);
+});
+
+test('data root rejects a non-C path whose nearest existing junction resolves to C', async () => {
+    let filesystemTouched = false;
+    const missing = () => Object.assign(new Error('missing'), { code: 'ENOENT' });
+
+    await assert.rejects(resolveDataRoot('G:\\junction\\new\\root', {
+        platform: 'win32',
+        mkdir: async () => { filesystemTouched = true; },
+        access: async () => { filesystemTouched = true; },
+        realpath: async (value) => {
+            if (value === 'G:\\junction\\new\\root' || value === 'G:\\junction\\new') throw missing();
+            if (value === 'G:\\junction') return 'C:\\redirected';
+            return value;
+        },
+    }), /must not use Windows drive C:/i);
 
     assert.equal(filesystemTouched, false);
 });
@@ -479,5 +1035,129 @@ test('control file atomically preserves pause and stop outside state checkpoints
     assert.deepEqual(await control.read(), { pause: true, stop: false });
     await control.update({ stop: true });
 
-    assert.deepEqual(await control.read(), { pause: true, stop: true });
+    assert.deepEqual(await control.read(), { pause: false, stop: true });
+});
+
+test('concurrent control updates preserve stop dominance and cannot clear it', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-control-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const control = new ControlFile(join(rootDir, 'control.json'));
+
+    await control.write({ pause: false, stop: false });
+    await Promise.all([
+        control.update({ pause: true }),
+        control.update({ stop: true }),
+    ]);
+    await control.update({ pause: false, stop: false });
+
+    assert.deepEqual(await control.read(), { pause: false, stop: true });
+});
+
+test('run lock rejects stopped runs and a second live collector', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-control-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const control = new ControlFile(join(rootDir, 'control.json'), {
+        isLiveProcess: (processId) => processId === 111,
+    });
+
+    await control.write({ pause: false, stop: false, ownerPid: 111 });
+    await assert.rejects(control.claim(222), /collector is already running/i);
+    await control.update({ stop: true });
+    await assert.rejects(control.claim(222), /stopped run/i);
+});
+
+test('control update recovers a lock left by a dead process', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-control-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const controlPath = join(rootDir, 'control.json');
+    const lockPath = `${controlPath}.lock`;
+    const control = new ControlFile(controlPath, {
+        isLiveProcess: (processId) => processId === process.pid,
+    });
+    await writeFile(lockPath, JSON.stringify({
+        pid: 999999,
+        token: 'dead-token',
+    }), 'utf8');
+
+    await control.update({ pause: true });
+
+    assert.deepEqual(await control.read(), { pause: true, stop: false });
+    assert.deepEqual(JSON.parse(await readFile(`${lockPath}.stale.dead-token`, 'utf8')), {
+        pid: 999999,
+        token: 'dead-token',
+    });
+});
+
+test('concurrent stale-lock reclaimers cannot remove a newly acquired control lock', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-control-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const controlPath = join(rootDir, 'control.json');
+    const lockPath = `${controlPath}.lock`;
+    const processCheck = (processId) => processId === process.pid;
+    const first = new ControlFile(controlPath, { isLiveProcess: processCheck });
+    const second = new ControlFile(controlPath, { isLiveProcess: processCheck });
+    await writeFile(lockPath, JSON.stringify({ pid: 999999, token: 'dead-token' }), 'utf8');
+
+    await Promise.all([
+        first.update({ pause: true }),
+        second.update({ stop: true }),
+    ]);
+
+    assert.deepEqual(await first.read(), { pause: false, stop: true });
+    assert.equal(JSON.parse(await readFile(`${lockPath}.stale.dead-token`, 'utf8')).token, 'dead-token');
+});
+
+test('incomplete legacy control lock fails closed with a recovery instruction', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-control-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const controlPath = join(rootDir, 'control.json');
+    const control = new ControlFile(controlPath);
+    await writeFile(`${controlPath}.lock`, '', 'utf8');
+
+    await assert.rejects(
+        control.update({ pause: true }),
+        /incomplete.*lock.*remove manually/i,
+    );
+});
+
+test('status pause stop and export CLI commands never open the donor transport', async (t) => {
+    const dataRoot = 'G:\\stylish-house-data\\rimskie-imports';
+    const runId = `test-cli-no-donor-${process.pid}-${Date.now()}`;
+    const runDir = join(dataRoot, runId);
+    t.after(() => rm(runDir, { recursive: true, force: true }));
+    const cliPath = fileURLToPath(new URL('../../scripts/rimskie-import/cli.mjs', import.meta.url));
+    const common = [
+        '--run', runId,
+        '--data-root', dataRoot,
+        '--chrome', 'Z:\\missing\\chrome.exe',
+    ];
+
+    const status = await execFileAsync(process.execPath, [cliPath, 'status', ...common, '--json']);
+    const pause = await execFileAsync(process.execPath, [cliPath, 'pause', ...common]);
+    const stop = await execFileAsync(process.execPath, [cliPath, 'stop', ...common]);
+    const exported = await execFileAsync(process.execPath, [cliPath, 'export', ...common]);
+
+    assert.equal(JSON.parse(status.stdout).control.stop, false);
+    assert.match(pause.stdout, /Pause requested/);
+    assert.match(stop.stdout, /Stop requested/);
+    assert.match(exported.stdout, /export\.json/);
+});
+
+test('failed Chrome launch releases the claimed run owner', async (t) => {
+    const dataRoot = 'G:\\stylish-house-data\\rimskie-imports';
+    const runId = `test-cli-launch-failure-${process.pid}-${Date.now()}`;
+    const runDir = join(dataRoot, runId);
+    t.after(() => rm(runDir, { recursive: true, force: true }));
+    const cliPath = fileURLToPath(new URL('../../scripts/rimskie-import/cli.mjs', import.meta.url));
+
+    await assert.rejects(execFileAsync(process.execPath, [
+        cliPath,
+        'dry-run',
+        '--run', runId,
+        '--data-root', dataRoot,
+        '--chrome', 'Z:\\missing\\chrome.exe',
+    ]));
+
+    const control = new ControlFile(join(runDir, 'control.json'));
+    assert.equal((await control.read()).ownerPid, null);
 });

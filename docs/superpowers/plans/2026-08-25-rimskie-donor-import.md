@@ -15,9 +15,10 @@
 - Collector concurrency is exactly `1`.
 - Default HTML delay is random `20–40` seconds; default image delay is random `10–20` seconds.
 - Default donor-origin ceiling is `120` requests per rolling hour.
-- Retry backoff is `2`, `5`, then `15` minutes; the third consecutive challenge/`403`/`429`/network failure pauses the run.
+- A visible BotHunt/challenge pauses immediately. Ordinary `403`, `429`, timeout, and network failures use `2`, `5`, then `15` minute backoff; the third consecutive failure requires an explicit resume and cannot cause a fourth automatic request after restart.
 - A completed URL or downloaded image is never requested again when resuming a run.
-- Only the first product photo is saved; gallery images are not collected.
+- Only the actual WebP bytes of the first product photo are saved; URL-only records and gallery images are not collected.
+- Local collector state, browser profile, checkpoints, JSON/NDJSON, export, and downloaded photos must use the explicit root `G:\stylish-house-data\rimskie-imports`; the CLI requires `--data-root` or `RIMSKIE_IMPORT_DATA_ROOT` and rejects drive `C:` before writing.
 - Donor price and raw donor copy remain private staging data and never appear on public pages.
 - One donor product is stored once and may belong to any number of the 46 SEO collections.
 - Rewritten copy may use only facts present in source data, must remove donor branding, and suspicious output is marked `needs_review`.
@@ -249,7 +250,7 @@ For every row, `source_url` is `https://rimskie.com/catalog/rimskie-shtory/<dono
 
 - [ ] **Step 9: Confirm runtime output is already ignored and run the focused tests**
 
-Verify `git check-ignore storage/app/imports/rimskie/probe/state.json` succeeds through `storage/app/.gitignore`; do not add a redundant root ignore rule.
+Verify the collector has no project-relative runtime default. Operational output must be supplied through `--data-root` or `RIMSKIE_IMPORT_DATA_ROOT` and remain outside the repository on `G:`.
 
 Run: `node --test tests/js/rimskie-import-parsers.test.mjs tests/js/rimskie-import-run-store.test.mjs`
 
@@ -294,7 +295,7 @@ test('third consecutive donor failure pauses after 2m, 5m, and 15m backoff', asy
   });
   assert.equal(await policy.recordFailure('http_403'), 'retry');
   assert.equal(await policy.recordFailure('http_429'), 'retry');
-  assert.equal(await policy.recordFailure('challenge'), 'pause');
+  assert.equal(await policy.recordFailure('network'), 'pause');
   assert.deepEqual(sleeps, [120000, 300000, 900000]);
 });
 
@@ -348,7 +349,7 @@ Expected: FAIL because `Collector` and transport contracts do not exist.
 
 Run: `npm install --save-dev playwright-core`
 
-The transport uses `chromium.launchPersistentContext(profileDir, { headless: false, executablePath })`, discovers Chrome/Edge paths on Windows and common Chromium paths on Linux, and keeps the profile inside the run directory. After an authenticated session exists, it aborts stylesheets, fonts, media, analytics hosts, and every image except the exact first-image download request. It detects `403`, `429`, and BotHunt/challenge markup as typed failures. It does not inspect or export cookies and never tries to defeat a challenge; it pauses with the visible browser available for the already-authorized human click.
+The transport uses `chromium.launchPersistentContext(profileDir, { headless: false, executablePath })`, discovers Chrome/Edge paths on Windows and common Chromium paths on Linux, and keeps the profile inside the validated `G:` run directory. After an authenticated session exists, it aborts stylesheets, fonts, media, analytics hosts, and every image except the exact first-image download request. It detects ordinary `403`/`429` as retryable typed failures, but any visible BotHunt/challenge page—including HTML returned to an image request—pauses immediately and disarms resource blocking. It accepts only matching `image/webp` bytes for the `.webp` destination, does not inspect or export cookies, and never tries to defeat a challenge; the visible browser remains available for the already-authorized human click.
 
 - [ ] **Step 7: Implement the collector state machine**
 
@@ -363,21 +364,21 @@ for (const source of state.sources) {
 }
 ```
 
-The real implementation processes one operation at a time, persists before advancing, downloads only `firstImageUrl`, and writes an event for every request, delay, retry, challenge, pause, resume, error, and completion without recording response bodies or credentials.
+The real implementation processes one operation at a time, persists before advancing, downloads only `firstImageUrl`, recovers saved product drafts and valid image bytes across either crash boundary without another donor request, and writes an event for every request, delay, retry, challenge, pause, resume, error, and completion without recording response bodies or credentials.
 
 - [ ] **Step 8: Implement the CLI and local-only control files**
 
 ```text
-start   --run <id> [--chrome <path>]
-status  --run <id> [--json]
-pause   --run <id>
-resume  --run <id> [--chrome <path>]
-stop    --run <id>
-export  --run <id>
-dry-run --run <id> --max-requests <n> --max-products <n>
+start   --run <id> --data-root <G:\path> [--chrome <path>]
+status  --run <id> --data-root <G:\path> [--json]
+pause   --run <id> --data-root <G:\path>
+resume  --run <id> --data-root <G:\path> [--chrome <path>]
+stop    --run <id> --data-root <G:\path>
+export  --run <id> --data-root <G:\path>
+dry-run --run <id> --data-root <G:\path> --max-requests <n> --max-products <n>
 ```
 
-`status`, `pause`, and `stop` never access the donor. `pause` and `stop` atomically set control flags checked before each donor request. `resume` refuses a stopped run and continues a paused run from checkpoints. `dry-run` defaults to three requests and one product when limits are omitted.
+`status`, `pause`, and `stop` never access the donor. `pause` and `stop` atomically set stop-dominant control flags checked after each delay, before reservation, and immediately before transport. A live owner prevents a second collector. `resume` refuses a stopped run and continues a paused run from checkpoints. `dry-run` defaults to three requests and one product when limits are omitted. Data-root and run-child validation occurs before runtime creation and rejects drive `C:`, device paths, and escaping junctions.
 
 - [ ] **Step 9: Run collector and existing JS suites**
 

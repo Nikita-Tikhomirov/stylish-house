@@ -113,6 +113,16 @@ export class RunStore {
         await writeJsonAtomically(join(this.productsDir, `${externalId}.json`), data);
     }
 
+    async readProduct(externalId) {
+        assertSafePathSegment(externalId, 'product external ID');
+        try {
+            return await readJson(join(this.productsDir, `${externalId}.json`));
+        } catch (error) {
+            if (isMissingFile(error)) return null;
+            throw error;
+        }
+    }
+
     async readMemberships() {
         return readNdjson(this.membershipsPath);
     }

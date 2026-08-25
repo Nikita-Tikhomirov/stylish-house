@@ -2,9 +2,10 @@ import { join } from 'node:path';
 
 import { parseCategoryPage } from './category-parser.mjs';
 import { parseProductPage } from './product-parser.mjs';
+import { validateImageFile } from './playwright-transport.mjs';
 
 const terminalStatuses = new Set(['completed', 'stopped']);
-const retryableFailureKinds = new Set(['http_403', 'http_429']);
+const retryableFailureKinds = new Set(['network', 'timeout', 'http_403', 'http_429']);
 
 function assertSafeId(value, label) {
     if (typeof value !== 'string' || !value || value === '.' || value === '..'
@@ -51,6 +52,7 @@ export class Collector {
         control,
         maxRequests = Number.POSITIVE_INFINITY,
         maxProducts = Number.POSITIVE_INFINITY,
+        acknowledgeFailurePause = false,
     }) {
         const state = await store.readState();
         if (!state) throw new Error('Run state does not exist');
@@ -67,6 +69,36 @@ export class Collector {
             requestsThisRun: 0,
             productsThisRun: 0,
         };
+        policy.hydrate(state.requestPolicy);
+        state.requestPolicy = policy.snapshot();
+        policy.connect({
+            beforeReserve: async () => !await this.#mustHalt(context),
+            persistState: async (policyState, reason) => {
+                state.requestPolicy = policyState;
+                if (reason === 'reservation') {
+                    context.requestsThisRun += 1;
+                    state.requestCount += 1;
+                }
+                await store.checkpoint(state);
+            },
+        });
+        if (policy.requiresFailurePause()) {
+            if (!acknowledgeFailurePause) {
+                const pauseReason = policy.snapshot().lastFailureKind || 'failure-limit';
+                const isNewPause = state.status !== 'paused' || state.pauseReason !== pauseReason;
+                state.status = 'paused';
+                state.pauseReason = pauseReason;
+                if (isNewPause) {
+                    await store.appendEvent({ type: 'pause', reason: pauseReason, recovered: true });
+                }
+                await store.checkpoint(state);
+                return snapshot(state);
+            }
+            await policy.resumePendingBackoff();
+            await policy.acknowledgeFailurePause();
+        } else {
+            await policy.resumePendingBackoff();
+        }
         const previousStatus = state.status;
         state.status = 'running';
         delete state.pauseReason;
@@ -75,16 +107,27 @@ export class Collector {
         }
         await store.checkpoint(state);
 
-        for (const source of state.sources) {
-            if (await this.#mustHalt(context)) break;
-            await this.#processSource(context, source);
-        }
+        try {
+            for (const source of state.sources) {
+                if (await this.#mustHalt(context)) break;
+                await this.#processSource(context, source);
+            }
 
-        if (state.status === 'running') {
-            state.status = state.sources.every((source) => source.completed) ? 'completed' : 'limited';
+            if (state.status === 'running') {
+                state.status = state.sources.every((source) => source.completed) ? 'completed' : 'limited';
+                await store.appendEvent({
+                    type: state.status === 'completed' ? 'completion' : 'pause',
+                    reason: state.status === 'limited' ? 'limit' : undefined,
+                });
+                await store.checkpoint(state);
+            }
+        } catch (error) {
+            state.status = 'error';
+            delete state.pauseReason;
             await store.appendEvent({
-                type: state.status === 'completed' ? 'completion' : 'pause',
-                reason: state.status === 'limited' ? 'limit' : undefined,
+                type: 'error',
+                kind: 'collector',
+                message: error?.message || String(error),
             });
             await store.checkpoint(state);
         }
@@ -140,16 +183,44 @@ export class Collector {
                 return;
             }
 
-            const html = await this.#request(
-                context,
-                'html',
-                card.sourceUrl,
-                () => context.transport.getHtml(card.sourceUrl),
-            );
-            if (html === null) return;
+            if (card.stage !== 'html-complete' && card.stage !== 'image-complete') {
+                const savedDraft = card.draft?.collectionStage === 'html-complete'
+                    ? card.draft
+                    : await context.store.readProduct?.(card.externalId);
+                if (savedDraft?.collectionStage === 'html-complete'
+                    && savedDraft.externalId === card.externalId
+                    && savedDraft.sourceUrl === card.sourceUrl) {
+                    card.draft = savedDraft;
+                    card.stage = 'html-complete';
+                    await context.store.checkpoint(context.state);
+                }
+            }
 
-            const product = parseProductPage(html, card.sourceUrl);
-            const externalId = product.externalId || card.externalId;
+            if (card.stage !== 'html-complete' && card.stage !== 'image-complete') {
+                const html = await this.#request(
+                    context,
+                    'html',
+                    card.sourceUrl,
+                    () => context.transport.getHtml(card.sourceUrl),
+                );
+                if (html === null) return;
+
+                const parsedProduct = parseProductPage(html, card.sourceUrl);
+                const parsedExternalId = parsedProduct.externalId || card.externalId;
+                assertSafeId(parsedExternalId, 'product external ID');
+                card.draft = {
+                    ...parsedProduct,
+                    externalId: parsedExternalId,
+                    firstImagePath: `images/${parsedExternalId}.webp`,
+                    collectionStage: 'html-complete',
+                };
+                await context.store.saveProduct(parsedExternalId, card.draft);
+                card.stage = 'html-complete';
+                await context.store.checkpoint(context.state);
+            }
+
+            const product = card.draft;
+            const externalId = product.externalId;
             assertSafeId(externalId, 'product external ID');
             if (!product.firstImageUrl) {
                 await this.#setError(context, 'missing_first_image', card.sourceUrl);
@@ -157,18 +228,32 @@ export class Collector {
             }
 
             const firstImagePath = `images/${externalId}.webp`;
-            const image = await this.#request(
-                context,
-                'image',
-                product.firstImageUrl,
-                () => context.transport.downloadFirstImage(
-                    product.firstImageUrl,
-                    join(context.store.imagesDir, `${externalId}.webp`),
-                ),
-            );
-            if (image === null) return;
+            const destination = join(context.store.imagesDir, `${externalId}.webp`);
+            const imageIsValid = await validateImageFile(destination, 'webp');
+            if (card.stage === 'image-complete' && !imageIsValid) {
+                card.stage = 'html-complete';
+                await context.store.checkpoint(context.state);
+            }
+            if (card.stage !== 'image-complete') {
+                if (!imageIsValid) {
+                    const image = await this.#request(
+                        context,
+                        'image',
+                        product.firstImageUrl,
+                        () => context.transport.downloadFirstImage(product.firstImageUrl, destination),
+                    );
+                    if (image === null) return;
+                }
+                card.stage = 'image-complete';
+                await context.store.checkpoint(context.state);
+            }
 
-            await context.store.saveProduct(externalId, { ...product, externalId, firstImagePath });
+            const { collectionStage, ...completedProduct } = product;
+            await context.store.saveProduct(externalId, {
+                ...completedProduct,
+                externalId,
+                firstImagePath,
+            });
             context.state.completedProductIds.push(externalId);
             context.productsThisRun += 1;
             source.pendingProducts.shift();
@@ -187,6 +272,7 @@ export class Collector {
             try {
                 await context.policy.beforeRequest(kind);
             } catch (error) {
+                if (error?.code === 'request_cancelled') return null;
                 const isHourlyBudget = error?.code === 'hourly_budget_exhausted';
                 context.state.status = isHourlyBudget ? 'paused' : 'error';
                 context.state.pauseReason = isHourlyBudget ? 'hourly-budget' : undefined;
@@ -202,21 +288,21 @@ export class Collector {
                 await context.store.checkpoint(context.state);
                 return null;
             }
-            context.requestsThisRun += 1;
-            context.state.requestCount += 1;
+            if (await this.#mustHalt(context)) return null;
             try {
                 const result = await operation();
-                context.policy.recordSuccess();
+                await context.policy.recordSuccess();
                 return result;
             } catch (error) {
                 const failureKind = error?.kind || 'error';
-                await context.store.appendEvent({
+                const errorEvent = {
                     type: failureKind === 'challenge' ? 'challenge' : 'error',
                     kind: failureKind,
                     url,
                     message: error?.message || String(error),
-                });
+                };
                 if (failureKind === 'challenge') {
+                    await context.store.appendEvent(errorEvent);
                     context.state.status = 'paused';
                     context.state.pauseReason = 'challenge';
                     await context.store.appendEvent({ type: 'pause', reason: 'challenge' });
@@ -224,12 +310,15 @@ export class Collector {
                     return null;
                 }
                 if (!retryableFailureKinds.has(failureKind)) {
+                    await context.store.appendEvent(errorEvent);
                     context.state.status = 'error';
                     await context.store.checkpoint(context.state);
                     return null;
                 }
 
-                const action = await context.policy.recordFailure(failureKind);
+                const action = await context.policy.recordFailure(failureKind, {
+                    afterPersist: () => context.store.appendEvent(errorEvent),
+                });
                 if (action === 'pause') {
                     context.state.status = 'paused';
                     context.state.pauseReason = failureKind;
