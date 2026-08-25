@@ -20,7 +20,11 @@ import {
     PlaywrightTransport,
 } from '../../scripts/rimskie-import/lib/playwright-transport.mjs';
 import { RequestPolicy } from '../../scripts/rimskie-import/lib/request-policy.mjs';
-import { configSchemaVersion, RunStore } from '../../scripts/rimskie-import/lib/run-store.mjs';
+import {
+    configDigest,
+    configSchemaVersion,
+    RunStore,
+} from '../../scripts/rimskie-import/lib/run-store.mjs';
 
 const whiteUrl = 'https://rimskie.com/catalog/rimskie-shtory/white';
 const greyUrl = 'https://rimskie.com/catalog/rimskie-shtory/grey';
@@ -60,6 +64,8 @@ function source(sourceSlug, sourceUrl) {
         label: sourceSlug,
         sourceSlug,
         sourceUrl,
+        enabled: true,
+        sortOrder: sourceSlug === 'white' ? 1 : 2,
         nextPageUrl: sourceUrl,
         pendingProducts: [],
         completed: false,
@@ -245,6 +251,41 @@ test('maxRequests=3 checkpoints a clean limited state before a fourth request', 
     assert.equal(snapshot.requestCount, 3);
     assert.equal(snapshot.status, 'limited');
     assert.equal((await store.readState()).status, 'limited');
+});
+
+test('maxRequests is a total durable cap across collector restarts', async (t) => {
+    const state = initialState([source('white', whiteUrl)]);
+    state.requestCount = 3;
+    const store = await createStore(t, state);
+    const fakeTransport = new FakeTransport(new Map());
+
+    const snapshot = await new Collector().run({
+        store, transport: fakeTransport, policy: createPolicy(store), maxRequests: 3,
+    });
+
+    assert.equal(snapshot.status, 'limited');
+    assert.equal(snapshot.pauseReason, 'max-requests');
+    assert.deepEqual(fakeTransport.calls, []);
+});
+
+test('maxProducts is a total durable cap across collector restarts', async (t) => {
+    const queuedSource = source('white', whiteUrl);
+    queuedSource.nextPageUrl = null;
+    queuedSource.pendingProducts = [{ externalId: '11900', sourceUrl: secondProductUrl }];
+    const state = initialState([queuedSource]);
+    state.completedProductIds = ['11889'];
+    const store = await createStore(t, state);
+    const fakeTransport = new FakeTransport(new Map([
+        [secondProductUrl, productHtml('11900')],
+    ]));
+
+    const snapshot = await new Collector().run({
+        store, transport: fakeTransport, policy: createPolicy(store), maxProducts: 1,
+    });
+
+    assert.equal(snapshot.status, 'limited');
+    assert.equal(snapshot.pauseReason, 'max-products');
+    assert.deepEqual(fakeTransport.calls, []);
 });
 
 test('resume after durable product HTML stage skips a second product request', async (t) => {
@@ -667,6 +708,7 @@ function fakePlaywright({
             if (imageError) throw imageError;
             return { ok: true };
         },
+        url: () => productUrl,
     };
     const context = {
         pages: () => [page],
@@ -697,6 +739,7 @@ test('playwright transport opens the supplied persistent profile in headed Chrom
         {
             headless: false,
             executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+            serviceWorkers: 'block',
         },
     ]]);
     assert.equal(fake.routes.length, 1);
@@ -732,10 +775,15 @@ test('playwright transport denies uncounted resources and only opens same-origin
     });
     const handler = fake.routes[0][1];
 
-    async function routeDecision(resourceType, url) {
+    async function routeDecision(resourceType, url, method = 'GET') {
         let decision = null;
         await handler({
-            request: () => ({ resourceType: () => resourceType, url: () => url }),
+            request: () => ({
+                method: () => method,
+                resourceType: () => resourceType,
+                url: () => url,
+                redirectedFrom: () => null,
+            }),
             abort: async () => { decision = 'abort'; },
             continue: async () => { decision = 'continue'; },
         });
@@ -753,8 +801,17 @@ test('playwright transport denies uncounted resources and only opens same-origin
     fake.page.goto = async () => ({ status: () => 403 });
     fake.page.content = async () => '<html><body>BotHunt verification</body></html>';
     await assert.rejects(transport.getHtml(whiteUrl), (error) => error.kind === 'challenge');
-    assert.equal(await routeDecision('stylesheet', 'https://rimskie.com/challenge.css'), 'continue');
+    assert.equal(await routeDecision('stylesheet', 'https://rimskie.com/challenge.css'), 'abort');
     assert.equal(await routeDecision('script', 'https://evil.example/challenge.js'), 'abort');
+    await transport.enableChallengeMode(whiteUrl);
+    assert.equal(await routeDecision('document', whiteUrl), 'continue');
+    assert.equal(await routeDecision(
+        'document', 'https://rimskie.com/catalog/rimskie-shtory/black',
+    ), 'abort');
+    assert.equal(await routeDecision('stylesheet', 'https://rimskie.com/challenge.css'), 'continue');
+    assert.equal(await routeDecision('fetch', 'https://rimskie.com/api/catalog'), 'abort');
+    assert.equal(await routeDecision('script', 'https://rimskie.com/challenge.js', 'POST'), 'abort');
+    assert.equal(await routeDecision('websocket', 'https://rimskie.com/challenge/socket'), 'abort');
     await transport.close();
 });
 
@@ -878,7 +935,8 @@ test('playwright transport rejects 403 HTML challenge bytes without writing an i
 
     await assert.rejects(
         transport.downloadFirstImage(imageUrl, destination),
-        (error) => error instanceof DonorRequestError && error.kind === 'challenge',
+        (error) => error instanceof DonorRequestError && error.kind === 'challenge'
+            && error.challengeDocumentUrl === productUrl && error.pageKind === 'product',
     );
     await assert.rejects(readFile(destination), /ENOENT/);
 });
@@ -1075,6 +1133,52 @@ test('run lock rejects stopped runs and a second live collector', async (t) => {
     await assert.rejects(control.claim(222), /stopped run/i);
 });
 
+test('run owner identity prevents PID reuse from impersonating the collector', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-owner-identity-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const controlPath = join(rootDir, 'control.json');
+    const first = new ControlFile(controlPath, {
+        isLiveProcess: () => true, processIdentity: 'instance-first',
+    });
+    const reusedPid = new ControlFile(controlPath, {
+        isLiveProcess: () => true, processIdentity: 'instance-second',
+    });
+    await first.claim(4242);
+
+    await assert.rejects(reusedPid.claim(4242), /instance|already running/i);
+});
+
+test('control exclusive operation blocks collector claim through manifest export', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-export-lock-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const controlPath = join(rootDir, 'control.json');
+    const exporter = new ControlFile(controlPath, {
+        isLiveProcess: () => false, processIdentity: 'exporter',
+    });
+    const collector = new ControlFile(controlPath, {
+        isLiveProcess: () => false, processIdentity: 'collector',
+    });
+    const order = [];
+    let releaseExport;
+    let notifyExportStarted;
+    const exportGate = new Promise((resolve) => { releaseExport = resolve; });
+    const exportStarted = new Promise((resolve) => { notifyExportStarted = resolve; });
+    const exporting = exporter.exclusive(async () => {
+        order.push('export-start');
+        notifyExportStarted();
+        await exportGate;
+        order.push('export-end');
+    });
+    await exportStarted;
+    const claiming = collector.claim(4242).then(() => order.push('claim'));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.deepEqual(order, ['export-start']);
+    releaseExport();
+    await Promise.all([exporting, claiming]);
+    assert.deepEqual(order, ['export-start', 'export-end', 'claim']);
+});
+
 test('control update recovers a lock left by a dead process', async (t) => {
     const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-control-'));
     t.after(() => rm(rootDir, { recursive: true, force: true }));
@@ -1136,25 +1240,38 @@ test('status pause stop and export CLI commands never open the donor transport',
     t.after(() => rm(runDir, { recursive: true, force: true }));
     const cliPath = fileURLToPath(new URL('../../scripts/rimskie-import/cli.mjs', import.meta.url));
     const store = await RunStore.open({ rootDir: dataRoot, runId });
+    const configuredSource = source('white', whiteUrl);
     const completedSource = {
-        ...source('white', whiteUrl),
+        ...configuredSource,
         nextPageUrl: null,
         completed: true,
+        pages: 1,
     };
-    await store.initializeConfig({
+    const config = {
         schema_version: configSchemaVersion,
-        sources: [completedSource],
-        limits: { max_requests: null, max_products: null },
-    });
+        sources: [configuredSource],
+        limits: {
+            html_delay_ms: [20_000, 40_000], image_delay_ms: [10_000, 20_000],
+            hourly_requests: 120, backoff_ms: [120_000, 300_000, 900_000],
+            concurrency: 1, max_requests: null, max_products: null,
+        },
+    };
+    await store.initializeConfig(config);
     await store.checkpoint({
         status: 'completed',
         requestCount: 3,
         completedProductIds: ['11889'],
         sources: [completedSource],
+        configDigest: configDigest(config),
     });
-    await store.saveSource('white', { status: 'completed', target_slug: 'white' });
+    await store.saveSource('white', {
+        label: 'white', source_url: whiteUrl, target_slug: 'white', enabled: true,
+        sort_order: 1, status: 'completed', pages: 1, next_page_url: null,
+    });
     await store.saveProduct('11889', {
-        externalId: '11889', firstImagePath: 'images/11889.webp',
+        externalId: '11889', sourceUrl: productUrl, sourceTitle: 'Product 11889',
+        sourceDescription: 'Private donor description', sourcePrice: '2708.00',
+        firstImageUrl: imageUrl, firstImagePath: 'images/11889.webp', attributes: {},
     });
     await store.appendMembership({ sourceSlug: 'white', externalId: '11889' });
     await writeFile(join(store.imagesDir, '11889.webp'), firstImageBytes);

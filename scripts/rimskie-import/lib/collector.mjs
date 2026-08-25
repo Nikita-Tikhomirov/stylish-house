@@ -47,12 +47,16 @@ export class Collector {
         maxRequests = Number.POSITIVE_INFINITY,
         maxProducts = Number.POSITIVE_INFINITY,
         acknowledgeFailurePause = false,
+        acknowledgeChallenge = false,
         acknowledgeError = false,
     }) {
         const state = await store.readState();
         if (!state) throw new Error('Run state does not exist');
         if (terminalStatuses.has(state.status)) return snapshot(state);
         if (state.status === 'error' && !acknowledgeError) return snapshot(state);
+        if (state.status === 'paused' && state.pauseReason === 'challenge' && !acknowledgeChallenge) {
+            return snapshot(state);
+        }
 
         const context = {
             store,
@@ -149,7 +153,9 @@ export class Collector {
             }
 
             const pageUrl = source.nextPageUrl;
-            const html = await this.#request(context, 'html', pageUrl, () => context.transport.getHtml(pageUrl));
+            const html = await this.#request(
+                context, 'html', pageUrl, () => context.transport.getHtml(pageUrl, { kind: 'category' }),
+            );
             if (html === null) return;
 
             const page = parseCategoryPage(html, pageUrl);
@@ -179,7 +185,7 @@ export class Collector {
                 await context.store.checkpoint(context.state);
                 continue;
             }
-            if (context.productsThisRun >= context.maxProducts) {
+            if (context.state.completedProductIds.length >= context.maxProducts) {
                 await this.#setLimited(context, 'max-products');
                 return;
             }
@@ -202,7 +208,7 @@ export class Collector {
                     context,
                     'html',
                     card.sourceUrl,
-                    () => context.transport.getHtml(card.sourceUrl),
+                    () => context.transport.getHtml(card.sourceUrl, { kind: 'product' }),
                 );
                 if (html === null) return;
 
@@ -265,7 +271,7 @@ export class Collector {
     async #request(context, kind, url, operation) {
         while (context.state.status === 'running') {
             if (await this.#mustHalt(context)) return null;
-            if (context.requestsThisRun >= context.maxRequests) {
+            if (context.state.requestCount >= context.maxRequests) {
                 await this.#setLimited(context, 'max-requests');
                 return null;
             }
@@ -307,6 +313,10 @@ export class Collector {
                     context.state.status = 'paused';
                     context.state.pauseReason = 'challenge';
                     await context.store.checkpoint(context.state);
+                    await context.transport.enableChallengeMode?.(
+                        error?.challengeDocumentUrl || error?.url || url,
+                        { kind: error?.pageKind || 'html' },
+                    );
                     await this.#appendEvent(context, errorEvent);
                     await this.#appendEvent(context, { type: 'pause', reason: 'challenge' });
                     return null;
@@ -378,6 +388,10 @@ export class Collector {
                 eventType: event?.type || 'unknown',
                 message: error?.message || String(error),
             };
+            if (context.state.status === 'running') {
+                context.state.status = 'error';
+                delete context.state.pauseReason;
+            }
             await context.store.checkpoint(context.state);
         }
     }

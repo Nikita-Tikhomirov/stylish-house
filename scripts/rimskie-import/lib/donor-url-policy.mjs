@@ -1,10 +1,5 @@
 const donorHostname = 'rimskie.com';
 
-const htmlPathPrefixes = [
-    '/catalog/rimskie-shtory/',
-    '/products/',
-];
-
 const imagePathPrefixes = [
     '/images/',
     '/media/',
@@ -14,9 +9,25 @@ const imagePathPrefixes = [
 ];
 
 function pathAllowed(pathname, kind) {
-    const prefixes = kind === 'image' ? imagePathPrefixes : htmlPathPrefixes;
+    if (kind === 'category') {
+        return /^\/catalog\/rimskie-shtory\/[a-z0-9-]+\/?$/i.test(pathname);
+    }
+    if (kind === 'product') {
+        return /^\/products\/\d+(?:-[a-z0-9-]+)?\/?$/i.test(pathname);
+    }
+    if (kind === 'html') {
+        return pathAllowed(pathname, 'category') || pathAllowed(pathname, 'product');
+    }
+    if (kind !== 'image') return false;
 
-    return prefixes.some((prefix) => pathname.startsWith(prefix));
+    return imagePathPrefixes.some((prefix) => pathname.startsWith(prefix) && pathname.length > prefix.length);
+}
+
+function assertUnambiguousUrlText(value, label) {
+    const text = String(value);
+    if (text.includes('\\') || /%(?:2e|2f|5c)|%25(?:2e|2f|5c)/i.test(text)) {
+        throw new Error(`${label} contains an encoded separator or ambiguous dot segment`);
+    }
 }
 
 export function resolveDonorOriginUrl(value, { label = 'donor URL' } = {}) {
@@ -42,6 +53,7 @@ export function resolveDonorUrl(value, {
     kind = 'html',
     label = 'donor URL',
 } = {}) {
+    assertUnambiguousUrlText(value, label);
     let candidate;
     try {
         candidate = baseUrl ? new URL(value, baseUrl).href : value;

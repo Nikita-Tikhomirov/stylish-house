@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import { DEFAULT_LIMITS } from './lib/request-policy.mjs';
-import { configSchemaVersion, RunStore } from './lib/run-store.mjs';
+import { configDigest, configSchemaVersion, RunStore } from './lib/run-store.mjs';
 import {
     assertSafeDirectoryPath,
     assertSafeIdentifier,
@@ -219,6 +219,12 @@ export async function assertRunDirectorySafe(dataRoot, runId, {
         if (stats.isSymbolicLink?.()) {
             throw new Error(`Nested run path must not use a junction or symbolic link: ${path}`);
         }
+        const leafName = paths.basename(path);
+        const knownLockRecoveryArtifact = leafName === 'control.json.lock'
+            || leafName.startsWith('control.json.lock.stale.');
+        if (stats.isFile?.() && stats.nlink > 1 && !knownLockRecoveryArtifact) {
+            throw new Error(`Nested run path contains an unsafe hard-linked file: ${path}`);
+        }
         let actual;
         try {
             actual = await realpath(path);
@@ -248,11 +254,15 @@ export async function assertRunDirectorySafe(dataRoot, runId, {
 }
 
 export class ControlFile {
-    constructor(path, { isLiveProcess: liveProcessCheck = isLiveProcess } = {}) {
+    constructor(path, {
+        isLiveProcess: liveProcessCheck = isLiveProcess,
+        processIdentity = randomUUID(),
+    } = {}) {
         this.path = path;
         this.rootDir = dirname(path);
         this.lockPath = `${path}.lock`;
         this.isLiveProcess = liveProcessCheck;
+        this.processIdentity = processIdentity;
     }
 
     async read() {
@@ -275,11 +285,17 @@ export class ControlFile {
         await this.write(changes);
     }
 
+    async exclusive(operation) {
+        return this.#withLock(async () => operation(await this.read()));
+    }
+
     async claim(ownerPid, { resume = false } = {}) {
         await this.#withLock(async () => {
             const current = await this.read();
             if (current.stop) throw new Error('A stopped run cannot start or resume');
-            if (current.ownerPid && current.ownerPid !== ownerPid && this.isLiveProcess(current.ownerPid)) {
+            const sameOwner = current.ownerPid === ownerPid
+                && current.ownerIdentity === this.processIdentity;
+            if (current.ownerPid && !sameOwner && this.isLiveProcess(current.ownerPid)) {
                 throw new Error(`Collector is already running with PID ${current.ownerPid}`);
             }
             if (current.pause && !resume) throw new Error('Run is paused; use the resume command');
@@ -288,6 +304,7 @@ export class ControlFile {
                 pause: resume ? false : Boolean(current.pause),
                 stop: false,
                 ownerPid,
+                ownerIdentity: this.processIdentity,
             });
         });
     }
@@ -295,8 +312,8 @@ export class ControlFile {
     async release(ownerPid) {
         await this.#withLock(async () => {
             const current = await this.read();
-            if (current.ownerPid !== ownerPid) return;
-            await this.#writeUnlocked({ ...current, ownerPid: null });
+            if (current.ownerPid !== ownerPid || current.ownerIdentity !== this.processIdentity) return;
+            await this.#writeUnlocked({ ...current, ownerPid: null, ownerIdentity: null });
         });
     }
 
@@ -394,6 +411,7 @@ export class ControlFile {
             await writeFile(reclaimPath, `${JSON.stringify({
                 pid: process.pid,
                 token: reclaimToken,
+                identity: this.processIdentity,
             })}\n`, { encoding: 'utf8', flag: 'wx' });
         } catch (error) {
             if (error?.code !== 'EEXIST') throw error;
@@ -406,10 +424,31 @@ export class ControlFile {
                     { cause: readError },
                 );
             }
-            if (!this.isLiveProcess(recoveryOwner?.pid)) {
+            if (!Number.isInteger(recoveryOwner?.pid) || recoveryOwner.pid <= 0
+                || typeof recoveryOwner?.token !== 'string'
+                || !/^[a-z0-9-]+$/i.test(recoveryOwner.token)
+                || typeof recoveryOwner?.identity !== 'string' || !recoveryOwner.identity) {
                 throw new Error(
-                    `Abandoned stale-lock recovery at ${reclaimPath}; remove it manually after verifying no collector is running`,
+                    `Incomplete stale-lock recovery at ${reclaimPath}; remove it manually after verifying no collector is running`,
                 );
+            }
+            if (!this.isLiveProcess(recoveryOwner.pid)) {
+                const currentText = await readFile(reclaimPath, 'utf8');
+                const currentOwner = JSON.parse(currentText);
+                if (currentOwner.pid !== recoveryOwner.pid
+                    || currentOwner.token !== recoveryOwner.token
+                    || currentOwner.identity !== recoveryOwner.identity) {
+                    return false;
+                }
+                let abandonedPath = `${reclaimPath}.stale.${recoveryOwner.token}`;
+                try {
+                    await fsLstat(abandonedPath);
+                    abandonedPath = `${abandonedPath}.${randomUUID()}`;
+                } catch (statError) {
+                    if (statError?.code !== 'ENOENT') throw statError;
+                }
+                await rename(reclaimPath, abandonedPath);
+                return false;
             }
             return false;
         }
@@ -478,7 +517,16 @@ function runtimeLimit(value) {
     return value === null ? Number.POSITIVE_INFINITY : value;
 }
 
-async function initializeRun(store, options) {
+export function savedPolicyOptions(config) {
+    return {
+        htmlDelayMs: config.limits.html_delay_ms,
+        imageDelayMs: config.limits.image_delay_ms,
+        hourlyLimit: config.limits.hourly_requests,
+        backoffMs: config.limits.backoff_ms,
+    };
+}
+
+export async function initializeRun(store, options) {
     const existingState = await store.readState();
     let config;
     try {
@@ -507,6 +555,7 @@ async function initializeRun(store, options) {
 
     const configuredMaxRequests = runtimeLimit(config.limits.max_requests);
     const configuredMaxProducts = runtimeLimit(config.limits.max_products);
+    const digest = configDigest(config);
     if (options.maxRequestsExplicit && options.maxRequests !== configuredMaxRequests) {
         throw new Error('Run max-request limit is immutable and differs from config.json');
     }
@@ -515,8 +564,13 @@ async function initializeRun(store, options) {
     }
 
     if (existingState) {
+        if (existingState.configDigest !== digest) {
+            throw new Error('Existing run state config digest does not match immutable config.json');
+        }
         return {
             state: existingState,
+            config,
+            configDigest: digest,
             maxRequests: configuredMaxRequests,
             maxProducts: configuredMaxProducts,
         };
@@ -526,11 +580,14 @@ async function initializeRun(store, options) {
         requestCount: 0,
         completedProductIds: [],
         sources: structuredClone(config.sources),
+        configDigest: digest,
     };
     await store.checkpoint(state);
 
     return {
         state,
+        config,
+        configDigest: digest,
         maxRequests: configuredMaxRequests,
         maxProducts: configuredMaxProducts,
     };
@@ -610,8 +667,12 @@ async function runCollector(options, store, control) {
             headed: true,
             executablePath: options.chrome,
         });
-        const policy = new RequestPolicy({ onEvent: (event) => store.appendEvent(event) });
+        const policy = new RequestPolicy({
+            ...savedPolicyOptions(initialized.config),
+            onEvent: (event) => store.appendEvent(event),
+        });
         const collector = new Collector();
+        let acknowledgeChallenge = options.command === 'resume';
         while (true) {
             result = await collector.run({
                 store,
@@ -621,8 +682,10 @@ async function runCollector(options, store, control) {
                 maxRequests: initialized.maxRequests,
                 maxProducts: initialized.maxProducts,
                 acknowledgeFailurePause: options.command === 'resume',
+                acknowledgeChallenge,
                 acknowledgeError: options.command === 'resume',
             });
+            acknowledgeChallenge = false;
             if (result.status !== 'paused' || result.pauseReason !== 'challenge') break;
 
             await control.update({ pause: true });
@@ -631,6 +694,7 @@ async function runCollector(options, store, control) {
                 result = await collector.run({ store, transport, policy, control });
                 break;
             }
+            acknowledgeChallenge = true;
         }
     } finally {
         try {
@@ -651,6 +715,7 @@ export async function main(argv = process.argv.slice(2)) {
     const store = mayCreateRun
         ? await RunStore.open({ rootDir: dataRoot, runId: options.runId })
         : await RunStore.openExisting({ rootDir: dataRoot, runId: options.runId });
+    if (!mayCreateRun) await store.requireInitialized();
     await assertRunDirectorySafe(dataRoot, options.runId);
     const control = new ControlFile(join(store.runDir, 'control.json'));
 
@@ -669,11 +734,12 @@ export async function main(argv = process.argv.slice(2)) {
         return;
     }
     if (options.command === 'export') {
-        const currentControl = await control.read();
-        if (isLiveProcess(currentControl.ownerPid)) {
-            throw new Error(`Cannot export while collector PID ${currentControl.ownerPid} is running`);
-        }
-        await store.exportManifest();
+        await control.exclusive(async (currentControl) => {
+            if (isLiveProcess(currentControl.ownerPid)) {
+                throw new Error(`Cannot export while collector PID ${currentControl.ownerPid} is running`);
+            }
+            await store.exportManifest();
+        });
         await print(store.exportPath);
         return;
     }

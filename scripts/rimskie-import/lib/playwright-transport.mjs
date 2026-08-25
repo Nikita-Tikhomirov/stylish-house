@@ -21,6 +21,7 @@ const analyticsHosts = [
     'analytics.yandex.ru',
 ];
 const challengePattern = /bothunt|captcha|challenge-platform|cf-chl-|verify you are human|подтвердите[^<]{0,40}человек/i;
+const challengeAssetPathPattern = /(?:^|\/)(?:bothunt|captcha|challenge|cdn-cgi\/challenge-platform)(?:[\/._-]|$)/i;
 const htmlDocumentPattern = /^\s*(?:<!doctype\s+html\b|<html\b|<head\b|<body\b)/i;
 export class DonorRequestError extends Error {
     constructor(kind, message, details = {}) {
@@ -99,7 +100,6 @@ function approvedUrl(value, { kind, label }) {
 }
 
 function redirectedFromCountedTarget(request, targetUrl) {
-    if (request.url() === targetUrl) return true;
     let previous = request.redirectedFrom?.();
     while (previous) {
         if (previous.url() === targetUrl) return true;
@@ -114,14 +114,21 @@ export function shouldAllowBrowserRequest({
     activeOperation,
     resourceType,
     url,
+    method = 'GET',
     redirectsFromActive = false,
 }) {
+    if (resourceType === 'websocket' || method !== 'GET') return false;
     if (!isApprovedDonorOriginUrl(url) || isAnalyticsUrl(url)) return false;
-    if (routeMode === 'challenge') return true;
+    if (routeMode === 'challenge') {
+        if (activeOperation?.kind !== 'challenge') return false;
+        if (resourceType === 'document') return url === activeOperation.url;
+        const allowedTypes = new Set(['stylesheet', 'script', 'image', 'font', 'fetch', 'xhr']);
+        return allowedTypes.has(resourceType) && challengeAssetPathPattern.test(new URL(url).pathname);
+    }
 
     if (activeOperation?.kind === 'html' && resourceType === 'document'
-        && isApprovedDonorUrl(url, { kind: 'html' })) {
-        return url === activeOperation.url || redirectsFromActive;
+        && isApprovedDonorUrl(url, { kind: activeOperation.pageKind || 'html' })) {
+        return url === activeOperation.url && !redirectsFromActive;
     }
     if (activeOperation?.kind === 'image' && url === activeOperation.url) {
         return ['fetch', 'xhr', 'image'].includes(resourceType);
@@ -155,6 +162,7 @@ export class PlaywrightTransport {
         const context = await chromium.launchPersistentContext(profileDir, {
             headless: false,
             executablePath: browserPath,
+            serviceWorkers: 'block',
         });
         const page = context.pages()[0] || await context.newPage();
         const transport = new PlaywrightTransport(context, page);
@@ -175,68 +183,92 @@ export class PlaywrightTransport {
         const resourceType = request.resourceType();
         const url = request.url();
 
+        if (this.routeMode === 'collecting' && this.activeOperation?.consumed) {
+            await route.abort();
+            return;
+        }
+
         const allowed = shouldAllowBrowserRequest({
             routeMode: this.routeMode,
             activeOperation: this.activeOperation,
             resourceType,
             url,
+            method: request.method?.() || 'GET',
             redirectsFromActive: this.activeOperation?.kind === 'html'
                 && redirectedFromCountedTarget(request, this.activeOperation.url),
         });
         if (allowed) {
+            if (this.routeMode === 'collecting') this.activeOperation.consumed = true;
             await route.continue();
         } else {
             await route.abort();
         }
     }
 
-    async getHtml(url) {
-        const requestedUrl = approvedUrl(url, { kind: 'html', label: 'queued donor HTML URL' });
-        this.activeOperation = { kind: 'html', url: requestedUrl };
+    async getHtml(url, { kind: pageKind = 'html' } = {}) {
+        const requestedUrl = approvedUrl(url, { kind: pageKind, label: 'queued donor HTML URL' });
+        this.activeOperation = { kind: 'html', pageKind, url: requestedUrl, consumed: false };
         this.routeMode = 'collecting';
-        let response;
         try {
-            response = await this.page.goto(requestedUrl, { waitUntil: 'domcontentloaded' });
-        } catch (error) {
-            const kind = error?.name === 'TimeoutError' ? 'timeout' : 'network';
-            throw new DonorRequestError(kind, error?.message || `Failed to navigate to ${requestedUrl}`, {
-                url: requestedUrl,
+            let response;
+            try {
+                response = await this.page.goto(requestedUrl, { waitUntil: 'domcontentloaded' });
+            } catch (error) {
+                const kind = error?.name === 'TimeoutError' ? 'timeout' : 'network';
+                throw new DonorRequestError(kind, error?.message || `Failed to navigate to ${requestedUrl}`, {
+                    url: requestedUrl,
+                });
+            }
+            if (!response) {
+                throw new DonorRequestError('network', 'Donor navigation returned no response', {
+                    url: requestedUrl,
+                });
+            }
+            const finalUrl = approvedUrl(response.url?.() || requestedUrl, {
+                kind: pageKind,
+                label: 'final donor HTML URL',
             });
-        }
-        if (!response) {
-            throw new DonorRequestError('network', 'Donor navigation returned no response', {
-                url: requestedUrl,
-            });
-        }
-        const finalUrl = approvedUrl(response.url?.() || requestedUrl, {
-            kind: 'html',
-            label: 'final donor HTML URL',
-        });
-        let html;
-        try {
-            html = await this.page.content();
-        } catch (error) {
-            const kind = error?.name === 'TimeoutError' ? 'timeout' : 'network';
-            throw new DonorRequestError(kind, error?.message || `Failed to read donor DOM at ${finalUrl}`, {
-                url: finalUrl,
-            });
-        }
-        if (challengePattern.test(html)) {
-            this.routeMode = 'challenge';
+            if (finalUrl !== requestedUrl) {
+                throw new DonorRequestError(
+                    'invalid_url',
+                    'HTML redirects are outside the exact counted request boundary',
+                    { url: finalUrl, pageKind },
+                );
+            }
+            let html;
+            try {
+                html = await this.page.content();
+            } catch (error) {
+                const kind = error?.name === 'TimeoutError' ? 'timeout' : 'network';
+                throw new DonorRequestError(kind, error?.message || `Failed to read donor DOM at ${finalUrl}`, {
+                    url: finalUrl,
+                });
+            }
+            if (challengePattern.test(html)) {
+                throw new DonorRequestError(
+                    'challenge',
+                    'BotHunt/challenge requires an explicitly authorized click in the visible browser',
+                    { url: finalUrl },
+                );
+            }
+            const failure = statusFailure(response.status(), finalUrl);
+            if (failure) throw failure;
+
+            return html;
+        } finally {
+            this.routeMode = 'idle';
             this.activeOperation = null;
-            throw new DonorRequestError(
-                'challenge',
-                'BotHunt/challenge requires an explicitly authorized click in the visible browser',
-                { url: finalUrl },
-            );
+            await this.page.evaluate(() => globalThis.stop?.()).catch(() => {});
         }
-        const failure = statusFailure(response.status(), finalUrl);
-        if (failure) throw failure;
+    }
 
-        this.routeMode = 'idle';
-        this.activeOperation = null;
-
-        return html;
+    async enableChallengeMode(url, { kind: pageKind = 'html' } = {}) {
+        const documentUrl = approvedUrl(url, {
+            kind: pageKind,
+            label: 'persisted challenge document URL',
+        });
+        this.activeOperation = { kind: 'challenge', url: documentUrl };
+        this.routeMode = 'challenge';
     }
 
     async downloadFirstImage(url, destination) {
@@ -248,7 +280,7 @@ export class PlaywrightTransport {
                 { url: requestedUrl, destination },
             );
         }
-        this.activeOperation = { kind: 'image', url: requestedUrl };
+        this.activeOperation = { kind: 'image', url: requestedUrl, consumed: false };
         this.routeMode = 'collecting';
         try {
             const responsePromise = this.page.waitForResponse((response) => response.url() === requestedUrl);
@@ -279,11 +311,15 @@ export class PlaywrightTransport {
             const bodyPrefix = bytes.subarray(0, 2_048).toString('utf8');
             if (contentType === 'text/html' || htmlDocumentPattern.test(bodyPrefix)
                 || challengePattern.test(bodyPrefix)) {
-                this.routeMode = 'challenge';
                 throw new DonorRequestError(
                     'challenge',
                     'HTML challenge was returned for the first-image request',
-                    { status, url: finalUrl },
+                    {
+                        status,
+                        url: finalUrl,
+                        challengeDocumentUrl: this.page.url?.(),
+                        pageKind: 'product',
+                    },
                 );
             }
             if (status < 200 || status >= 300) {
@@ -313,7 +349,7 @@ export class PlaywrightTransport {
             });
         } finally {
             this.activeOperation = null;
-            if (this.routeMode !== 'challenge') this.routeMode = 'idle';
+            this.routeMode = 'idle';
         }
     }
 

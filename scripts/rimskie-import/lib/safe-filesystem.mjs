@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+    link,
     lstat,
     readFile,
     realpath,
@@ -114,6 +115,29 @@ export async function writeFileAtomically(rootDir, path, data, encoding) {
         await assertSafeFileTarget(rootDir, target);
         await rename(temporaryPath, target);
         created = false;
+    } finally {
+        if (created) await rm(temporaryPath, { force: true }).catch(() => {});
+    }
+}
+
+export async function createFileAtomically(rootDir, path, data, encoding) {
+    const target = await assertSafeFileTarget(rootDir, path);
+    const temporaryPath = `${target}.${randomUUID()}.create`;
+    assertContainedPath(rootDir, temporaryPath, 'temporary file path');
+    let created = false;
+    try {
+        await writeFile(temporaryPath, data, { encoding, flag: 'wx' });
+        created = true;
+        const temporaryStats = await lstat(temporaryPath);
+        if (!temporaryStats.isFile() || temporaryStats.isSymbolicLink() || temporaryStats.nlink !== 1) {
+            throw new Error(`Unsafe temporary file at ${temporaryPath}`);
+        }
+        await assertSafeFileTarget(rootDir, target);
+        await link(temporaryPath, target);
+        return true;
+    } catch (error) {
+        if (error?.code === 'EEXIST') return false;
+        throw error;
     } finally {
         if (created) await rm(temporaryPath, { force: true }).catch(() => {});
     }

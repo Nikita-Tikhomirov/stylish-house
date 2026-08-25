@@ -31,7 +31,7 @@ function readCategoryCard(card, link, pageUrl) {
         externalId,
         sourceUrl: resolveDonorUrl(link.getAttribute('href'), {
             baseUrl: pageUrl,
-            kind: 'html',
+            kind: 'product',
             label: 'product URL',
         }),
         sourceTitle: normalizedText(card.querySelector('.product-title')),
@@ -48,12 +48,17 @@ function readCategoryCard(card, link, pageUrl) {
 
 function resolveNextPage(document, pageUrl) {
     const href = document.querySelector('a[rel="next"]')?.getAttribute('href');
-
-    return href ? resolveDonorUrl(href, {
+    if (!href) return null;
+    const nextPageUrl = resolveDonorUrl(href, {
         baseUrl: pageUrl,
-        kind: 'html',
+        kind: 'category',
         label: 'next-page URL',
-    }) : null;
+    });
+    if (new URL(nextPageUrl).pathname !== new URL(pageUrl).pathname) {
+        throw new Error('Category pagination must stay on the exact source path');
+    }
+
+    return nextPageUrl;
 }
 
 function readPageNumber(pageUrl) {
@@ -64,7 +69,7 @@ function readPageNumber(pageUrl) {
 
 export function parseCategoryPage(html, pageUrl) {
     const approvedPageUrl = resolveDonorUrl(pageUrl, {
-        kind: 'html',
+        kind: 'category',
         label: 'category page URL',
     });
     const document = new JSDOM(html, { url: approvedPageUrl }).window.document;

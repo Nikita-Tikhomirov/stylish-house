@@ -72,7 +72,7 @@ function readAttributes(document) {
 
 export function parseProductPage(html, pageUrl) {
     const approvedPageUrl = resolveDonorUrl(pageUrl, {
-        kind: 'html',
+        kind: 'product',
         label: 'product page URL',
     });
     const document = new JSDOM(html, { url: approvedPageUrl }).window.document;

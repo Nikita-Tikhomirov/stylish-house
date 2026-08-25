@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { lstat, mkdir, readFile, readdir } from 'node:fs/promises';
 import { isAbsolute, join, relative, sep } from 'node:path';
 
@@ -8,10 +9,12 @@ import {
     assertSafeDirectoryPath,
     assertSafeFileTarget,
     assertSafeIdentifier,
+    createFileAtomically,
     readSafeFile,
     writeFileAtomically,
 } from './safe-filesystem.mjs';
 import { validateImageFile } from './webp.mjs';
+import { resolveDonorUrl } from './donor-url-policy.mjs';
 
 const manifestSchemaVersion = 'stylish-house.catalog-import/v1';
 const configSchemaVersion = 'stylish-house.catalog-import-run/v1';
@@ -22,6 +25,70 @@ function isMissingFile(error) {
 
 function stableJson(value) {
     return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+function canonicalize(value) {
+    if (Array.isArray(value)) return value.map(canonicalize);
+    if (!value || typeof value !== 'object') return value;
+    return Object.fromEntries(
+        Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]),
+    );
+}
+
+export function configDigest(config) {
+    return createHash('sha256').update(JSON.stringify(canonicalize(config))).digest('hex');
+}
+
+function validateConfig(config) {
+    if (!config || config.schema_version !== configSchemaVersion
+        || !Array.isArray(config.sources) || config.sources.length === 0 || !config.limits) {
+        throw new Error('Run config must include the supported schema_version, sources, and limits');
+    }
+    const { limits } = config;
+    const validRange = (value) => Array.isArray(value) && value.length === 2
+        && value.every((entry) => Number.isInteger(entry) && entry >= 0)
+        && value[0] <= value[1];
+    const validBackoff = Array.isArray(limits.backoff_ms) && limits.backoff_ms.length === 3
+        && limits.backoff_ms.every((entry) => Number.isInteger(entry) && entry >= 0);
+    const validCap = (value) => value === null || (Number.isInteger(value) && value > 0);
+    if (!validRange(limits.html_delay_ms) || !validRange(limits.image_delay_ms)
+        || !Number.isInteger(limits.hourly_requests) || limits.hourly_requests <= 0
+        || !validBackoff || limits.concurrency !== 1
+        || !validCap(limits.max_requests) || !validCap(limits.max_products)) {
+        throw new Error('Run config limits do not match the required request-policy schema');
+    }
+    const sourceSlugs = new Set();
+    const sourceOrders = new Set();
+    for (const source of config.sources) {
+        let approvedSourceUrl;
+        try {
+            assertSafeIdentifier(source?.sourceSlug, 'source slug', {
+                pattern: /^[a-z0-9][a-z0-9-]{0,127}$/,
+            });
+            approvedSourceUrl = resolveDonorUrl(source.sourceUrl, {
+                kind: 'category', label: 'configured source URL',
+            });
+        } catch (error) {
+            throw new Error('Run config source schema is invalid', { cause: error });
+        }
+        if (typeof source.label !== 'string' || !source.label.trim()
+            || approvedSourceUrl !== source.sourceUrl
+            || source.enabled !== true
+            || !Number.isInteger(source.sortOrder) || source.sortOrder <= 0
+            || source.nextPageUrl !== source.sourceUrl
+            || !Array.isArray(source.pendingProducts) || source.pendingProducts.length !== 0
+            || source.completed !== false || source.pages !== 0
+            || sourceSlugs.has(source.sourceSlug) || sourceOrders.has(source.sortOrder)) {
+            throw new Error('Run config source schema is invalid');
+        }
+        sourceSlugs.add(source.sourceSlug);
+        sourceOrders.add(source.sortOrder);
+    }
+    if (config.sources.some((source, index) => index > 0
+        && source.sortOrder <= config.sources[index - 1].sortOrder)) {
+        throw new Error('Run config source schema order is invalid');
+    }
+    return config;
 }
 
 async function readNdjson(path) {
@@ -68,11 +135,11 @@ export class RunStore {
         assertSafeIdentifier(runId, 'run ID');
         await mkdir(rootDir, { recursive: true });
         const runDir = assertContainedPath(rootDir, join(rootDir, runId), 'run directory');
-        if (!await directoryExists(runDir)) await mkdir(runDir);
+        await mkdir(runDir, { recursive: true });
         const store = new RunStore(runDir, runId);
         await assertSafeDirectoryPath(store.runDir, store.runDir);
         for (const directory of [store.sourcesDir, store.productsDir, store.imagesDir]) {
-            if (!await directoryExists(directory)) await mkdir(directory);
+            await mkdir(directory, { recursive: true });
             await assertSafeDirectoryPath(store.runDir, directory);
         }
         await store.#loadMembershipKeys();
@@ -115,10 +182,7 @@ export class RunStore {
     }
 
     async initializeConfig(config) {
-        if (!config || config.schema_version !== configSchemaVersion
-            || !Array.isArray(config.sources) || config.sources.length === 0 || !config.limits) {
-            throw new Error('Run config must include schema_version, sources, and limits');
-        }
+        validateConfig(config);
         try {
             const existing = await this.readConfig();
             if (stableJson(existing) !== stableJson(config)) {
@@ -129,12 +193,18 @@ export class RunStore {
             if (!isMissingFile(error)) throw error;
         }
 
-        await writeFileAtomically(this.runDir, this.configPath, stableJson(config), 'utf8');
-        return config;
+        if (await createFileAtomically(this.runDir, this.configPath, stableJson(config), 'utf8')) {
+            return config;
+        }
+        const existing = await this.readConfig();
+        if (stableJson(existing) !== stableJson(config)) {
+            throw new Error('Run config is immutable and does not match the existing config.json');
+        }
+        return existing;
     }
 
     async readConfig() {
-        return JSON.parse(await readSafeFile(this.runDir, this.configPath, 'utf8'));
+        return validateConfig(JSON.parse(await readSafeFile(this.runDir, this.configPath, 'utf8')));
     }
 
     async readState() {
@@ -144,6 +214,28 @@ export class RunStore {
             if (isMissingFile(error)) return null;
             throw error;
         }
+    }
+
+    async requireInitialized() {
+        let config;
+        try {
+            config = await this.readConfig();
+        } catch (error) {
+            if (isMissingFile(error)) {
+                throw new Error('Run requires initialized config.json and state.json');
+            }
+            throw error;
+        }
+        const state = await this.readState();
+        if (!state || typeof state.status !== 'string' || !Array.isArray(state.sources)
+            || !Array.isArray(state.completedProductIds)
+            || !Number.isInteger(state.requestCount) || state.requestCount < 0) {
+            throw new Error('Run requires a valid initialized state schema');
+        }
+        if (state.configDigest !== configDigest(config)) {
+            throw new Error('Run state config digest does not match immutable config.json');
+        }
+        return { config, state };
     }
 
     async checkpoint(state) {
@@ -236,9 +328,18 @@ export class RunStore {
         if (state.status !== 'completed') {
             throw new Error(`Cannot export a run in ${state.status || 'unknown'} state; completed is required`);
         }
+        const digest = configDigest(config);
+        if (state.configDigest !== digest) {
+            throw new Error('State config digest does not match immutable config.json');
+        }
         if (!Array.isArray(state.sources) || state.sources.length === 0
             || state.sources.some((source) => !source.completed)) {
             throw new Error('Cannot export an incomplete source set');
+        }
+        if (state.sources.some((source) => source.nextPageUrl !== null
+            || !Array.isArray(source.pendingProducts) || source.pendingProducts.length !== 0
+            || !Number.isInteger(source.pages) || source.pages < 1)) {
+            throw new Error('Completed source progress is contradictory or has pending products');
         }
         if (sources.length !== state.sources.length || sources.some((source) => source.status !== 'completed')) {
             throw new Error('Persisted source records are incomplete or inconsistent');
@@ -246,18 +347,34 @@ export class RunStore {
         if (memberships.length === 0) throw new Error('Cannot export an empty membership set');
 
         const sourceSlugs = new Set(state.sources.map(({ sourceSlug }) => sourceSlug));
-        const configuredSources = new Map(config.sources.map((source) => [source.sourceSlug, source]));
-        if (configuredSources.size !== state.sources.length || state.sources.some((source) => {
-            const configured = configuredSources.get(source.sourceSlug);
-            return !configured || configured.sourceUrl !== source.sourceUrl;
+        const immutableSourceFields = ['label', 'sourceSlug', 'sourceUrl', 'enabled', 'sortOrder'];
+        if (config.sources.length !== state.sources.length || state.sources.some((source, index) => {
+            const configured = config.sources[index];
+            return !configured
+                || immutableSourceFields.some((field) => configured[field] !== source[field])
+                || !Array.isArray(source.pendingProducts)
+                || typeof source.completed !== 'boolean'
+                || !Number.isInteger(source.pages) || source.pages < 0
+                || (source.nextPageUrl !== null && typeof source.nextPageUrl !== 'string');
         })) {
             throw new Error('State sources differ from immutable config.json');
         }
-        const persistedSourceSlugs = new Set(sources.map((source) => source.target_slug));
-        if (persistedSourceSlugs.size !== sourceSlugs.size
-            || [...sourceSlugs].some((slug) => !persistedSourceSlugs.has(slug))) {
-            throw new Error('Persisted source records do not match state sources');
+        const persistedSources = new Map(sources.map((source) => [source.target_slug, source]));
+        if (persistedSources.size !== sourceSlugs.size || state.sources.some((source) => {
+            const persisted = persistedSources.get(source.sourceSlug);
+            return !persisted
+                || persisted.label !== source.label
+                || persisted.source_url !== source.sourceUrl
+                || persisted.target_slug !== source.sourceSlug
+                || persisted.enabled !== source.enabled
+                || persisted.sort_order !== source.sortOrder
+                || persisted.status !== (source.completed ? 'completed' : 'running')
+                || persisted.pages !== source.pages
+                || persisted.next_page_url !== source.nextPageUrl;
+        })) {
+            throw new Error('Persisted source records contradict immutable config or state progress');
         }
+        const orderedSources = state.sources.map((source) => persistedSources.get(source.sourceSlug));
         const membershipKeys = memberships.map(({ sourceSlug, externalId }) => `${sourceSlug}\u0000${externalId}`);
         if (new Set(membershipKeys).size !== membershipKeys.length) {
             throw new Error('Membership file contains duplicate records');
@@ -288,11 +405,45 @@ export class RunStore {
         }
 
         const products = [];
+        const images = [];
         for (const externalId of externalIds) {
             const product = await this.readProduct(externalId);
             if (!product) throw new Error(`Missing product JSON for ${externalId}`);
+            if (product.collectionStage || product.stage || product.draft) {
+                throw new Error(`Product ${externalId} is a draft-stage or incomplete product record`);
+            }
             if (product.externalId !== externalId) {
                 throw new Error(`Product JSON external ID mismatch for ${externalId}`);
+            }
+            const requiredTextFields = [
+                'sourceUrl', 'sourceTitle', 'sourceDescription', 'sourcePrice',
+                'firstImageUrl', 'firstImagePath',
+            ];
+            for (const field of requiredTextFields) {
+                if (typeof product[field] !== 'string' || !product[field].trim()) {
+                    throw new Error(`Product ${externalId} requires ${field}`);
+                }
+            }
+            if (!/^\d+(?:\.\d{2})$/.test(product.sourcePrice)) {
+                throw new Error(`Product ${externalId} sourcePrice must be an exact donor amount`);
+            }
+            let approvedProductUrl;
+            let approvedImageUrl;
+            try {
+                approvedProductUrl = resolveDonorUrl(product.sourceUrl, {
+                    kind: 'product', label: `Product ${externalId} sourceUrl`,
+                });
+                approvedImageUrl = resolveDonorUrl(product.firstImageUrl, {
+                    kind: 'image', label: `Product ${externalId} firstImageUrl`,
+                });
+            } catch (error) {
+                throw new Error(`Product ${externalId} requires approved product and image URLs`, {
+                    cause: error,
+                });
+            }
+            if (approvedProductUrl !== product.sourceUrl || approvedImageUrl !== product.firstImageUrl
+                || new URL(approvedProductUrl).pathname.match(/^\/products\/(\d+)/)?.[1] !== externalId) {
+                throw new Error(`Product ${externalId} requires approved exact product and image URLs`);
             }
             const imagePath = product.firstImagePath || product.first_image_path;
             const resolvedImagePath = resolveFirstImagePath(
@@ -314,17 +465,32 @@ export class RunStore {
             if (!await validateImageFile(resolvedImagePath, 'webp')) {
                 throw new Error(`Product ${externalId} first image is not a structurally valid WebP file`);
             }
+            const imageBytes = await readSafeFile(this.runDir, resolvedImagePath);
+            images.push({
+                external_id: externalId,
+                path: imagePath,
+                byte_length: imageBytes.length,
+                sha256: createHash('sha256').update(imageBytes).digest('hex'),
+            });
             products.push(product);
         }
 
         const manifest = {
             schema_version: manifestSchemaVersion,
             run_id: this.runId,
+            config_digest: digest,
             config,
             state,
-            sources,
+            sources: orderedSources,
             products,
+            images,
             memberships,
+            counts: {
+                sources: orderedSources.length,
+                products: products.length,
+                memberships: memberships.length,
+                images: images.length,
+            },
         };
         await writeFileAtomically(this.runDir, this.exportPath, stableJson(manifest), 'utf8');
 

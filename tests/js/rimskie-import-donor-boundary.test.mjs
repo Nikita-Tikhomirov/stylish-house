@@ -6,6 +6,7 @@ import test from 'node:test';
 
 import { parseCategoryPage } from '../../scripts/rimskie-import/lib/category-parser.mjs';
 import { parseProductPage } from '../../scripts/rimskie-import/lib/product-parser.mjs';
+import { resolveDonorUrl } from '../../scripts/rimskie-import/lib/donor-url-policy.mjs';
 import {
     detectImageFormat,
     DonorRequestError,
@@ -93,10 +94,40 @@ test('category parser rejects an off-origin product link', () => {
     assert.throws(() => parseCategoryPage(html, categoryUrl), /product URL.*rimskie\.com/i);
 });
 
+test('donor URL policy separates category and product page contexts', () => {
+    assert.equal(resolveDonorUrl(categoryUrl, { kind: 'category' }), categoryUrl);
+    assert.equal(
+        resolveDonorUrl('https://rimskie.com/products/11889-example', { kind: 'product' }),
+        'https://rimskie.com/products/11889-example',
+    );
+    assert.throws(() => resolveDonorUrl(categoryUrl, { kind: 'product' }), /product path/i);
+    assert.throws(
+        () => resolveDonorUrl('https://rimskie.com/products/11889-example', { kind: 'category' }),
+        /category path/i,
+    );
+});
+
+test('donor URL policy rejects encoded separators and ambiguous dot segments', () => {
+    for (const value of [
+        'https://rimskie.com/catalog/rimskie-shtory/white%2fextra',
+        'https://rimskie.com/catalog/rimskie-shtory/white%5cextra',
+        'https://rimskie.com/catalog/rimskie-shtory/%2e%2e/products/11889-example',
+        'https://rimskie.com/catalog/rimskie-shtory/white%252fextra',
+    ]) {
+        assert.throws(() => resolveDonorUrl(value, { kind: 'category' }), /encoded|ambiguous/i);
+    }
+});
+
 test('category parser rejects a non-HTTPS next-page link', () => {
     const html = '<a rel="next" href="http://rimskie.com/catalog?page=2"></a>';
 
     assert.throws(() => parseCategoryPage(html, categoryUrl), /next-page URL.*HTTPS/i);
+});
+
+test('category parser keeps pagination on the exact configured source path', () => {
+    const html = '<a rel="next" href="/catalog/rimskie-shtory/black?page=2"></a>';
+
+    assert.throws(() => parseCategoryPage(html, categoryUrl), /exact source path|pagination/i);
 });
 
 test('category parser rejects an off-origin card image link', () => {
@@ -169,6 +200,10 @@ test('browser routing permits only the exact counted operation outside challenge
         routeMode: 'collecting', activeOperation: activeHtml, resourceType: 'document',
         url: 'https://evil.example/redirected', redirectsFromActive: true,
     }), false);
+    assert.equal(shouldAllowBrowserRequest({
+        routeMode: 'collecting', activeOperation: activeHtml, resourceType: 'document',
+        url: 'https://rimskie.com/catalog/rimskie-shtory/black', redirectsFromActive: true,
+    }), false);
 
     const activeImage = { kind: 'image', url: imageUrl };
     assert.equal(shouldAllowBrowserRequest({
@@ -179,13 +214,59 @@ test('browser routing permits only the exact counted operation outside challenge
         url: 'https://rimskie.com/media/output/second.webp',
     }), false);
     assert.equal(shouldAllowBrowserRequest({
-        routeMode: 'challenge', activeOperation: null, resourceType: 'script',
+        routeMode: 'challenge', activeOperation: { kind: 'challenge', url: categoryUrl },
+        resourceType: 'script',
         url: 'https://rimskie.com/challenge/script.js',
     }), true);
     assert.equal(shouldAllowBrowserRequest({
-        routeMode: 'challenge', activeOperation: null, resourceType: 'script',
+        routeMode: 'challenge', activeOperation: { kind: 'challenge', url: categoryUrl },
+        resourceType: 'script',
         url: 'https://evil.example/challenge.js',
     }), false);
+    assert.equal(shouldAllowBrowserRequest({
+        routeMode: 'challenge', activeOperation: { kind: 'challenge', url: categoryUrl },
+        resourceType: 'websocket',
+        url: 'https://rimskie.com/challenge/socket', method: 'GET',
+    }), false);
+});
+
+test('one HTML operation authorizes only its first exact document request', async () => {
+    const decisions = [];
+    let stopCalls = 0;
+    let routeHandler;
+    const page = {
+        goto: async () => {
+            for (let count = 0; count < 2; count += 1) {
+                await routeHandler({
+                    request: () => ({
+                        method: () => 'GET',
+                        resourceType: () => 'document',
+                        url: () => categoryUrl,
+                        redirectedFrom: () => null,
+                    }),
+                    continue: async () => decisions.push('continue'),
+                    abort: async () => decisions.push('abort'),
+                });
+            }
+            return { status: () => 200, url: () => categoryUrl };
+        },
+        content: async () => '<html><body>ok</body></html>',
+        evaluate: async () => { stopCalls += 1; },
+    };
+    const context = {
+        pages: () => [page],
+        route: async (_pattern, handler) => { routeHandler = handler; },
+        close: async () => {},
+    };
+    const transport = await PlaywrightTransport.open({
+        profileDir: 'profile', executablePath: 'chrome.exe',
+        chromium: { launchPersistentContext: async () => context },
+    });
+
+    await transport.getHtml(categoryUrl);
+
+    assert.deepEqual(decisions, ['continue', 'abort']);
+    assert.equal(stopCalls, 1);
 });
 
 test('WebP validation checks RIFF length and the first chunk type', () => {
