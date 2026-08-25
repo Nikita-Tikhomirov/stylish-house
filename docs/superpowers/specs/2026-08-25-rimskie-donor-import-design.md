@@ -82,7 +82,7 @@ CLI-команды сборщика:
 
 Уникальные ключи:
 
-- `(provider, external_id)` для staging-товара;
+- `(catalog_import_run_id, provider, external_id)` для staging-товара, чтобы каждый run сохранял независимые review-статусы и audit snapshot;
 - `(import_item_id, import_source_id)` для membership;
 - `(attribute_id, normalized_value)` для значения фильтра.
 
