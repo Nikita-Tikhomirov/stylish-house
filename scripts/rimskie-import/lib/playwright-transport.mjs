@@ -282,7 +282,9 @@ export class PlaywrightTransport {
         } finally {
             this.routeMode = 'idle';
             this.activeOperation = null;
-            await this.page.evaluate(() => globalThis.stop?.()).catch(() => {});
+            if (!this.pendingChallenge) {
+                await this.page.evaluate(() => globalThis.stop?.()).catch(() => {});
+            }
         }
     }
 

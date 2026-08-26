@@ -948,6 +948,7 @@ test('playwright transport reports typed 403 and visible challenge failures', as
 test('playwright transport clicks the exact simple challenge retry button once', async () => {
     let html = '<html><body>BotHunt verification<button>Попробовать снова</button></body></html>';
     let retryClicks = 0;
+    let stopCalls = 0;
     const response = {
         status: () => 200,
         url: () => whiteUrl,
@@ -964,7 +965,7 @@ test('playwright transport clicks the exact simple challenge retry button once',
     const page = {
         goto: async () => response,
         content: async () => html,
-        evaluate: async () => {},
+        evaluate: async () => { stopCalls += 1; },
         // Chrome can expose its internal error-document URL while preserving the
         // donor challenge DOM that was returned for the counted navigation.
         url: () => 'chrome-error://chromewebdata/',
@@ -982,10 +983,12 @@ test('playwright transport clicks the exact simple challenge retry button once',
         transport.getHtml(whiteUrl, { kind: 'category' }),
         (error) => error instanceof DonorRequestError && error.kind === 'challenge',
     );
+    assert.equal(stopCalls, 0);
     const result = await transport.retrySimpleChallenge(whiteUrl, { kind: 'category' });
 
     assert.equal(result, categoryHtml([]));
     assert.equal(retryClicks, 1);
+    assert.equal(stopCalls, 1);
 });
 
 test('playwright transport never clicks retry when full CAPTCHA controls are present', async () => {
