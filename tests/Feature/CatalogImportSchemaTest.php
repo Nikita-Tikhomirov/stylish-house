@@ -32,6 +32,7 @@ class CatalogImportSchemaTest extends TestCase
             require database_path('migrations/2026_08_25_000000_create_catalog_import_staging_tables.php'),
             require database_path('migrations/2026_08_25_000100_create_catalog_attribute_tables.php'),
             require database_path('migrations/2026_08_25_000200_add_catalog_import_fields_to_products_and_subcategories.php'),
+            require database_path('migrations/2026_08_26_000000_add_catalog_import_image_integrity_fields.php'),
         ];
 
         foreach ($this->migrations as $migration) {
@@ -177,6 +178,8 @@ class CatalogImportSchemaTest extends TestCase
             'external_id' => '11889',
             'source_url' => 'https://rimskie.com/products/11889-example',
             'source_price' => '2708.00',
+            'source_image_sha256' => str_repeat('a', 64),
+            'source_image_byte_length' => 30,
             'review_status' => CatalogImportItem::STATUS_APPROVED,
             'warnings' => ['removed_branding'],
             'published_product_id' => $product->id,
@@ -208,6 +211,8 @@ class CatalogImportSchemaTest extends TestCase
         $this->assertTrue($source->fresh()->created_subcategory);
         $this->assertSame(['title' => 'До публикации'], $source->fresh()->publication_snapshot);
         $this->assertTrue($item->fresh()->created_product);
+        $this->assertSame(str_repeat('a', 64), $item->fresh()->source_image_sha256);
+        $this->assertSame(30, $item->fresh()->source_image_byte_length);
         $this->assertSame(['title' => 'До публикации'], $item->fresh()->publication_snapshot);
         $this->assertTrue($item->fresh()->product->is($product));
         $this->assertTrue($source->fresh()->publishedSubcategory->is($subcategory));
@@ -342,6 +347,7 @@ class CatalogImportSchemaTest extends TestCase
         $this->assertTrue(Schema::hasColumn('subcategories', 'title'));
         $this->assertFalse(Schema::hasColumn('products', 'source_provider'));
         $this->assertFalse(Schema::hasColumn('products', 'calculator_enabled'));
+        $this->assertFalse(Schema::hasColumn('catalog_import_items', 'source_image_sha256'));
         $this->assertFalse(Schema::hasColumn('subcategories', 'is_import_collection'));
         $this->assertFalse(Schema::hasTable('catalog_import_runs'));
         $this->assertFalse(Schema::hasTable('catalog_collection_product'));

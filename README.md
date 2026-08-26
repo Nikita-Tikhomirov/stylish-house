@@ -49,6 +49,16 @@ Complete authentication manually. If BotHunt or another visible challenge appear
 
 Residual filesystem threat model: the collector prevents pre-existing/static path traversal, reserved names, drive-`C:` escapes, symbolic links, junctions, reparse points, and unexpected hard links, and it revalidates immediately before writes. A hostile local process that can concurrently replace an already validated writable directory ancestor remains outside this portable Node/Chrome design because Node does not expose a cross-platform held-directory-handle/no-share-delete write API and Chrome profile writes cannot be routed through one. Normal operation remains rooted only at the validated `G:\stylish-house-data\rimskie-imports` path.
 
+## Private catalog staging
+
+An exported collector package can be validated without writing anything:
+
+```powershell
+php artisan catalog-import:ingest 'G:\stylish-house-data\rimskie-imports\<run-id>\export.json' --dry-run
+```
+
+After a successful dry run, omit `--dry-run` to create a private staging run. The command validates the complete manifest and every local WebP before database or storage writes, copies verified images to the private Laravel `local` disk, and leaves all product and landing drafts in `needs_review`. It does not publish products, enable calculator pricing, or expose the donor price. Repeating the identical package is a verified no-op that preserves manual rewrite and review fields; a changed digest or damaged staging facts/image is rejected for operator review.
+
 ## Learning Laravel
 
 Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.

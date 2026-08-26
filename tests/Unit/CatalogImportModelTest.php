@@ -57,6 +57,8 @@ class CatalogImportModelTest extends TestCase
         ]);
         $item = new CatalogImportItem([
             'source_price' => '2708',
+            'source_image_sha256' => str_repeat('a', 64),
+            'source_image_byte_length' => '30',
             'warnings' => ['removed_branding'],
             'created_product' => 1,
             'publication_snapshot' => ['title' => 'Before'],
@@ -71,6 +73,8 @@ class CatalogImportModelTest extends TestCase
         $this->assertTrue($source->created_subcategory);
         $this->assertSame(['title' => 'Before'], $source->publication_snapshot);
         $this->assertSame('2708.00', $item->source_price);
+        $this->assertSame(str_repeat('a', 64), $item->source_image_sha256);
+        $this->assertSame(30, $item->source_image_byte_length);
         $this->assertSame(['removed_branding'], $item->warnings);
         $this->assertTrue($item->created_product);
         $this->assertSame(['title' => 'Before'], $item->publication_snapshot);

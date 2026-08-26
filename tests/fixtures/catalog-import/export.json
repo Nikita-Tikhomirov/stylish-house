@@ -1,0 +1,132 @@
+{
+  "schema_version": "stylish-house.catalog-import/v1",
+  "run_id": "fixture-run-001",
+  "config_digest": "0b741805531e882191d13e5f3cbd73c390385948ce29aae27496b63375381976",
+  "config": {
+    "schema_version": "stylish-house.catalog-import-run/v1",
+    "sources": [
+      {
+        "label": "Белые",
+        "sourceSlug": "rimskie-shtory-belye",
+        "sourceUrl": "https://rimskie.com/catalog/rimskie-shtory/rimskie-shtory-belye",
+        "nextPageUrl": "https://rimskie.com/catalog/rimskie-shtory/rimskie-shtory-belye",
+        "enabled": true,
+        "sortOrder": 1,
+        "pendingProducts": [],
+        "completed": false,
+        "pages": 0
+      },
+      {
+        "label": "Для офиса",
+        "sourceSlug": "rimskie-shtory-na-stvorku",
+        "sourceUrl": "https://rimskie.com/catalog/rimskie-shtory/rimskie-shtory-na-stvorku",
+        "nextPageUrl": "https://rimskie.com/catalog/rimskie-shtory/rimskie-shtory-na-stvorku",
+        "enabled": true,
+        "sortOrder": 2,
+        "pendingProducts": [],
+        "completed": false,
+        "pages": 0
+      }
+    ],
+    "limits": {
+      "html_delay_ms": [20000, 40000],
+      "image_delay_ms": [10000, 20000],
+      "hourly_requests": 120,
+      "backoff_ms": [120000, 300000, 900000],
+      "concurrency": 1,
+      "max_requests": null,
+      "max_products": null
+    }
+  },
+  "state": {
+    "status": "completed",
+    "requestCount": 5,
+    "completedProductIds": ["11889"],
+    "sources": [
+      {
+        "label": "Белые",
+        "sourceSlug": "rimskie-shtory-belye",
+        "sourceUrl": "https://rimskie.com/catalog/rimskie-shtory/rimskie-shtory-belye",
+        "nextPageUrl": null,
+        "enabled": true,
+        "sortOrder": 1,
+        "pendingProducts": [],
+        "completed": true,
+        "pages": 1
+      },
+      {
+        "label": "Для офиса",
+        "sourceSlug": "rimskie-shtory-na-stvorku",
+        "sourceUrl": "https://rimskie.com/catalog/rimskie-shtory/rimskie-shtory-na-stvorku",
+        "nextPageUrl": null,
+        "enabled": true,
+        "sortOrder": 2,
+        "pendingProducts": [],
+        "completed": true,
+        "pages": 1
+      }
+    ],
+    "configDigest": "0b741805531e882191d13e5f3cbd73c390385948ce29aae27496b63375381976"
+  },
+  "sources": [
+    {
+      "label": "Белые",
+      "source_url": "https://rimskie.com/catalog/rimskie-shtory/rimskie-shtory-belye",
+      "target_slug": "rimskie-shtory-belye",
+      "enabled": true,
+      "sort_order": 1,
+      "status": "completed",
+      "pages": 1,
+      "next_page_url": null
+    },
+    {
+      "label": "Для офиса",
+      "source_url": "https://rimskie.com/catalog/rimskie-shtory/rimskie-shtory-na-stvorku",
+      "target_slug": "rimskie-shtory-na-stvorku",
+      "enabled": true,
+      "sort_order": 2,
+      "status": "completed",
+      "pages": 1,
+      "next_page_url": null
+    }
+  ],
+  "products": [
+    {
+      "externalId": "11889",
+      "sourceUrl": "https://rimskie.com/products/11889-rimskaya-shtora",
+      "sourceTitle": "Римская штора KORTIN белая",
+      "sourceDescription": "Купить римскую штору KORTIN белого цвета с доставкой.",
+      "sourcePrice": "2708.00",
+      "firstImageUrl": "https://rimskie.com/media/output/11889.webp",
+      "firstImagePath": "images/11889.webp",
+      "attributes": {
+        "material": ["полиэстер"],
+        "color": ["белый"]
+      }
+    }
+  ],
+  "images": [
+    {
+      "external_id": "11889",
+      "path": "images/11889.webp",
+      "byte_length": 30,
+      "sha256": "4a5d3458dfeabd63090fe08fdc8224ae61d45f0c430eee3c0544a92891af3b69"
+    }
+  ],
+  "memberships": [
+    {
+      "sourceSlug": "rimskie-shtory-belye",
+      "externalId": "11889"
+    },
+    {
+      "sourceSlug": "rimskie-shtory-na-stvorku",
+      "externalId": "11889"
+    }
+  ],
+  "counts": {
+    "sources": 2,
+    "products": 1,
+    "memberships": 2,
+    "images": 1
+  }
+}

@@ -30,6 +30,8 @@ class CatalogImportItem extends Model
         'source_description',
         'source_price',
         'source_image_path',
+        'source_image_sha256',
+        'source_image_byte_length',
         'rewritten_title',
         'rewritten_summary',
         'rewritten_description',
@@ -45,6 +47,7 @@ class CatalogImportItem extends Model
 
     protected $casts = [
         'source_price' => 'decimal:2',
+        'source_image_byte_length' => 'integer',
         'warnings' => 'array',
         'created_product' => 'boolean',
         'publication_snapshot' => 'array',
