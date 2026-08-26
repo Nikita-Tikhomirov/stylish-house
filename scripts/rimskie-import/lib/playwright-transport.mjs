@@ -161,6 +161,7 @@ export class PlaywrightTransport {
         const browserPath = executablePath || await findBrowserExecutable();
         const context = await chromium.launchPersistentContext(profileDir, {
             headless: false,
+            chromiumSandbox: true,
             executablePath: browserPath,
             serviceWorkers: 'block',
             offline: true,

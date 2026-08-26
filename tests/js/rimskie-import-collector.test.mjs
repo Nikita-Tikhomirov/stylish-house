@@ -727,7 +727,7 @@ function fakePlaywright({
     return { chromium, context, page, launchCalls, routes };
 }
 
-test('playwright transport opens the supplied persistent profile in headed Chrome', async () => {
+test('playwright transport opens the supplied persistent profile in headed sandboxed Chrome', async () => {
     const fake = fakePlaywright();
     const transport = await PlaywrightTransport.open({
         profileDir: 'C:\\runs\\run-001\\profile',
@@ -740,6 +740,7 @@ test('playwright transport opens the supplied persistent profile in headed Chrom
         'C:\\runs\\run-001\\profile',
         {
             headless: false,
+            chromiumSandbox: true,
             executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
             serviceWorkers: 'block',
             offline: true,
