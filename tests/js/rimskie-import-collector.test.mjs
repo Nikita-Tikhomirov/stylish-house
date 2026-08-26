@@ -893,7 +893,7 @@ test('playwright transport denies every uncounted resource after a challenge', a
     assert.equal(await routeDecision('document', whiteUrl), 'abort');
     fake.page.goto = async () => ({ status: () => 403 });
     fake.page.content = async () => '<html><body>BotHunt verification</body></html>';
-    await assert.rejects(transport.getHtml(whiteUrl), (error) => error.kind === 'http_403');
+    await assert.rejects(transport.getHtml(whiteUrl), (error) => error.kind === 'challenge');
     assert.equal(await routeDecision('stylesheet', 'https://rimskie.com/challenge.css'), 'abort');
     assert.equal(await routeDecision('script', 'https://evil.example/challenge.js'), 'abort');
     assert.equal(await routeDecision('document', whiteUrl), 'abort');
@@ -941,7 +941,7 @@ test('playwright transport reports typed 403 and visible challenge failures', as
     });
     await assert.rejects(
         forbiddenChallengeTransport.getHtml(whiteUrl),
-        (error) => error instanceof DonorRequestError && error.kind === 'http_403',
+        (error) => error instanceof DonorRequestError && error.kind === 'challenge',
     );
 });
 
@@ -965,7 +965,9 @@ test('playwright transport clicks the exact simple challenge retry button once',
         goto: async () => response,
         content: async () => html,
         evaluate: async () => {},
-        url: () => whiteUrl,
+        // Chrome can expose its internal error-document URL while preserving the
+        // donor challenge DOM that was returned for the counted navigation.
+        url: () => 'chrome-error://chromewebdata/',
         getByRole: (role, options) => {
             assert.equal(role, 'button');
             assert.match('Попробовать снова', options.name);

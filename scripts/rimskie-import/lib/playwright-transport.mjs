@@ -197,6 +197,7 @@ export class PlaywrightTransport {
         this.context = context;
         this.page = page;
         this.activeOperation = null;
+        this.pendingChallenge = null;
         this.routeMode = 'idle';
     }
 
@@ -229,6 +230,7 @@ export class PlaywrightTransport {
 
     async getHtml(url, { kind: pageKind = 'html' } = {}) {
         const requestedUrl = approvedUrl(url, { kind: pageKind, label: 'queued donor HTML URL' });
+        this.pendingChallenge = null;
         this.activeOperation = { kind: 'html', pageKind, url: requestedUrl, consumed: false };
         this.routeMode = 'collecting';
         try {
@@ -266,15 +268,16 @@ export class PlaywrightTransport {
                     url: finalUrl,
                 });
             }
-            const failure = statusFailure(response.status(), finalUrl);
-            if (failure) throw failure;
             if (challengePattern.test(html)) {
+                this.pendingChallenge = { url: finalUrl, pageKind };
                 throw new DonorRequestError(
                     'challenge',
                     'BotHunt/challenge requires an explicitly authorized click in the visible browser',
-                    { url: finalUrl },
+                    { url: finalUrl, pageKind },
                 );
             }
+            const failure = statusFailure(response.status(), finalUrl);
+            if (failure) throw failure;
             return html;
         } finally {
             this.routeMode = 'idle';
@@ -288,10 +291,16 @@ export class PlaywrightTransport {
             kind: pageKind,
             label: 'queued donor challenge URL',
         });
-        const currentUrl = approvedUrl(this.page.url?.() || requestedUrl, {
-            kind: pageKind,
-            label: 'visible donor challenge URL',
-        });
+        const visibleUrl = this.page.url?.() || requestedUrl;
+        const pendingChallengeMatches = this.pendingChallenge?.url === requestedUrl
+            && this.pendingChallenge?.pageKind === pageKind;
+        let currentUrl = requestedUrl;
+        if (!pendingChallengeMatches || /^https:/i.test(visibleUrl)) {
+            currentUrl = approvedUrl(visibleUrl, {
+                kind: pageKind,
+                label: 'visible donor challenge URL',
+            });
+        }
         if (currentUrl !== requestedUrl) {
             throw new DonorRequestError(
                 'invalid_url',
@@ -370,6 +379,7 @@ export class PlaywrightTransport {
             }
             return html;
         } finally {
+            this.pendingChallenge = null;
             this.routeMode = 'idle';
             this.activeOperation = null;
             await this.page.evaluate(() => globalThis.stop?.()).catch(() => {});
