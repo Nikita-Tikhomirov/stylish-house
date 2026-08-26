@@ -6,7 +6,9 @@ use App\Models\CatalogImportItem;
 use App\Models\CatalogImportSource;
 use App\Services\CatalogImport\CatalogImportIngestor;
 use App\Services\CatalogImport\CatalogImportPackageValidator;
+use App\Services\CatalogImport\CatalogImportRewritePlanner;
 use Illuminate\Console\Command;
+use InvalidArgumentException;
 use Throwable;
 
 class IngestCatalogImport extends Command
@@ -18,12 +20,14 @@ class IngestCatalogImport extends Command
     public function handle(
         CatalogImportPackageValidator $validator,
         CatalogImportIngestor $ingestor,
+        CatalogImportRewritePlanner $rewritePlanner,
     ): int {
         $manifestPath = (string) $this->argument('manifest');
         try {
             $package = $validator->validate($manifestPath);
             $counts = $package->counts;
             if ((bool) $this->option('dry-run')) {
+                $rewritePlan = $rewritePlanner->plan($package);
                 $this->info(sprintf(
                     'Validated run=%s sources=%d products=%d memberships=%d images=%d warnings=%d',
                     $package->runId,
@@ -31,7 +35,7 @@ class IngestCatalogImport extends Command
                     $counts['products'],
                     $counts['memberships'],
                     $counts['images'],
-                    count($package->warnings),
+                    $rewritePlan->warningCount,
                 ));
 
                 return self::SUCCESS;
@@ -62,9 +66,19 @@ class IngestCatalogImport extends Command
 
             return self::SUCCESS;
         } catch (Throwable $error) {
-            $this->error(sprintf('Manifest %s: %s', $manifestPath, $error->getMessage()));
+            $this->error(sprintf('Manifest %s: %s', $manifestPath, $this->safeErrorMessage($error)));
 
             return self::FAILURE;
         }
+    }
+
+    private function safeErrorMessage(Throwable $error): string
+    {
+        if ($error instanceof InvalidArgumentException
+            && str_starts_with($error->getMessage(), 'Catalog import manifest invariant failed:')) {
+            return $error->getMessage();
+        }
+
+        return 'Catalog import failed safely; inspect the application log for diagnostics.';
     }
 }

@@ -2,8 +2,6 @@
 
 namespace App\Services\CatalogImport;
 
-use App\Data\CatalogImport\RewrittenLandingContent;
-use App\Data\CatalogImport\RewrittenProductContent;
 use App\Data\CatalogImport\ValidatedCatalogImportPackage;
 use App\Models\CatalogAttribute;
 use App\Models\CatalogImportItem;
@@ -18,9 +16,9 @@ use Throwable;
 
 class CatalogImportIngestor
 {
-    private ProductContentRewriter $productRewriter;
+    private PublicTextSanitizer $publicTextSanitizer;
 
-    private LandingContentRewriter $landingRewriter;
+    private CatalogImportRewritePlanner $rewritePlanner;
 
     /** @var array<string, string> */
     private const ATTRIBUTE_TYPES = [
@@ -32,27 +30,26 @@ class CatalogImportIngestor
     public function __construct(
         ?ProductContentRewriter $productRewriter = null,
         ?LandingContentRewriter $landingRewriter = null,
+        ?PublicTextSanitizer $publicTextSanitizer = null,
     ) {
-        $this->productRewriter = $productRewriter ?? new TemplateProductRewriter;
-        $this->landingRewriter = $landingRewriter ?? new TemplateLandingRewriter;
+        $this->publicTextSanitizer = $publicTextSanitizer ?? new PublicTextSanitizer;
+        $this->rewritePlanner = new CatalogImportRewritePlanner(
+            $productRewriter,
+            $landingRewriter,
+            $this->publicTextSanitizer,
+        );
     }
 
     public function ingest(ValidatedCatalogImportPackage $package): CatalogImportRun
     {
         $disk = Storage::disk('local');
         $createdFiles = [];
-        $landingDrafts = $this->rewriteLandings($package);
-        $productDrafts = $this->rewriteProducts($package);
-        $attributeVisibility = $this->attributeVisibility($package);
 
         try {
             return DB::transaction(function () use (
                 $package,
                 $disk,
                 &$createdFiles,
-                $landingDrafts,
-                $productDrafts,
-                $attributeVisibility,
             ): CatalogImportRun {
                 $existing = CatalogImportRun::query()
                     ->where('provider', 'rimskie.com')
@@ -64,6 +61,11 @@ class CatalogImportIngestor
 
                     return $existing;
                 }
+
+                $rewritePlan = $this->rewritePlanner->plan($package);
+                $landingDrafts = $rewritePlan->landings;
+                $productDrafts = $rewritePlan->products;
+                $attributeVisibility = $this->attributeVisibility($package);
 
                 $run = CatalogImportRun::create([
                     'provider' => 'rimskie.com',
@@ -140,67 +142,21 @@ class CatalogImportIngestor
                 return $run->fresh();
             }, 3);
         } catch (Throwable $error) {
-            $this->compensateCreatedFiles($package, $disk, $createdFiles);
+            try {
+                $this->compensateCreatedFiles($package, $disk, $createdFiles);
+            } catch (Throwable $cleanupError) {
+                throw new RuntimeException(
+                    'Catalog import cleanup requires manual verification; private images were preserved where possible.',
+                    0,
+                    $cleanupError,
+                );
+            }
             throw $error;
         }
     }
 
     /**
-     * @return array<string, RewrittenLandingContent>
-     */
-    private function rewriteLandings(ValidatedCatalogImportPackage $package): array
-    {
-        $drafts = [];
-        $signatures = [];
-        foreach ($package->sources as $source) {
-            $slug = $source['target_slug'];
-            $draft = $this->landingRewriter->rewrite($source['label'], $slug);
-            $drafts[$slug] = $draft;
-            $signature = $this->landingSignature($draft);
-            $signatures[$signature][] = $slug;
-        }
-        foreach ($signatures as $slugs) {
-            if (count($slugs) < 2) {
-                continue;
-            }
-            foreach ($slugs as $slug) {
-                $draft = $drafts[$slug];
-                $warnings = [...$draft->warnings, 'duplicate_landing_copy'];
-                $warnings = array_values(array_unique($warnings));
-                sort($warnings, SORT_STRING);
-                $drafts[$slug] = new RewrittenLandingContent(
-                    title: $draft->title,
-                    h1: $draft->h1,
-                    intro: $draft->intro,
-                    description: $draft->description,
-                    seo: $draft->seo,
-                    warnings: $warnings,
-                );
-            }
-        }
-
-        return $drafts;
-    }
-
-    /** @return array<string, RewrittenProductContent> */
-    private function rewriteProducts(ValidatedCatalogImportPackage $package): array
-    {
-        $drafts = [];
-        foreach ($package->products as $product) {
-            $drafts[$product['external_id']] = $this->productRewriter->rewrite([
-                'external_id' => $product['external_id'],
-                'title' => $product['source_title'],
-                'description' => $product['source_description'],
-                'source_price' => $product['source_price'],
-                'attributes' => $product['attributes'],
-            ]);
-        }
-
-        return $drafts;
-    }
-
-    /**
-     * @param  array<int, string>  $createdFiles
+     * @param  array<int, array{path: string, sha256: string, byte_length: int}>  $createdFiles
      * @return array<string, string>
      */
     private function copyImages(
@@ -219,7 +175,7 @@ class CatalogImportIngestor
         return $destinations;
     }
 
-    /** @param  array<int, string>  $createdFiles */
+    /** @param  array<int, array{path: string, sha256: string, byte_length: int}>  $createdFiles */
     private function copyVerifiedImage(
         array $image,
         string $relativePath,
@@ -235,8 +191,9 @@ class CatalogImportIngestor
             throw new RuntimeException('Source image changed after package validation.');
         }
 
+        $this->assertSafePrivateDestination($disk, $relativePath);
         $disk->makeDirectory(dirname($relativePath));
-        $destinationPath = $disk->path($relativePath);
+        $destinationPath = $this->assertSafePrivateDestination($disk, $relativePath);
         if (file_exists($destinationPath)) {
             $this->assertDestinationImage($destinationPath, $expectedHash, $expectedLength);
 
@@ -254,7 +211,11 @@ class CatalogImportIngestor
 
             return;
         }
-        $createdFiles[] = $relativePath;
+        $createdFiles[] = [
+            'path' => $relativePath,
+            'sha256' => $expectedHash,
+            'byte_length' => $expectedLength,
+        ];
         try {
             $copied = stream_copy_to_stream($input, $output);
             if ($copied !== $expectedLength || ! fflush($output)) {
@@ -284,6 +245,48 @@ class CatalogImportIngestor
         }
     }
 
+    private function assertSafePrivateDestination(
+        FilesystemAdapter $disk,
+        string $relativePath,
+    ): string {
+        if (! preg_match('/^catalog-imports\/[a-z0-9][a-z0-9._-]{0,127}\/images\/\d{1,32}\.webp$/iD', $relativePath)) {
+            throw new RuntimeException('Private destination path is outside the approved layout.');
+        }
+        $rootPath = rtrim($disk->path(''), '\\/');
+        $rootReal = realpath($rootPath);
+        if ($rootReal === false || ! is_dir($rootReal)) {
+            throw new RuntimeException('Private destination root is unavailable.');
+        }
+        $segments = explode('/', dirname($relativePath));
+        $current = $rootPath;
+        $expectedReal = rtrim($rootReal, '\\/');
+        foreach ($segments as $segment) {
+            $current .= DIRECTORY_SEPARATOR.$segment;
+            $expectedReal .= DIRECTORY_SEPARATOR.$segment;
+            if (! file_exists($current) && ! is_link($current)) {
+                continue;
+            }
+            $stats = @lstat($current);
+            $currentReal = realpath($current);
+            if ($stats === false || is_link($current)
+                || (($stats['mode'] ?? 0) & 0170000) !== 0040000
+                || $currentReal === false
+                || $this->normalizedFilesystemPath($currentReal)
+                    !== $this->normalizedFilesystemPath($expectedReal)) {
+                throw new RuntimeException('Private destination path traverses a link or reparse ancestor.');
+            }
+        }
+
+        return $disk->path($relativePath);
+    }
+
+    private function normalizedFilesystemPath(string $path): string
+    {
+        $normalized = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path), DIRECTORY_SEPARATOR);
+
+        return DIRECTORY_SEPARATOR === '\\' ? strtolower($normalized) : $normalized;
+    }
+
     /**
      * @param  array<string, array<int, string>>  $attributes
      * @param  array<string, bool>  $attributeVisibility
@@ -311,7 +314,7 @@ class CatalogImportIngestor
             if (! $attribute->wasRecentlyCreated
                 && ($attribute->label !== $expectedLabel
                     || $attribute->type !== $expectedType
-                    || (! $isPublic && $attribute->is_public))) {
+                    || $attribute->is_public !== $isPublic)) {
                 throw new RuntimeException('Catalog attribute metadata collision for '.$code.'.');
             }
             $valueIds = [];
@@ -320,6 +323,7 @@ class CatalogImportIngestor
                 $numericValue = isset(self::ATTRIBUTE_TYPES[$code])
                     ? $this->numericAttributeValue($value)
                     : null;
+                $expectedNumericValue = $this->normalizedNumericMetadata($numericValue);
                 $attributeValue = $attribute->values()->firstOrCreate(
                     ['normalized_value' => $normalizedValue],
                     [
@@ -328,6 +332,11 @@ class CatalogImportIngestor
                         'sort_order' => count($valueIds) + 1,
                     ],
                 );
+                if (! $attributeValue->wasRecentlyCreated
+                    && ($attributeValue->label !== $value
+                        || $attributeValue->numeric_value !== $expectedNumericValue)) {
+                    throw new RuntimeException('Catalog attribute value metadata collision for '.$code.'.');
+                }
                 $valueIds[] = $attributeValue->id;
             }
             $item->attributeValues()->syncWithoutDetaching($valueIds);
@@ -340,34 +349,20 @@ class CatalogImportIngestor
         $visibility = [];
         foreach ($package->products as $product) {
             foreach ($product['attributes'] as $code => $values) {
-                $safe = array_key_exists($code, TemplateProductRewriter::ATTRIBUTE_LABELS)
-                    && ! $this->containsBlockedAttributeValue($values, $product['source_price']);
+                $safe = array_key_exists($code, TemplateProductRewriter::ATTRIBUTE_LABELS);
+                foreach ($values as $value) {
+                    if ($this->publicTextSanitizer
+                        ->sanitize($value, $product['source_price'])
+                        ->wasModified()) {
+                        $safe = false;
+                        break;
+                    }
+                }
                 $visibility[$code] = ($visibility[$code] ?? true) && $safe;
             }
         }
 
         return $visibility;
-    }
-
-    /** @param  array<int, string>  $values */
-    private function containsBlockedAttributeValue(array $values, string $sourcePrice): bool
-    {
-        $text = implode(' ', $values);
-        $blocked = '/<[^>]+>|&(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]+);|https?:\/\/|www\.|'
-            .'[\p{L}\p{N}.+_-]+@[\p{L}\p{N}.-]+\.[\p{L}]{2,}|'
-            .'(?:\+?7|8)[\s()\p{Pd}-]*\d{3}[\s()\p{Pd}-]*\d{3}[\s\p{Pd}-]*\d{2}[\s\p{Pd}-]*\d{2}|'
-            .'\b(?:rimskie(?:\.com)?|kortin)\b|'
-            .'\b(?:купить|заказать|доставк\p{L}*|лучш\p{L}*|гаранти\p{L}*|акци\p{L}*|'
-            .'скидк\p{L}*|бесплатн\p{L}*|идеальн\p{L}*|премиальн\p{L}*)\b|'
-            .'\d[\d\s\x{00A0}\x{2009}\x{202F}]*(?:[.,]\d{1,2})?\s*(?:₽|руб(?:\.|лей|ля)?)|'
-            .'[\x{0000}-\x{001F}\x{007F}\x{200B}-\x{200F}\x{202A}-\x{202E}\x{2060}-\x{206F}\x{FEFF}]/ui';
-        if (preg_match($blocked, $text) === 1) {
-            return true;
-        }
-        $integerPrice = preg_replace('/\.00$/D', '', $sourcePrice) ?? $sourcePrice;
-        $digits = implode('[\s\x{00A0}\x{2009}\x{202F}]*', str_split($integerPrice));
-
-        return preg_match('/(?<!\d)'.$digits.'(?:[.,]00)?(?!\d|[.,]\d|\s*(?:мм|см|м\b))/ui', $text) === 1;
     }
 
     private function normalizedAttributeValue(string $value): string
@@ -389,6 +384,11 @@ class CatalogImportIngestor
         return str_replace(',', '.', $matches[0]);
     }
 
+    private function normalizedNumericMetadata(?string $value): ?string
+    {
+        return $value === null ? null : number_format((float) $value, 4, '.', '');
+    }
+
     private function itemSlug(string $slugBase, string $externalId): string
     {
         $suffix = '-'.$externalId;
@@ -399,20 +399,6 @@ class CatalogImportIngestor
         $base = rtrim(mb_substr($base, 0, 191 - strlen($suffix)), '-');
 
         return ($base !== '' ? $base : 'product').$suffix;
-    }
-
-    private function landingSignature(RewrittenLandingContent $draft): string
-    {
-        $value = implode("\0", [
-            $draft->title,
-            $draft->h1,
-            $draft->intro,
-            $draft->description,
-            $draft->seo,
-        ]);
-        $value = mb_strtolower($value);
-
-        return preg_replace('/\s+/u', ' ', trim($value)) ?? trim($value);
     }
 
     private function verifyExistingRun(
@@ -457,6 +443,7 @@ class CatalogImportIngestor
             }
         }
         $storedItems = $run->items()->get()->keyBy('external_id');
+        $attributeVisibility = $this->attributeVisibility($package);
         foreach ($package->products as $expected) {
             $stored = $storedItems->get($expected['external_id']);
             if (! $stored
@@ -470,22 +457,53 @@ class CatalogImportIngestor
             $expectedAttributes = [];
             foreach ($expected['attributes'] as $code => $values) {
                 foreach ($values as $value) {
-                    $expectedAttributes[] = $code."\0".$this->normalizedAttributeValue($value);
+                    $key = $code."\0".$this->normalizedAttributeValue($value);
+                    $numericValue = isset(self::ATTRIBUTE_TYPES[$code])
+                        ? $this->numericAttributeValue($value)
+                        : null;
+                    $expectedAttributes[$key] = [
+                        'attribute_label' => TemplateProductRewriter::ATTRIBUTE_LABELS[$code] ?? $code,
+                        'attribute_type' => self::ATTRIBUTE_TYPES[$code] ?? CatalogAttribute::TYPE_SELECT,
+                        'attribute_is_public' => $attributeVisibility[$code] ?? false,
+                        'value_label' => $value,
+                        'numeric_value' => $this->normalizedNumericMetadata($numericValue),
+                    ];
                 }
             }
-            $expectedAttributes = array_values(array_unique($expectedAttributes, SORT_STRING));
-            sort($expectedAttributes, SORT_STRING);
+            ksort($expectedAttributes, SORT_STRING);
             $storedAttributes = DB::table('catalog_import_item_attribute_value as pivot')
                 ->join('catalog_attribute_values as value', 'value.id', '=', 'pivot.attribute_value_id')
                 ->join('catalog_attributes as attribute', 'attribute.id', '=', 'value.catalog_attribute_id')
                 ->where('pivot.import_item_id', $stored->id)
-                ->get(['attribute.code', 'value.normalized_value'])
-                ->map(static fn (object $record): string => $record->code."\0".$record->normalized_value)
-                ->sort()
-                ->values()
+                ->get([
+                    'attribute.code',
+                    'attribute.label as attribute_label',
+                    'attribute.type as attribute_type',
+                    'attribute.is_public as attribute_is_public',
+                    'value.normalized_value',
+                    'value.label as value_label',
+                    'value.numeric_value',
+                ])
+                ->mapWithKeys(fn (object $record): array => [
+                    $record->code."\0".$record->normalized_value => [
+                        'attribute_label' => $record->attribute_label,
+                        'attribute_type' => $record->attribute_type,
+                        'attribute_is_public' => (bool) $record->attribute_is_public,
+                        'value_label' => $record->value_label,
+                        'numeric_value' => $this->normalizedNumericMetadata(
+                            $record->numeric_value === null ? null : (string) $record->numeric_value,
+                        ),
+                    ],
+                ])
+                ->sortKeys()
                 ->all();
-            if ($storedAttributes !== $expectedAttributes) {
+            if (array_keys($storedAttributes) !== array_keys($expectedAttributes)) {
                 throw new RuntimeException('Existing catalog import item has a conflicting attribute set.');
+            }
+            foreach ($expectedAttributes as $key => $metadata) {
+                if ($storedAttributes[$key] !== $metadata) {
+                    throw new RuntimeException('Existing catalog import item has conflicting attribute metadata.');
+                }
             }
         }
         $itemIds = $run->items()->pluck('id');
@@ -522,7 +540,8 @@ class CatalogImportIngestor
                 || $item->source_image_byte_length !== $image['byte_length']) {
                 throw new RuntimeException('Existing catalog import item has conflicting immutable image metadata.');
             }
-            $this->assertDestinationImage($disk->path($expectedPath), $image['sha256'], $image['byte_length']);
+            $destinationPath = $this->assertSafePrivateDestination($disk, $expectedPath);
+            $this->assertDestinationImage($destinationPath, $image['sha256'], $image['byte_length']);
         }
     }
 
@@ -553,25 +572,38 @@ class CatalogImportIngestor
         return $indexed;
     }
 
-    /** @param  array<int, string>  $createdFiles */
+    /** @param  array<int, array{path: string, sha256: string, byte_length: int}>  $createdFiles */
     private function compensateCreatedFiles(
         ValidatedCatalogImportPackage $package,
         FilesystemAdapter $disk,
         array $createdFiles,
     ): void {
-        try {
-            $committedRunExists = CatalogImportRun::query()
-                ->where('provider', 'rimskie.com')
-                ->where('external_run_id', $package->runId)
-                ->exists();
-        } catch (Throwable) {
-            $committedRunExists = false;
-        }
-        if ($committedRunExists) {
+        if ($this->committedRunExists($package)) {
             return;
         }
-        foreach ($createdFiles as $relativePath) {
-            $disk->delete($relativePath);
+        foreach ($createdFiles as $createdFile) {
+            $destinationPath = $this->assertSafePrivateDestination($disk, $createdFile['path']);
+            $this->assertDestinationImage(
+                $destinationPath,
+                $createdFile['sha256'],
+                $createdFile['byte_length'],
+            );
+            if (! $this->deleteCompensationFile($disk, $createdFile['path'])) {
+                throw new RuntimeException('A private image could not be removed during rollback cleanup.');
+            }
         }
+    }
+
+    protected function committedRunExists(ValidatedCatalogImportPackage $package): bool
+    {
+        return CatalogImportRun::query()
+            ->where('provider', 'rimskie.com')
+            ->where('external_run_id', $package->runId)
+            ->exists();
+    }
+
+    protected function deleteCompensationFile(FilesystemAdapter $disk, string $relativePath): bool
+    {
+        return $disk->delete($relativePath);
     }
 }

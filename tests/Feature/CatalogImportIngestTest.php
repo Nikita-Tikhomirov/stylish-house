@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Data\CatalogImport\RewrittenLandingContent;
+use App\Data\CatalogImport\RewrittenProductContent;
 use App\Models\CatalogAttribute;
 use App\Models\CatalogImportItem;
 use App\Models\CatalogImportRun;
@@ -10,15 +11,19 @@ use App\Models\CatalogImportSource;
 use App\Services\CatalogImport\CatalogImportIngestor;
 use App\Services\CatalogImport\CatalogImportPackageValidator;
 use App\Services\CatalogImport\LandingContentRewriter;
+use App\Services\CatalogImport\ProductContentRewriter;
 use App\Services\CatalogImport\TemplateProductRewriter;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Filesystem\FilesystemAdapter;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use RuntimeException;
+use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 class CatalogImportIngestTest extends TestCase
@@ -146,6 +151,73 @@ class CatalogImportIngestTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('requestCount');
+        $this->validator()->validate($this->manifestPath());
+    }
+
+    public function test_validator_enforces_the_immutable_max_products_cap(): void
+    {
+        File::copy(
+            $this->packageDirectory.'/images/11889.webp',
+            $this->packageDirectory.'/images/11890.webp',
+        );
+        $this->rewriteManifest(function (array &$manifest): void {
+            $manifest['config']['limits']['max_products'] = 1;
+            $product = $manifest['products'][0];
+            $product['externalId'] = '11890';
+            $product['sourceUrl'] = 'https://rimskie.com/products/11890-rimskaya-shtora';
+            $product['sourceTitle'] = 'Римская штора 11890';
+            $product['firstImageUrl'] = 'https://rimskie.com/media/output/11890.webp';
+            $product['firstImagePath'] = 'images/11890.webp';
+            $manifest['products'][] = $product;
+            $image = $manifest['images'][0];
+            $image['external_id'] = '11890';
+            $image['path'] = 'images/11890.webp';
+            $manifest['images'][] = $image;
+            $manifest['memberships'][] = [
+                'sourceSlug' => 'rimskie-shtory-belye',
+                'externalId' => '11890',
+            ];
+            $manifest['state']['completedProductIds'][] = '11890';
+            $manifest['counts']['products'] = 2;
+            $manifest['counts']['images'] = 2;
+            $manifest['counts']['memberships'] = 3;
+        }, refreshConfigDigest: true);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('max_products');
+        $this->validator()->validate($this->manifestPath());
+    }
+
+    public function test_validator_enforces_price_and_numeric_attribute_decimal_boundaries(): void
+    {
+        $this->rewriteManifest(function (array &$manifest): void {
+            $manifest['products'][0]['sourcePrice'] = '10000000000.00';
+        });
+        try {
+            $this->validator()->validate($this->manifestPath());
+            $this->fail('An overflowing DECIMAL(12,2) price was accepted.');
+        } catch (InvalidArgumentException $error) {
+            $this->assertStringContainsString('sourcePrice', $error->getMessage());
+        }
+
+        $this->resetPackage();
+        $this->rewriteManifest(function (array &$manifest): void {
+            $manifest['products'][0]['sourcePrice'] = '0001.00';
+        });
+        try {
+            $this->validator()->validate($this->manifestPath());
+            $this->fail('A non-normalized price was accepted.');
+        } catch (InvalidArgumentException $error) {
+            $this->assertStringContainsString('sourcePrice', $error->getMessage());
+        }
+
+        $this->resetPackage();
+        $this->rewriteManifest(function (array &$manifest): void {
+            $manifest['products'][0]['attributes']['width'] = ['100000000.0000 мм'];
+        });
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('numeric attribute');
         $this->validator()->validate($this->manifestPath());
     }
 
@@ -299,6 +371,58 @@ class CatalogImportIngestTest extends TestCase
         $this->validator()->validate($this->manifestPath());
     }
 
+    public function test_validator_rejects_text_that_exceeds_database_string_boundaries(): void
+    {
+        $this->rewriteManifest(function (array &$manifest): void {
+            $manifest['products'][0]['sourceTitle'] = str_repeat('я', 256);
+        });
+        try {
+            $this->validator()->validate($this->manifestPath());
+            $this->fail('A source title longer than the database column was accepted.');
+        } catch (InvalidArgumentException $error) {
+            $this->assertStringContainsString('sourceTitle', $error->getMessage());
+        }
+
+        $this->resetPackage();
+        $this->rewriteManifest(function (array &$manifest): void {
+            $manifest['products'][0]['attributes']['color'] = [str_repeat('я', 256)];
+        });
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('attribute value');
+        $this->validator()->validate($this->manifestPath());
+    }
+
+    public function test_long_database_safe_input_ingests_with_capped_public_copy(): void
+    {
+        $this->rewriteManifest(function (array &$manifest): void {
+            $manifest['run_id'] = 'fixture-run-long-copy';
+            $manifest['products'][0]['sourceTitle'] = rtrim(mb_substr(
+                str_repeat('Длинная римская штора ', 12),
+                0,
+                240,
+            ));
+            $manifest['products'][0]['sourceDescription'] = str_repeat('Факты о модели. ', 200);
+            $manifest['products'][0]['attributes'] = [
+                'material' => [rtrim(mb_substr(str_repeat('материал ', 30), 0, 250))],
+                'color' => [rtrim(mb_substr(str_repeat('цвет ', 50), 0, 250))],
+                'style' => [rtrim(mb_substr(str_repeat('стиль ', 50), 0, 250))],
+            ];
+        });
+
+        $package = $this->validator()->validate($this->manifestPath());
+        $run = $this->ingestor()->ingest($package);
+        $item = $run->items()->firstOrFail();
+
+        $this->assertSame(240, mb_strlen($item->source_title));
+        $this->assertLessThanOrEqual(140, mb_strlen($item->rewritten_title));
+        $this->assertLessThanOrEqual(220, mb_strlen($item->rewritten_summary));
+        $this->assertLessThanOrEqual(1000, mb_strlen($item->rewritten_description));
+        $this->assertContains('title_truncated', $item->warnings);
+        $this->assertContains('summary_truncated', $item->warnings);
+        $this->assertContains('description_truncated', $item->warnings);
+    }
+
     public function test_ingest_is_idempotent_and_preserves_manual_review_changes(): void
     {
         $package = $this->validator()->validate($this->manifestPath());
@@ -340,6 +464,30 @@ class CatalogImportIngestTest extends TestCase
         $this->assertSame($package->manifestDigest, $second->config['manifest_digest']);
         $this->assertSame($package->configDigest, $second->config['config_digest']);
         $this->assertSame(5, $second->config['collector_request_count']);
+    }
+
+    public function test_verified_identical_no_op_does_not_invoke_rewriters(): void
+    {
+        $package = $this->validator()->validate($this->manifestPath());
+        $run = $this->ingestor()->ingest($package);
+        $throwingProduct = new class implements ProductContentRewriter
+        {
+            public function rewrite(array $source): RewrittenProductContent
+            {
+                throw new RuntimeException('Product rewriter must not run for a verified no-op.');
+            }
+        };
+        $throwingLanding = new class implements LandingContentRewriter
+        {
+            public function rewrite(string $label, string $targetSlug): RewrittenLandingContent
+            {
+                throw new RuntimeException('Landing rewriter must not run for a verified no-op.');
+            }
+        };
+
+        $repeated = (new CatalogImportIngestor($throwingProduct, $throwingLanding))->ingest($package);
+
+        $this->assertSame($run->id, $repeated->id);
     }
 
     public function test_existing_run_rejects_a_changed_config_and_manifest_digest(): void
@@ -443,6 +591,120 @@ class CatalogImportIngestTest extends TestCase
         $this->assertDatabaseCount('catalog_import_runs', 0);
     }
 
+    public function test_private_image_copy_rejects_a_symlinked_run_directory_ancestor(): void
+    {
+        $disk = Storage::disk('local');
+        $disk->makeDirectory('catalog-imports');
+        $outside = storage_path('framework/testing/catalog-import-outside-'.bin2hex(random_bytes(4)));
+        File::makeDirectory($outside, 0755, true);
+        $link = $disk->path('catalog-imports/fixture-run-001');
+        if (! @symlink($outside, $link)) {
+            File::deleteDirectory($outside);
+            $this->markTestSkipped('Directory symlinks are unavailable on this host.');
+        }
+
+        try {
+            $this->ingestor()->ingest($this->validator()->validate($this->manifestPath()));
+            $this->fail('A symlinked private run directory was accepted.');
+        } catch (RuntimeException $error) {
+            $this->assertStringContainsString('private destination', mb_strtolower($error->getMessage()));
+        } finally {
+            @unlink($link);
+            File::deleteDirectory($outside);
+        }
+
+        $this->assertDatabaseCount('catalog_import_runs', 0);
+    }
+
+    public function test_private_image_copy_rejects_a_windows_junction_run_directory_ancestor(): void
+    {
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $this->markTestSkipped('Windows junction regression.');
+        }
+
+        $disk = Storage::disk('local');
+        $disk->makeDirectory('catalog-imports');
+        $outside = storage_path('framework/testing/catalog-import-junction-target-'.bin2hex(random_bytes(4)));
+        File::makeDirectory($outside, 0755, true);
+        $sentinel = $outside.DIRECTORY_SEPARATOR.'sentinel.txt';
+        File::put($sentinel, 'unchanged');
+        $outsideBefore = [basename($sentinel) => hash_file('sha256', $sentinel)];
+        $junction = $disk->path('catalog-imports/fixture-run-001');
+        $process = new Process([
+            'powershell.exe',
+            '-NoProfile',
+            '-NonInteractive',
+            '-Command',
+            '& { param($linkPath, $targetPath) '
+                .'New-Item -ItemType Junction -Path $linkPath -Target $targetPath | Out-Null }',
+            $junction,
+            $outside,
+        ]);
+        $process->run();
+        $this->assertTrue($process->isSuccessful(), $process->getErrorOutput().$process->getOutput());
+
+        try {
+            $this->ingestor()->ingest($this->validator()->validate($this->manifestPath()));
+            $this->fail('A junction private run directory was accepted.');
+        } catch (RuntimeException $error) {
+            $this->assertStringContainsString('private destination', mb_strtolower($error->getMessage()));
+        } finally {
+            $outsideAfter = collect(File::files($outside))
+                ->mapWithKeys(fn (\SplFileInfo $file): array => [
+                    $file->getFilename() => hash_file('sha256', $file->getPathname()),
+                ])
+                ->all();
+            $this->assertSame($outsideBefore, $outsideAfter, 'Rejected junction must not mutate its target.');
+            @rmdir($junction);
+            File::deleteDirectory($outside);
+        }
+
+        $this->assertDatabaseCount('catalog_import_runs', 0);
+    }
+
+    public function test_repeat_ingest_rejects_a_windows_junction_substituted_after_commit(): void
+    {
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $this->markTestSkipped('Windows junction regression.');
+        }
+
+        $package = $this->validator()->validate($this->manifestPath());
+        $this->ingestor()->ingest($package);
+        $disk = Storage::disk('local');
+        $runDirectory = $disk->path('catalog-imports/fixture-run-001');
+        $savedDirectory = $disk->path('catalog-imports/fixture-run-001-saved');
+        $outside = storage_path('framework/testing/catalog-import-junction-verified-'.bin2hex(random_bytes(4)));
+        File::makeDirectory($outside.DIRECTORY_SEPARATOR.'images', 0755, true);
+        File::copy(
+            $runDirectory.DIRECTORY_SEPARATOR.'images'.DIRECTORY_SEPARATOR.'11889.webp',
+            $outside.DIRECTORY_SEPARATOR.'images'.DIRECTORY_SEPARATOR.'11889.webp',
+        );
+        File::moveDirectory($runDirectory, $savedDirectory);
+        $process = new Process([
+            'powershell.exe',
+            '-NoProfile',
+            '-NonInteractive',
+            '-Command',
+            '& { param($linkPath, $targetPath) '
+                .'New-Item -ItemType Junction -Path $linkPath -Target $targetPath | Out-Null }',
+            $runDirectory,
+            $outside,
+        ]);
+        $process->run();
+        $this->assertTrue($process->isSuccessful(), $process->getErrorOutput().$process->getOutput());
+
+        try {
+            $this->ingestor()->ingest($package);
+            $this->fail('A substituted junction was accepted during verified no-op.');
+        } catch (RuntimeException $error) {
+            $this->assertStringContainsString('private destination', mb_strtolower($error->getMessage()));
+        } finally {
+            @rmdir($runDirectory);
+            File::moveDirectory($savedDirectory, $runDirectory);
+            File::deleteDirectory($outside);
+        }
+    }
+
     public function test_repeat_ingest_rejects_a_missing_or_corrupt_committed_private_image(): void
     {
         $package = $this->validator()->validate($this->manifestPath());
@@ -486,6 +748,115 @@ class CatalogImportIngestTest extends TestCase
                 $table->timestamps();
                 $table->unique(['import_item_id', 'import_source_id'], 'ciis_item_source_uq');
             });
+        }
+    }
+
+    public function test_uncertain_commit_check_preserves_image_and_requires_manual_verification(): void
+    {
+        Schema::drop('catalog_import_item_source');
+        $ingestor = new class extends CatalogImportIngestor
+        {
+            protected function committedRunExists(\App\Data\CatalogImport\ValidatedCatalogImportPackage $package): bool
+            {
+                throw new RuntimeException('simulated database check failure');
+            }
+        };
+
+        try {
+            $ingestor->ingest($this->validator()->validate($this->manifestPath()));
+            $this->fail('An uncertain commit state was hidden.');
+        } catch (RuntimeException $error) {
+            $this->assertStringContainsString('manual verification', mb_strtolower($error->getMessage()));
+            $this->assertTrue(Storage::disk('local')->exists(
+                'catalog-imports/fixture-run-001/images/11889.webp'
+            ));
+        } finally {
+            $this->recreateMembershipSchema();
+        }
+    }
+
+    public function test_failed_compensation_delete_is_reported_and_not_silent(): void
+    {
+        Schema::drop('catalog_import_item_source');
+        $ingestor = new class extends CatalogImportIngestor
+        {
+            protected function deleteCompensationFile(FilesystemAdapter $disk, string $relativePath): bool
+            {
+                return false;
+            }
+        };
+
+        try {
+            $ingestor->ingest($this->validator()->validate($this->manifestPath()));
+            $this->fail('A failed compensation delete was hidden.');
+        } catch (RuntimeException $error) {
+            $this->assertStringContainsString('manual verification', mb_strtolower($error->getMessage()));
+            $this->assertTrue(Storage::disk('local')->exists(
+                'catalog-imports/fixture-run-001/images/11889.webp'
+            ));
+        } finally {
+            $this->recreateMembershipSchema();
+        }
+    }
+
+    public function test_compensation_rejects_a_windows_junction_substituted_before_delete(): void
+    {
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $this->markTestSkipped('Windows junction regression.');
+        }
+
+        Schema::drop('catalog_import_item_source');
+        $disk = Storage::disk('local');
+        $runDirectory = $disk->path('catalog-imports/fixture-run-001');
+        $savedDirectory = $disk->path('catalog-imports/fixture-run-001-before-cleanup');
+        $outside = storage_path('framework/testing/catalog-import-cleanup-junction-'.bin2hex(random_bytes(4)));
+        File::makeDirectory($outside.DIRECTORY_SEPARATOR.'images', 0755, true);
+        $sentinel = $outside.DIRECTORY_SEPARATOR.'images'.DIRECTORY_SEPARATOR.'11889.webp';
+        File::put($sentinel, 'outside-file-must-not-be-deleted');
+        $sentinelHash = hash_file('sha256', $sentinel);
+        $ingestor = new class($runDirectory, $savedDirectory, $outside) extends CatalogImportIngestor
+        {
+            public function __construct(
+                private readonly string $runDirectory,
+                private readonly string $savedDirectory,
+                private readonly string $outside,
+            ) {
+                parent::__construct();
+            }
+
+            protected function committedRunExists(
+                \App\Data\CatalogImport\ValidatedCatalogImportPackage $package,
+            ): bool {
+                File::moveDirectory($this->runDirectory, $this->savedDirectory);
+                $process = new Process([
+                    'powershell.exe',
+                    '-NoProfile',
+                    '-NonInteractive',
+                    '-Command',
+                    '& { param($linkPath, $targetPath) '
+                        .'New-Item -ItemType Junction -Path $linkPath -Target $targetPath | Out-Null }',
+                    $this->runDirectory,
+                    $this->outside,
+                ]);
+                $process->mustRun();
+
+                return false;
+            }
+        };
+
+        try {
+            $ingestor->ingest($this->validator()->validate($this->manifestPath()));
+            $this->fail('A substituted cleanup junction was not reported.');
+        } catch (RuntimeException $error) {
+            $this->assertStringContainsString('manual verification', mb_strtolower($error->getMessage()));
+            $this->assertFileExists($sentinel);
+            $this->assertSame($sentinelHash, hash_file('sha256', $sentinel));
+            $this->assertFileExists($savedDirectory.DIRECTORY_SEPARATOR.'images'.DIRECTORY_SEPARATOR.'11889.webp');
+        } finally {
+            @rmdir($runDirectory);
+            File::deleteDirectory($savedDirectory);
+            File::deleteDirectory($outside);
+            $this->recreateMembershipSchema();
         }
     }
 
@@ -544,6 +915,77 @@ class CatalogImportIngestTest extends TestCase
         ));
     }
 
+    public function test_existing_known_filter_with_wrong_visibility_is_rejected(): void
+    {
+        CatalogAttribute::create([
+            'code' => 'color',
+            'label' => 'цвет',
+            'type' => CatalogAttribute::TYPE_SELECT,
+            'sort_order' => 1,
+            'is_public' => false,
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('attribute metadata collision');
+        $this->ingestor()->ingest($this->validator()->validate($this->manifestPath()));
+    }
+
+    public function test_existing_normalized_filter_value_with_wrong_label_is_rejected(): void
+    {
+        $attribute = CatalogAttribute::create([
+            'code' => 'color',
+            'label' => 'цвет',
+            'type' => CatalogAttribute::TYPE_SELECT,
+            'sort_order' => 1,
+            'is_public' => true,
+        ]);
+        $attribute->values()->create([
+            'normalized_value' => 'belyi',
+            'label' => 'Чужое значение',
+            'numeric_value' => null,
+            'sort_order' => 1,
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('attribute value metadata collision');
+        $this->ingestor()->ingest($this->validator()->validate($this->manifestPath()));
+    }
+
+    public function test_existing_numeric_filter_value_with_wrong_numeric_metadata_is_rejected(): void
+    {
+        $this->rewriteManifest(function (array &$manifest): void {
+            $manifest['products'][0]['attributes']['width'] = ['160 мм'];
+        });
+        $attribute = CatalogAttribute::create([
+            'code' => 'width',
+            'label' => 'ширина',
+            'type' => CatalogAttribute::TYPE_NUMBER,
+            'sort_order' => 1,
+            'is_public' => true,
+        ]);
+        $attribute->values()->create([
+            'normalized_value' => '160-mm',
+            'label' => '160 мм',
+            'numeric_value' => '161.0000',
+            'sort_order' => 1,
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('attribute value metadata collision');
+        $this->ingestor()->ingest($this->validator()->validate($this->manifestPath()));
+    }
+
+    public function test_repeat_ingest_rejects_flipped_imported_filter_metadata(): void
+    {
+        $package = $this->validator()->validate($this->manifestPath());
+        $this->ingestor()->ingest($package);
+        CatalogAttribute::where('code', 'color')->firstOrFail()->update(['is_public' => false]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('attribute metadata');
+        $this->ingestor()->ingest($package);
+    }
+
     public function test_hostile_value_under_known_code_is_staged_only_as_non_public(): void
     {
         $this->rewriteManifest(function (array &$manifest): void {
@@ -566,16 +1008,22 @@ class CatalogImportIngestTest extends TestCase
 
     public function test_double_encoded_markup_attribute_value_never_becomes_a_public_filter(): void
     {
-        $this->rewriteManifest(function (array &$manifest): void {
+        $deepMarkup = $this->encodeRepeatedly('<script>alert(1)</script>', 6);
+        $this->rewriteManifest(function (array &$manifest) use ($deepMarkup): void {
             $manifest['run_id'] = 'fixture-run-encoded-attribute';
             $manifest['products'][0]['attributes'] = [
-                'color' => ['&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;'],
+                'color' => [$deepMarkup.' KOR TIN +7.999.123.45.67 экологичный №1'],
             ];
         });
 
-        $this->ingestor()->ingest($this->validator()->validate($this->manifestPath()));
+        $run = $this->ingestor()->ingest($this->validator()->validate($this->manifestPath()));
 
         $this->assertFalse(CatalogAttribute::where('code', 'color')->firstOrFail()->is_public);
+        $warnings = $run->items()->firstOrFail()->warnings;
+        $this->assertContains('removed_markup', $warnings);
+        $this->assertContains('removed_branding', $warnings);
+        $this->assertContains('removed_contact', $warnings);
+        $this->assertContains('removed_promotional', $warnings);
     }
 
     public function test_duplicate_landing_copy_flags_every_colliding_source_without_changing_copy(): void
@@ -634,6 +1082,70 @@ class CatalogImportIngestTest extends TestCase
         $this->assertSame($filesBefore, $this->storageSnapshot());
     }
 
+    public function test_dry_run_reports_the_same_real_rewrite_warning_count_as_ingest(): void
+    {
+        $exitCode = Artisan::call('catalog-import:ingest', [
+            'manifest' => $this->manifestPath(),
+            '--dry-run' => true,
+        ]);
+        $output = Artisan::output();
+
+        $this->assertSame(0, $exitCode);
+        $this->assertMatchesRegularExpression('/warnings=([1-9]\d*)/', $output);
+        preg_match('/warnings=(\d+)/', $output, $matches);
+        $dryRunWarnings = (int) $matches[1];
+
+        $run = $this->ingestor()->ingest($this->validator()->validate($this->manifestPath()));
+        $storedWarnings = $run->sources->sum(
+            static fn (CatalogImportSource $source): int => count($source->warnings ?? []),
+        ) + $run->items->sum(
+            static fn (CatalogImportItem $item): int => count($item->warnings ?? []),
+        );
+
+        $this->assertSame($storedWarnings, $dryRunWarnings);
+    }
+
+    public function test_dry_run_exercises_landing_rewrite_validation_without_writes(): void
+    {
+        $this->rewriteManifest(function (array &$manifest): void {
+            $manifest['config']['sources'][0]['sourceSlug'] = 'foo--bar';
+            $manifest['state']['sources'][0]['sourceSlug'] = 'foo--bar';
+            $manifest['sources'][0]['target_slug'] = 'foo--bar';
+            $manifest['memberships'][0]['sourceSlug'] = 'foo--bar';
+        }, refreshConfigDigest: true);
+
+        $exitCode = Artisan::call('catalog-import:ingest', [
+            'manifest' => $this->manifestPath(),
+            '--dry-run' => true,
+        ]);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertDatabaseCount('catalog_import_runs', 0);
+        $this->assertSame([], Storage::disk('local')->allFiles());
+    }
+
+    public function test_command_redacts_arbitrary_ingest_exception_messages(): void
+    {
+        $secret = 'SECRET_BINDING_MARKER_7f4d';
+        $failingIngestor = new class($secret) extends CatalogImportIngestor
+        {
+            public function __construct(private readonly string $secret) {}
+
+            public function ingest(\App\Data\CatalogImport\ValidatedCatalogImportPackage $package): CatalogImportRun
+            {
+                throw new RuntimeException('SQLSTATE binding '.$this->secret);
+            }
+        };
+        $this->app->instance(CatalogImportIngestor::class, $failingIngestor);
+
+        $exitCode = Artisan::call('catalog-import:ingest', ['manifest' => $this->manifestPath()]);
+        $output = Artisan::output();
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringNotContainsString($secret, $output);
+        $this->assertStringContainsString('Catalog import failed safely', $output);
+    }
+
     private function validator(): CatalogImportPackageValidator
     {
         return app(CatalogImportPackageValidator::class);
@@ -684,6 +1196,15 @@ class CatalogImportIngestTest extends TestCase
         ksort($value, SORT_STRING);
 
         return array_map(fn (mixed $entry): mixed => $this->canonicalize($entry), $value);
+    }
+
+    private function encodeRepeatedly(string $value, int $passes): string
+    {
+        for ($pass = 0; $pass < $passes; $pass++) {
+            $value = htmlspecialchars($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
+        return $value;
     }
 
     /** @return array<string, array<int, array<string, mixed>>> */
@@ -742,6 +1263,16 @@ class CatalogImportIngestTest extends TestCase
             $table->string('title');
             $table->string('slug')->unique();
             $table->timestamps();
+        });
+    }
+
+    private function recreateMembershipSchema(): void
+    {
+        Schema::create('catalog_import_item_source', function (Blueprint $table): void {
+            $table->unsignedBigInteger('import_item_id');
+            $table->unsignedBigInteger('import_source_id');
+            $table->timestamps();
+            $table->unique(['import_item_id', 'import_source_id'], 'ciis_item_source_uq');
         });
     }
 }

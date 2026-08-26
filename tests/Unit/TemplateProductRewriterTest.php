@@ -166,6 +166,52 @@ class TemplateProductRewriterTest extends TestCase
         $this->assertContains('removed_price', $result->warnings);
     }
 
+    public function test_deep_entities_obfuscated_brands_dotted_phones_and_unsupported_claims_are_removed(): void
+    {
+        $source = $this->source('11889');
+        $source['title'] = $this->encodeRepeatedly('<b>Римская штора</b>', 6)
+            .' KOR TIN R.I.M.S.K.I.E +7.999.123.45.67 160 мм';
+        $source['description'] = '8/999/123/45/67 example.ru/catalog экологичная гипоаллергенная модель №1, номер один. '
+            .'&definitely_unknown_entity;';
+        $source['attributes'] = ['width' => ['160 мм']];
+
+        $result = (new TemplateProductRewriter)->rewrite($source);
+        $publicText = mb_strtolower($result->title.' '.$result->summary.' '.$result->description);
+
+        foreach (['kor tin', 'r.i.m.s.k.i.e', '+7.999', '8/999', 'example.ru', 'экологич', 'гипоаллерген', '№1', 'номер один', 'definitely_unknown_entity'] as $blocked) {
+            $this->assertStringNotContainsString($blocked, $publicText);
+        }
+        $this->assertStringContainsString('160 мм', $publicText);
+        $this->assertContains('removed_branding', $result->warnings);
+        $this->assertContains('removed_contact', $result->warnings);
+        $this->assertContains('removed_promotional', $result->warnings);
+        $this->assertContains('removed_unresolved_entity', $result->warnings);
+    }
+
+    public function test_long_factual_input_is_capped_at_public_field_maxima_without_splitting_words(): void
+    {
+        $source = $this->source('11889');
+        $source['title'] = mb_substr(str_repeat('Длинная римская штора ', 12), 0, 240);
+        $source['description'] = str_repeat('Точное описание модели. ', 100);
+        $source['attributes'] = [
+            'material' => [str_repeat('материал ', 25)],
+            'color' => [str_repeat('цвет ', 40)],
+            'style' => [str_repeat('стиль ', 40)],
+        ];
+
+        $result = (new TemplateProductRewriter)->rewrite($source);
+
+        $this->assertLessThanOrEqual(140, mb_strlen($result->title));
+        $this->assertLessThanOrEqual(220, mb_strlen($result->summary));
+        $this->assertLessThanOrEqual(1000, mb_strlen($result->description));
+        $this->assertStringEndsWith('…', $result->title);
+        $this->assertStringEndsWith('…', $result->summary);
+        $this->assertStringEndsWith('…', $result->description);
+        $this->assertContains('title_truncated', $result->warnings);
+        $this->assertContains('summary_truncated', $result->warnings);
+        $this->assertContains('description_truncated', $result->warnings);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -182,5 +228,14 @@ class TemplateProductRewriterTest extends TestCase
                 'color' => ['белый'],
             ],
         ];
+    }
+
+    private function encodeRepeatedly(string $value, int $passes): string
+    {
+        for ($pass = 0; $pass < $passes; $pass++) {
+            $value = htmlspecialchars($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
+        return $value;
     }
 }

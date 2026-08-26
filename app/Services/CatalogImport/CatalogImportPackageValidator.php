@@ -33,6 +33,13 @@ final class CatalogImportPackageValidator
         'otdelka' => 'trim',
     ];
 
+    /** @var array<string, true> */
+    private const NUMERIC_ATTRIBUTE_CODES = [
+        'width' => true,
+        'height' => true,
+        'density' => true,
+    ];
+
     public function validate(string $manifestPath): ValidatedCatalogImportPackage
     {
         $resolvedManifest = realpath($manifestPath);
@@ -94,6 +101,10 @@ final class CatalogImportPackageValidator
         );
         $sources = $this->validatePersistedSources($manifest['sources'] ?? null, $configSources, $stateSources);
         $products = $this->validateProducts($manifest['products'] ?? null);
+        $maxProducts = $config['limits']['max_products'];
+        if ($maxProducts !== null && count($products) > $maxProducts) {
+            $this->fail('products exceed the immutable config.limits.max_products cap');
+        }
         $images = $this->validateImages(
             $manifest['images'] ?? null,
             $products,
@@ -182,7 +193,8 @@ final class CatalogImportPackageValidator
             if (isset($slugs[$slug])) {
                 $this->fail('config contains duplicate source slug '.$slug);
             }
-            if (! is_string($label) || trim($label) === '' || $label !== trim($label)) {
+            if (! is_string($label) || trim($label) === '' || $label !== trim($label)
+                || mb_strlen($label) > 255) {
                 $this->fail("config.sources.$index label is invalid");
             }
             $this->validateDonorUrl($url, 'category', "config.sources.$index sourceUrl");
@@ -313,13 +325,16 @@ final class CatalogImportPackageValidator
                     $this->fail("products.$index.$field must be a non-empty string");
                 }
             }
+            if (mb_strlen($record['sourceTitle']) > 255) {
+                $this->fail("products.$index.sourceTitle exceeds the database string boundary");
+            }
             $productId = $this->validateDonorUrl($record['sourceUrl'], 'product', "products.$index sourceUrl");
             if ($productId !== $externalId) {
                 $this->fail("products.$index product URL ID differs from externalId");
             }
             $this->validateDonorUrl($record['firstImageUrl'], 'image', "products.$index firstImageUrl");
-            if (! preg_match('/^\d+\.\d{2}$/D', $record['sourcePrice'])) {
-                $this->fail("products.$index sourcePrice must be an exact decimal string");
+            if (! preg_match('/^(?:0|[1-9]\d{0,9})\.\d{2}$/D', $record['sourcePrice'])) {
+                $this->fail("products.$index sourcePrice exceeds or is not normalized for DECIMAL(12,2)");
             }
             $expectedImagePath = 'images/'.$externalId.'.webp';
             if ($record['firstImagePath'] !== $expectedImagePath) {
@@ -472,13 +487,18 @@ final class CatalogImportPackageValidator
         foreach ($attributes as $sourceCode => $values) {
             if (! is_string($sourceCode)
                 || ! preg_match('/^[a-z0-9]+(?:_[a-z0-9]+)*$/D', $sourceCode)
+                || strlen($sourceCode) > 64
                 || ! is_array($values) || ! array_is_list($values) || $values === []) {
                 $this->fail("products.$productIndex attributes contain an invalid key or value list");
             }
             $targetCode = self::ATTRIBUTE_ALIASES[$sourceCode] ?? $sourceCode;
             foreach ($values as $value) {
-                if (! is_string($value) || trim($value) === '' || $value !== trim($value)) {
-                    $this->fail("products.$productIndex attributes contain an invalid value");
+                if (! is_string($value) || trim($value) === '' || $value !== trim($value)
+                    || mb_strlen($value) > 255) {
+                    $this->fail("products.$productIndex attributes contain an invalid attribute value");
+                }
+                if (isset(self::NUMERIC_ATTRIBUTE_CODES[$targetCode])) {
+                    $this->validateNumericAttributeValue($value, $productIndex, $targetCode);
                 }
                 $normalized[$targetCode][] = $value;
             }
@@ -491,6 +511,17 @@ final class CatalogImportPackageValidator
         unset($values);
 
         return $normalized;
+    }
+
+    private function validateNumericAttributeValue(string $value, int $productIndex, string $code): void
+    {
+        if (! preg_match('/(?<![\d.,])-?\d+(?:[.,]\d+)?(?![\d.,])/u', $value, $matches)) {
+            $this->fail("products.$productIndex numeric attribute $code has no decimal value");
+        }
+        $normalized = str_replace(',', '.', $matches[0]);
+        if (! preg_match('/^-?(?:0|[1-9]\d{0,7})(?:\.\d{1,4})?$/D', $normalized)) {
+            $this->fail("products.$productIndex numeric attribute $code exceeds DECIMAL(12,4)");
+        }
     }
 
     private function validateDonorUrl(mixed $value, string $kind, string $label): ?string
