@@ -133,6 +133,22 @@ class TemplateLandingRewriterTest extends TestCase
         $this->assertContains('римские шторы в стиле прованс', $h1s);
     }
 
+    public function test_database_string_fields_are_word_safely_capped_for_a_maximum_source_label(): void
+    {
+        $rewriter = new TemplateLandingRewriter;
+        $label = mb_substr(str_repeat('Длинная категория ', 20), 0, 255);
+        $this->assertSame(255, mb_strlen($label));
+
+        $result = $rewriter->rewrite($label, 'long-category');
+
+        $this->assertLessThanOrEqual(255, mb_strlen($result->title));
+        $this->assertLessThanOrEqual(255, mb_strlen($result->h1));
+        $this->assertMatchesRegularExpression('/\p{L}…$/u', $result->title);
+        $this->assertMatchesRegularExpression('/\p{L}…$/u', $result->h1);
+        $this->assertContains('title_truncated', $result->warnings);
+        $this->assertContains('h1_truncated', $result->warnings);
+    }
+
     private function encodeRepeatedly(string $value, int $passes): string
     {
         for ($pass = 0; $pass < $passes; $pass++) {

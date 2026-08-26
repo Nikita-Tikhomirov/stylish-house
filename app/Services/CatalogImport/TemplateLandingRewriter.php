@@ -3,7 +3,7 @@
 namespace App\Services\CatalogImport;
 
 use App\Data\CatalogImport\RewrittenLandingContent;
-use InvalidArgumentException;
+use App\Exceptions\CatalogImportInvariantException;
 
 final class TemplateLandingRewriter implements LandingContentRewriter
 {
@@ -15,7 +15,7 @@ final class TemplateLandingRewriter implements LandingContentRewriter
     {
         if (! preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $targetSlug)
             || strlen($targetSlug) > 128) {
-            throw new InvalidArgumentException('Landing target slug must be lowercase kebab-case.');
+            throw CatalogImportInvariantException::for('landing_slug');
         }
 
         $sanitized = $this->sanitizer->sanitize($label);
@@ -26,7 +26,7 @@ final class TemplateLandingRewriter implements LandingContentRewriter
             $warnings[] = 'awkward_label';
         }
         if ($cleanLabel === '') {
-            throw new InvalidArgumentException('Landing label becomes empty after sanitization.');
+            throw CatalogImportInvariantException::for('landing_empty');
         }
         $normalizedLabel = mb_strtolower($cleanLabel);
         if ($normalizedLabel === 'крепление без сверления') {
@@ -42,20 +42,22 @@ final class TemplateLandingRewriter implements LandingContentRewriter
         } else {
             $collectionName = 'Римские шторы — '.$cleanLabel;
         }
+        $h1 = $this->truncateStringField($collectionName, 'h1', $warnings);
+        $title = $this->truncateStringField($collectionName.' — каталог', 'title', $warnings);
         $warnings = array_values(array_unique($warnings));
         sort($warnings, SORT_STRING);
 
         return new RewrittenLandingContent(
-            title: $collectionName.' — каталог',
-            h1: $collectionName,
-            intro: sprintf('В разделе собраны модели категории «%s».', $collectionName),
+            title: $title,
+            h1: $h1,
+            intro: sprintf('В разделе собраны модели категории «%s».', $h1),
             description: sprintf(
                 'Подборка объединяет модели, относящиеся к категории «%s». Параметры каждой модели перечислены в её карточке.',
-                $collectionName,
+                $h1,
             ),
             seo: sprintf(
                 'Раздел «%s» позволяет сравнить модели по характеристикам, указанным в карточках товаров.',
-                $collectionName,
+                $h1,
             ),
             warnings: $warnings,
         );
@@ -64,5 +66,29 @@ final class TemplateLandingRewriter implements LandingContentRewriter
     private function lowercaseFirst(string $value): string
     {
         return mb_strtolower(mb_substr($value, 0, 1)).mb_substr($value, 1);
+    }
+
+    /** @param  array<int, string>  $warnings */
+    private function truncateStringField(string $value, string $field, array &$warnings): string
+    {
+        if (mb_strlen($value) <= 255) {
+            return $value;
+        }
+
+        preg_match_all('/\X/u', $value, $matches);
+        $prefix = '';
+        foreach ($matches[0] ?? [] as $grapheme) {
+            if (mb_strlen($prefix.$grapheme) > 254) {
+                break;
+            }
+            $prefix .= $grapheme;
+        }
+        $wordSafe = preg_replace('/\s+\S*$/u', '', $prefix) ?? $prefix;
+        if (trim($wordSafe) !== '') {
+            $prefix = $wordSafe;
+        }
+        $warnings[] = $field.'_truncated';
+
+        return rtrim($prefix, " \t\n\r\0\x0B,.;:-—").'…';
     }
 }

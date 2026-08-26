@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Data\CatalogImport\RewrittenLandingContent;
 use App\Data\CatalogImport\RewrittenProductContent;
+use App\Exceptions\CatalogImportOperationalException;
 use App\Models\CatalogAttribute;
 use App\Models\CatalogImportItem;
 use App\Models\CatalogImportRun;
@@ -19,9 +20,11 @@ use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
+use Mockery;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
@@ -421,6 +424,25 @@ class CatalogImportIngestTest extends TestCase
         $this->assertContains('title_truncated', $item->warnings);
         $this->assertContains('summary_truncated', $item->warnings);
         $this->assertContains('description_truncated', $item->warnings);
+    }
+
+    public function test_maximum_source_label_ingests_with_database_safe_landing_strings(): void
+    {
+        $label = rtrim(mb_substr(str_repeat('Длинная категория ', 20), 0, 255));
+        $this->assertSame(255, mb_strlen($label));
+        $this->rewriteManifest(function (array &$manifest) use ($label): void {
+            $manifest['config']['sources'][0]['label'] = $label;
+            $manifest['state']['sources'][0]['label'] = $label;
+            $manifest['sources'][0]['label'] = $label;
+        }, refreshConfigDigest: true);
+
+        $run = $this->ingestor()->ingest($this->validator()->validate($this->manifestPath()));
+        $source = $run->sources()->orderBy('sort_order')->firstOrFail();
+
+        $this->assertLessThanOrEqual(255, mb_strlen($source->rewritten_title));
+        $this->assertLessThanOrEqual(255, mb_strlen($source->rewritten_h1));
+        $this->assertContains('title_truncated', $source->warnings);
+        $this->assertContains('h1_truncated', $source->warnings);
     }
 
     public function test_ingest_is_idempotent_and_preserves_manual_review_changes(): void
@@ -1118,8 +1140,11 @@ class CatalogImportIngestTest extends TestCase
             'manifest' => $this->manifestPath(),
             '--dry-run' => true,
         ]);
+        $output = Artisan::output();
 
         $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('lowercase kebab-case', $output);
+        $this->assertMatchesRegularExpression('/correlation=[a-f0-9]{16}/', $output);
         $this->assertDatabaseCount('catalog_import_runs', 0);
         $this->assertSame([], Storage::disk('local')->allFiles());
     }
@@ -1127,6 +1152,17 @@ class CatalogImportIngestTest extends TestCase
     public function test_command_redacts_arbitrary_ingest_exception_messages(): void
     {
         $secret = 'SECRET_BINDING_MARKER_7f4d';
+        $loggedContext = '';
+        Log::shouldReceive('warning')
+            ->once()
+            ->with('Catalog import failure', Mockery::on(
+                function (array $context) use (&$loggedContext): bool {
+                    $loggedContext = json_encode($context, JSON_THROW_ON_ERROR);
+
+                    return isset($context['correlation'], $context['exception_class'], $context['exception_code'])
+                        && ! isset($context['message'], $context['trace']);
+                },
+            ));
         $failingIngestor = new class($secret) extends CatalogImportIngestor
         {
             public function __construct(private readonly string $secret) {}
@@ -1143,7 +1179,32 @@ class CatalogImportIngestTest extends TestCase
 
         $this->assertSame(1, $exitCode);
         $this->assertStringNotContainsString($secret, $output);
+        $this->assertStringNotContainsString($secret, $loggedContext);
         $this->assertStringContainsString('Catalog import failed safely', $output);
+        $this->assertMatchesRegularExpression('/correlation=[a-f0-9]{16}/', $output);
+        preg_match('/correlation=([a-f0-9]{16})/', $output, $matches);
+        $this->assertStringContainsString($matches[1], $loggedContext);
+    }
+
+    public function test_command_shows_a_typed_safe_manual_cleanup_diagnostic(): void
+    {
+        Log::shouldReceive('warning')->once();
+        $failingIngestor = new class extends CatalogImportIngestor
+        {
+            public function ingest(\App\Data\CatalogImport\ValidatedCatalogImportPackage $package): CatalogImportRun
+            {
+                throw CatalogImportOperationalException::for('cleanup_manual');
+            }
+        };
+        $this->app->instance(CatalogImportIngestor::class, $failingIngestor);
+
+        $exitCode = Artisan::call('catalog-import:ingest', ['manifest' => $this->manifestPath()]);
+        $output = Artisan::output();
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('manual verification', mb_strtolower($output));
+        $this->assertStringNotContainsString('inspect the application log', $output);
+        $this->assertMatchesRegularExpression('/correlation=[a-f0-9]{16}/', $output);
     }
 
     private function validator(): CatalogImportPackageValidator

@@ -3,6 +3,7 @@
 namespace App\Services\CatalogImport;
 
 use App\Data\CatalogImport\ValidatedCatalogImportPackage;
+use App\Exceptions\CatalogImportOperationalException;
 use App\Models\CatalogAttribute;
 use App\Models\CatalogImportItem;
 use App\Models\CatalogImportRun;
@@ -11,7 +12,6 @@ use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use RuntimeException;
 use Throwable;
 
 class CatalogImportIngestor
@@ -145,11 +145,7 @@ class CatalogImportIngestor
             try {
                 $this->compensateCreatedFiles($package, $disk, $createdFiles);
             } catch (Throwable $cleanupError) {
-                throw new RuntimeException(
-                    'Catalog import cleanup requires manual verification; private images were preserved where possible.',
-                    0,
-                    $cleanupError,
-                );
+                throw CatalogImportOperationalException::for('cleanup_manual', $cleanupError);
             }
             throw $error;
         }
@@ -188,7 +184,7 @@ class CatalogImportIngestor
         clearstatcache(true, $sourcePath);
         if (filesize($sourcePath) !== $expectedLength
             || ! hash_equals($expectedHash, hash_file('sha256', $sourcePath))) {
-            throw new RuntimeException('Source image changed after package validation.');
+            throw CatalogImportOperationalException::for('source_changed_after_validation');
         }
 
         $this->assertSafePrivateDestination($disk, $relativePath);
@@ -202,7 +198,7 @@ class CatalogImportIngestor
 
         $input = fopen($sourcePath, 'rb');
         if ($input === false) {
-            throw new RuntimeException('Validated source image cannot be opened for copying.');
+            throw CatalogImportOperationalException::for('source_open_failed');
         }
         $output = @fopen($destinationPath, 'xb');
         if ($output === false) {
@@ -219,7 +215,7 @@ class CatalogImportIngestor
         try {
             $copied = stream_copy_to_stream($input, $output);
             if ($copied !== $expectedLength || ! fflush($output)) {
-                throw new RuntimeException('Private image copy did not write the expected bytes.');
+                throw CatalogImportOperationalException::for('image_copy_failed');
             }
         } finally {
             fclose($input);
@@ -229,7 +225,7 @@ class CatalogImportIngestor
         clearstatcache(true, $sourcePath);
         if (filesize($sourcePath) !== $expectedLength
             || ! hash_equals($expectedHash, hash_file('sha256', $sourcePath))) {
-            throw new RuntimeException('Source image changed during the private copy.');
+            throw CatalogImportOperationalException::for('source_changed_during_copy');
         }
         $this->assertDestinationImage($destinationPath, $expectedHash, $expectedLength);
     }
@@ -241,7 +237,7 @@ class CatalogImportIngestor
         if ($stats === false || is_link($path) || (($stats['mode'] ?? 0) & 0170000) !== 0100000
             || ($stats['nlink'] ?? 1) !== 1 || filesize($path) !== $expectedLength
             || ! hash_equals($expectedHash, hash_file('sha256', $path))) {
-            throw new RuntimeException('Private destination contains a conflicting image.');
+            throw CatalogImportOperationalException::for('destination_conflict');
         }
     }
 
@@ -250,12 +246,12 @@ class CatalogImportIngestor
         string $relativePath,
     ): string {
         if (! preg_match('/^catalog-imports\/[a-z0-9][a-z0-9._-]{0,127}\/images\/\d{1,32}\.webp$/iD', $relativePath)) {
-            throw new RuntimeException('Private destination path is outside the approved layout.');
+            throw CatalogImportOperationalException::for('destination_layout');
         }
         $rootPath = rtrim($disk->path(''), '\\/');
         $rootReal = realpath($rootPath);
         if ($rootReal === false || ! is_dir($rootReal)) {
-            throw new RuntimeException('Private destination root is unavailable.');
+            throw CatalogImportOperationalException::for('destination_root');
         }
         $segments = explode('/', dirname($relativePath));
         $current = $rootPath;
@@ -273,7 +269,7 @@ class CatalogImportIngestor
                 || $currentReal === false
                 || $this->normalizedFilesystemPath($currentReal)
                     !== $this->normalizedFilesystemPath($expectedReal)) {
-                throw new RuntimeException('Private destination path traverses a link or reparse ancestor.');
+                throw CatalogImportOperationalException::for('destination_link');
             }
         }
 
@@ -315,7 +311,7 @@ class CatalogImportIngestor
                 && ($attribute->label !== $expectedLabel
                     || $attribute->type !== $expectedType
                     || $attribute->is_public !== $isPublic)) {
-                throw new RuntimeException('Catalog attribute metadata collision for '.$code.'.');
+                throw CatalogImportOperationalException::for('attribute_metadata_conflict');
             }
             $valueIds = [];
             foreach ($values as $value) {
@@ -335,7 +331,7 @@ class CatalogImportIngestor
                 if (! $attributeValue->wasRecentlyCreated
                     && ($attributeValue->label !== $value
                         || $attributeValue->numeric_value !== $expectedNumericValue)) {
-                    throw new RuntimeException('Catalog attribute value metadata collision for '.$code.'.');
+                    throw CatalogImportOperationalException::for('attribute_value_conflict');
                 }
                 $valueIds[] = $attributeValue->id;
             }
@@ -414,7 +410,7 @@ class CatalogImportIngestor
             || ($envelope['manifest_digest'] ?? null) !== $package->manifestDigest
             || ($envelope['collector_request_count'] ?? null) !== $package->requestCount
             || ($envelope['collector_config'] ?? null) !== $package->config) {
-            throw new RuntimeException('Existing catalog import run has a changed manifest or config digest.');
+            throw CatalogImportOperationalException::for('digest_conflict');
         }
         if ($run->source_count !== $package->counts['sources']
             || $run->unique_product_count !== $package->counts['products']
@@ -423,7 +419,7 @@ class CatalogImportIngestor
             || $run->page_count !== $package->pageCount
             || $run->sources()->count() !== $package->counts['sources']
             || $run->items()->count() !== $package->counts['products']) {
-            throw new RuntimeException('Existing catalog import run no longer matches validated counts.');
+            throw CatalogImportOperationalException::for('count_conflict');
         }
         $membershipsPerSource = array_count_values(array_column($package->memberships, 'source_slug'));
         $storedSources = $run->sources()->orderBy('sort_order')->get()->values();
@@ -439,7 +435,7 @@ class CatalogImportIngestor
                 || $stored->pages_count !== $expected['pages']
                 || $stored->items_count !== ($membershipsPerSource[$expected['target_slug']] ?? 0)
                 || $stored->next_page_url !== null) {
-                throw new RuntimeException('Existing catalog import run has a conflicting immutable source.');
+                throw CatalogImportOperationalException::for('source_conflict');
             }
         }
         $storedItems = $run->items()->get()->keyBy('external_id');
@@ -452,7 +448,7 @@ class CatalogImportIngestor
                 || $stored->source_title !== $expected['source_title']
                 || $stored->source_description !== $expected['source_description']
                 || $stored->source_price !== $expected['source_price']) {
-                throw new RuntimeException('Existing catalog import run has a conflicting immutable item.');
+                throw CatalogImportOperationalException::for('item_conflict');
             }
             $expectedAttributes = [];
             foreach ($expected['attributes'] as $code => $values) {
@@ -498,11 +494,11 @@ class CatalogImportIngestor
                 ->sortKeys()
                 ->all();
             if (array_keys($storedAttributes) !== array_keys($expectedAttributes)) {
-                throw new RuntimeException('Existing catalog import item has a conflicting attribute set.');
+                throw CatalogImportOperationalException::for('attribute_set_conflict');
             }
             foreach ($expectedAttributes as $key => $metadata) {
                 if ($storedAttributes[$key] !== $metadata) {
-                    throw new RuntimeException('Existing catalog import item has conflicting attribute metadata.');
+                    throw CatalogImportOperationalException::for('attribute_detail_conflict');
                 }
             }
         }
@@ -511,7 +507,7 @@ class CatalogImportIngestor
             ->whereIn('import_item_id', $itemIds)
             ->count();
         if ($membershipCount !== $package->counts['memberships']) {
-            throw new RuntimeException('Existing catalog import run has a conflicting membership set.');
+            throw CatalogImportOperationalException::for('membership_conflict');
         }
         $storedMemberships = DB::table('catalog_import_item_source as pivot')
             ->join('catalog_import_items as item', 'item.id', '=', 'pivot.import_item_id')
@@ -529,7 +525,7 @@ class CatalogImportIngestor
         );
         sort($expectedMemberships, SORT_STRING);
         if ($storedMemberships !== $expectedMemberships) {
-            throw new RuntimeException('Existing catalog import run has a conflicting membership set.');
+            throw CatalogImportOperationalException::for('membership_conflict');
         }
         $imagesById = $this->keyBy($package->images, 'external_id');
         foreach ($run->items as $item) {
@@ -538,7 +534,7 @@ class CatalogImportIngestor
             if (! $image || $item->source_image_path !== $expectedPath
                 || $item->source_image_sha256 !== $image['sha256']
                 || $item->source_image_byte_length !== $image['byte_length']) {
-                throw new RuntimeException('Existing catalog import item has conflicting immutable image metadata.');
+                throw CatalogImportOperationalException::for('image_metadata_conflict');
             }
             $destinationPath = $this->assertSafePrivateDestination($disk, $expectedPath);
             $this->assertDestinationImage($destinationPath, $image['sha256'], $image['byte_length']);
@@ -589,7 +585,7 @@ class CatalogImportIngestor
                 $createdFile['byte_length'],
             );
             if (! $this->deleteCompensationFile($disk, $createdFile['path'])) {
-                throw new RuntimeException('A private image could not be removed during rollback cleanup.');
+                throw CatalogImportOperationalException::for('cleanup_delete_failed');
             }
         }
     }

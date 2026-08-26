@@ -2,12 +2,14 @@
 
 namespace App\Console\Commands;
 
+use App\Exceptions\SafeCatalogImportException;
 use App\Models\CatalogImportItem;
 use App\Models\CatalogImportSource;
 use App\Services\CatalogImport\CatalogImportIngestor;
 use App\Services\CatalogImport\CatalogImportPackageValidator;
 use App\Services\CatalogImport\CatalogImportRewritePlanner;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Throwable;
 
@@ -66,7 +68,20 @@ class IngestCatalogImport extends Command
 
             return self::SUCCESS;
         } catch (Throwable $error) {
-            $this->error(sprintf('Manifest %s: %s', $manifestPath, $this->safeErrorMessage($error)));
+            $correlation = bin2hex(random_bytes(8));
+            Log::warning('Catalog import failure', [
+                'correlation' => $correlation,
+                'exception_class' => $error::class,
+                'exception_code' => $error instanceof SafeCatalogImportException
+                    ? $error->safeCode()
+                    : (string) $error->getCode(),
+            ]);
+            $this->error(sprintf(
+                'Manifest %s: %s correlation=%s',
+                $manifestPath,
+                $this->safeErrorMessage($error),
+                $correlation,
+            ));
 
             return self::FAILURE;
         }
@@ -78,7 +93,10 @@ class IngestCatalogImport extends Command
             && str_starts_with($error->getMessage(), 'Catalog import manifest invariant failed:')) {
             return $error->getMessage();
         }
+        if ($error instanceof SafeCatalogImportException) {
+            return $error->getMessage();
+        }
 
-        return 'Catalog import failed safely; inspect the application log for diagnostics.';
+        return 'Catalog import failed safely; no private diagnostic details were displayed.';
     }
 }
