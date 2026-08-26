@@ -1,9 +1,10 @@
 import { setTimeout as sleepTimeout } from 'node:timers/promises';
 
 export const DEFAULT_LIMITS = Object.freeze({
-    htmlDelayMs: [20_000, 40_000],
-    imageDelayMs: [10_000, 20_000],
-    hourlyLimit: 120,
+    htmlDelayMs: [120_000, 240_000],
+    imageDelayMs: [60_000, 120_000],
+    challengeDelayMs: [10_000, 20_000],
+    hourlyLimit: 20,
     backoffMs: [120_000, 300_000, 900_000],
     concurrency: 1,
 });
@@ -41,6 +42,7 @@ export class RequestPolicy {
         sleep = sleepTimeout,
         htmlDelayMs = DEFAULT_LIMITS.htmlDelayMs,
         imageDelayMs = DEFAULT_LIMITS.imageDelayMs,
+        challengeDelayMs = DEFAULT_LIMITS.challengeDelayMs,
         hourlyLimit = DEFAULT_LIMITS.hourlyLimit,
         backoffMs = DEFAULT_LIMITS.backoffMs,
         onEvent = async () => {},
@@ -51,7 +53,7 @@ export class RequestPolicy {
         this.clock = clock;
         this.random = random;
         this.sleep = sleep;
-        this.delays = { html: htmlDelayMs, image: imageDelayMs };
+        this.delays = { html: htmlDelayMs, image: imageDelayMs, challenge: challengeDelayMs };
         this.hourlyLimit = hourlyLimit;
         this.backoffMs = backoffMs;
         this.onEvent = onEvent;

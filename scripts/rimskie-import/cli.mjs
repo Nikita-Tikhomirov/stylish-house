@@ -829,10 +829,24 @@ function stateSourcesMatchConfig(stateSources, configSources) {
         ));
 }
 
+function usesCurrentSafeRequestProfile(config) {
+    const limits = config?.limits;
+    return Array.isArray(limits?.html_delay_ms)
+        && limits.html_delay_ms[0] >= DEFAULT_LIMITS.htmlDelayMs[0]
+        && Array.isArray(limits.image_delay_ms)
+        && limits.image_delay_ms[0] >= DEFAULT_LIMITS.imageDelayMs[0]
+        && Array.isArray(limits.challenge_delay_ms)
+        && limits.challenge_delay_ms[0] >= DEFAULT_LIMITS.challengeDelayMs[0]
+        && Number.isInteger(limits.hourly_requests)
+        && limits.hourly_requests <= DEFAULT_LIMITS.hourlyLimit
+        && limits.concurrency === DEFAULT_LIMITS.concurrency;
+}
+
 export function savedPolicyOptions(config) {
     return {
         htmlDelayMs: config.limits.html_delay_ms,
         imageDelayMs: config.limits.image_delay_ms,
+        challengeDelayMs: config.limits.challenge_delay_ms,
         hourlyLimit: config.limits.hourly_requests,
         backoffMs: config.limits.backoff_ms,
     };
@@ -855,6 +869,7 @@ export async function initializeRun(store, options) {
             limits: {
                 html_delay_ms: DEFAULT_LIMITS.htmlDelayMs,
                 image_delay_ms: DEFAULT_LIMITS.imageDelayMs,
+                challenge_delay_ms: DEFAULT_LIMITS.challengeDelayMs,
                 hourly_requests: DEFAULT_LIMITS.hourlyLimit,
                 backoff_ms: DEFAULT_LIMITS.backoffMs,
                 concurrency: DEFAULT_LIMITS.concurrency,
@@ -882,6 +897,11 @@ export async function initializeRun(store, options) {
         if (!stateSourcesMatchConfig(existingState.sources, config.sources)) {
             throw new Error('State sources differ from immutable config.json');
         }
+        if (!usesCurrentSafeRequestProfile(config)) {
+            throw new Error(
+                'Existing run uses an obsolete aggressive request profile; create a new run ID',
+            );
+        }
         return {
             state: existingState,
             config,
@@ -889,6 +909,11 @@ export async function initializeRun(store, options) {
             maxRequests: configuredMaxRequests,
             maxProducts: configuredMaxProducts,
         };
+    }
+    if (!usesCurrentSafeRequestProfile(config)) {
+        throw new Error(
+            'Existing run uses an obsolete aggressive request profile; create a new run ID',
+        );
     }
     const state = {
         status: 'ready',
@@ -918,18 +943,6 @@ export function isLiveProcess(processId, kill = process.kill) {
     }
 }
 
-async function waitForAuthorizedChallenge(control) {
-    process.stderr.write(
-        'Challenge paused. Complete only an explicitly authorized click in the visible browser, '
-        + 'then run the resume command.\n',
-    );
-    while (true) {
-        const flags = await control.read();
-        if (flags.stop || !flags.pause) return flags;
-        await sleep(1_000);
-    }
-}
-
 function printableSnapshot(state, control) {
     return {
         ...state,
@@ -946,16 +959,19 @@ async function print(value, json = false) {
     process.stdout.write(`${value}\n`);
 }
 
-async function runCollector(options, store, control) {
+export async function runCollector(options, store, control, dependencies = {}) {
     const [
-        { Collector },
-        { PlaywrightTransport },
-        { RequestPolicy },
+        collectorModule,
+        transportModule,
+        policyModule,
     ] = await Promise.all([
         import('./lib/collector.mjs'),
         import('./lib/playwright-transport.mjs'),
         import('./lib/request-policy.mjs'),
     ]);
+    const Collector = dependencies.Collector || collectorModule.Collector;
+    const PlaywrightTransport = dependencies.PlaywrightTransport || transportModule.PlaywrightTransport;
+    const RequestPolicy = dependencies.RequestPolicy || policyModule.RequestPolicy;
     const currentControl = await control.read();
     if (options.command === 'resume' && currentControl.stop) {
         throw new Error('A stopped run cannot be resumed');
@@ -994,30 +1010,17 @@ async function runCollector(options, store, control) {
             onEvent: (event) => store.appendEvent(event),
         });
         const collector = new Collector();
-        let acknowledgeChallenge = options.command === 'resume';
-        while (true) {
-            result = await collector.run({
-                store,
-                transport,
-                policy,
-                control,
-                maxRequests: initialized.maxRequests,
-                maxProducts: initialized.maxProducts,
-                acknowledgeFailurePause: options.command === 'resume',
-                acknowledgeChallenge,
-                acknowledgeError: options.command === 'resume',
-            });
-            acknowledgeChallenge = false;
-            if (result.status !== 'paused' || result.pauseReason !== 'challenge') break;
-
-            await control.update({ pause: true });
-            const flags = await waitForAuthorizedChallenge(control);
-            if (flags.stop) {
-                result = await collector.run({ store, transport, policy, control });
-                break;
-            }
-            acknowledgeChallenge = true;
-        }
+        result = await collector.run({
+            store,
+            transport,
+            policy,
+            control,
+            maxRequests: initialized.maxRequests,
+            maxProducts: initialized.maxProducts,
+            acknowledgeFailurePause: options.command === 'resume',
+            acknowledgeChallenge: options.command === 'resume',
+            acknowledgeError: options.command === 'resume',
+        });
     } finally {
         try {
             await transport?.close();

@@ -195,7 +195,7 @@ test('download rejects unapproved image URLs before browser fetch', async (t) =>
     }
 });
 
-test('browser routing permits only the exact counted operation outside challenge mode', () => {
+test('browser routing permits only the exact counted operation and never challenge assets', () => {
     const activeHtml = { kind: 'html', url: categoryUrl };
     assert.equal(shouldAllowBrowserRequest({
         routeMode: 'collecting', activeOperation: activeHtml, resourceType: 'document', url: categoryUrl,
@@ -229,7 +229,7 @@ test('browser routing permits only the exact counted operation outside challenge
         routeMode: 'challenge', activeOperation: { kind: 'challenge', url: categoryUrl },
         resourceType: 'script',
         url: 'https://rimskie.com/challenge/script.js',
-    }), true);
+    }), false);
     assert.equal(shouldAllowBrowserRequest({
         routeMode: 'challenge', activeOperation: { kind: 'challenge', url: categoryUrl },
         resourceType: 'script',

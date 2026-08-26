@@ -95,6 +95,7 @@ function createPolicy(store) {
     return new RequestPolicy({
         htmlDelayMs: [0, 0],
         imageDelayMs: [0, 0],
+        challengeDelayMs: [0, 0],
         backoffMs: [0, 0, 0],
         sleep: async () => {},
         random: () => 0,
@@ -534,30 +535,123 @@ test('challenge writes an event and checkpoints the run as paused', async (t) =>
     assert.equal(events.some((event) => event.type === 'pause' && event.reason === 'challenge'), true);
 });
 
-test('network and timeout failures use durable backoff and pause on the third attempt', async (t) => {
+test('simple challenge button is clicked once and its request is durably counted', async (t) => {
     const store = await createStore(t, initialState([source('white', whiteUrl)]));
-    const failures = ['network', 'timeout', 'http_403'];
-    const fakeTransport = new FakeTransport(new Map());
-    fakeTransport.getHtml = async (url) => {
-        fakeTransport.calls.push(['html', url]);
-        throw Object.assign(new Error(`typed ${failures[0]} failure`), { kind: failures.shift() });
+    const calls = [];
+    const transport = {
+        async getHtml(url) {
+            calls.push(['html', url]);
+            throw Object.assign(new Error('visible BotHunt retry page'), {
+                kind: 'challenge', url, pageKind: 'category',
+            });
+        },
+        async retrySimpleChallenge(url, { kind }) {
+            calls.push(['challenge', url, kind]);
+            const durable = await store.readState();
+            assert.deepEqual(durable.challengeRetryUrls, [whiteUrl]);
+            assert.equal(durable.requestCount, 2);
+            return categoryHtml([]);
+        },
     };
-    const sleeps = [];
-    const policy = new RequestPolicy({
-        htmlDelayMs: [0, 0],
-        imageDelayMs: [0, 0],
-        backoffMs: [120_000, 300_000, 900_000],
-        sleep: async (milliseconds) => sleeps.push(milliseconds),
-        onEvent: (event) => store.appendEvent(event),
+
+    const snapshot = await new Collector().run({
+        store, transport, policy: createPolicy(store),
     });
 
-    const snapshot = await new Collector().run({ store, transport: fakeTransport, policy });
+    assert.equal(snapshot.status, 'completed');
+    assert.equal(snapshot.requestCount, 2);
+    assert.deepEqual(snapshot.challengeRetryUrls, [whiteUrl]);
+    assert.deepEqual(calls, [
+        ['html', whiteUrl],
+        ['challenge', whiteUrl, 'category'],
+    ]);
+});
+
+test('a failed challenge click is never repeated for the same URL', async (t) => {
+    const state = initialState([source('white', whiteUrl)]);
+    state.challengeRetryUrls = [whiteUrl];
+    const store = await createStore(t, state);
+    const calls = [];
+    const transport = {
+        async getHtml(url) {
+            calls.push(['html', url]);
+            throw Object.assign(new Error('challenge returned again'), {
+                kind: 'challenge', url, pageKind: 'category',
+            });
+        },
+        async retrySimpleChallenge() {
+            calls.push(['unexpected-challenge-click']);
+            return categoryHtml([]);
+        },
+    };
+
+    const snapshot = await new Collector().run({
+        store, transport, policy: createPolicy(store), acknowledgeChallenge: true,
+    });
 
     assert.equal(snapshot.status, 'paused');
-    assert.equal(snapshot.requestPolicy.consecutiveFailures, 3);
-    assert.equal(snapshot.requestPolicy.pauseRequired, true);
-    assert.equal(fakeTransport.calls.length, 3);
-    assert.deepEqual(sleeps, [0, 120_000, 0, 300_000, 0, 900_000]);
+    assert.equal(snapshot.pauseReason, 'challenge');
+    assert.deepEqual(calls, [['html', whiteUrl]]);
+});
+
+test('an image challenge pauses without clicking or marking the image complete', async (t) => {
+    const store = await createStore(t, initialState([source('white', whiteUrl)]));
+    const transport = new FakeTransport(new Map([
+        [whiteUrl, categoryHtml([{ externalId: '11889', url: productUrl }])],
+        [productUrl, productHtml('11889')],
+    ]));
+    let retryClicks = 0;
+    transport.downloadFirstImage = async (url) => {
+        transport.calls.push(['image', url]);
+        throw Object.assign(new Error('image fetch returned challenge HTML'), {
+            kind: 'challenge',
+            challengeDocumentUrl: productUrl,
+            pageKind: 'product',
+        });
+    };
+    transport.retrySimpleChallenge = async () => {
+        retryClicks += 1;
+        return productHtml('11889');
+    };
+
+    const snapshot = await new Collector().run({
+        store, transport, policy: createPolicy(store),
+    });
+
+    assert.equal(snapshot.status, 'paused');
+    assert.equal(snapshot.pauseReason, 'challenge');
+    assert.equal(retryClicks, 0);
+    assert.deepEqual(snapshot.completedProductIds, []);
+    assert.equal(snapshot.sources[0].pendingProducts[0].stage, 'html-complete');
+    await assert.rejects(readFile(join(store.imagesDir, '11889.webp')), /ENOENT/);
+});
+
+test('first transient or protection failure pauses without an automatic retry', async (t) => {
+    for (const failureKind of ['network', 'timeout', 'http_403', 'http_429']) {
+        await t.test(failureKind, async (subtest) => {
+            const store = await createStore(subtest, initialState([source('white', whiteUrl)]));
+            const fakeTransport = new FakeTransport(new Map());
+            fakeTransport.getHtml = async (url) => {
+                fakeTransport.calls.push(['html', url]);
+                throw Object.assign(new Error(`typed ${failureKind} failure`), { kind: failureKind });
+            };
+            const sleeps = [];
+            const policy = new RequestPolicy({
+                htmlDelayMs: [0, 0],
+                imageDelayMs: [0, 0],
+                backoffMs: [120_000, 300_000, 900_000],
+                sleep: async (milliseconds) => sleeps.push(milliseconds),
+                onEvent: (event) => store.appendEvent(event),
+            });
+
+            const snapshot = await new Collector().run({ store, transport: fakeTransport, policy });
+
+            assert.equal(snapshot.status, 'paused');
+            assert.equal(snapshot.pauseReason, failureKind);
+            assert.equal(fakeTransport.calls.length, 1);
+            assert.deepEqual(sleeps, [0]);
+        });
+    }
 });
 
 test('restart during the third failure backoff cannot make a fourth automatic request', async (t) => {
@@ -592,14 +686,8 @@ test('restart during the third failure backoff cannot make a fourth automatic re
     assert.deepEqual(fakeTransport.calls, [['html', whiteUrl]]);
 });
 
-test('third failure marker is durable before writing its error event', async (t) => {
+test('protective pause is durable before its error event and blocks an implicit restart', async (t) => {
     const state = initialState([source('white', whiteUrl)]);
-    state.requestPolicy = {
-        requestTimes: [],
-        consecutiveFailures: 2,
-        pauseRequired: false,
-        lastFailureKind: 'timeout',
-    };
     const store = await createStore(t, state);
     const firstTransport = new FakeTransport(new Map());
     firstTransport.getHtml = async (url) => {
@@ -622,7 +710,8 @@ test('third failure marker is durable before writing its error event', async (t)
         policy: createPolicy(store),
     });
     assert.equal(crashed.status, 'paused');
-    assert.equal((await store.readState()).requestPolicy.pauseRequired, true);
+    assert.equal((await store.readState()).pauseReason, 'network');
+    assert.equal(firstTransport.calls.length, 1);
 
     const resumedTransport = new FakeTransport(new Map([[whiteUrl, categoryHtml([])]]));
     const recovered = await new Collector().run({
@@ -770,7 +859,7 @@ test('browser discovery checks Windows Chrome and Edge installations without dow
     assert.equal(checked.some((candidate) => candidate.endsWith('Google\\Chrome\\Application\\chrome.exe')), true);
 });
 
-test('playwright transport denies uncounted resources and only opens same-origin challenge assets', async () => {
+test('playwright transport denies every uncounted resource after a challenge', async () => {
     const fake = fakePlaywright();
     const transport = await PlaywrightTransport.open({
         profileDir: 'profile',
@@ -804,15 +893,14 @@ test('playwright transport denies uncounted resources and only opens same-origin
     assert.equal(await routeDecision('document', whiteUrl), 'abort');
     fake.page.goto = async () => ({ status: () => 403 });
     fake.page.content = async () => '<html><body>BotHunt verification</body></html>';
-    await assert.rejects(transport.getHtml(whiteUrl), (error) => error.kind === 'challenge');
+    await assert.rejects(transport.getHtml(whiteUrl), (error) => error.kind === 'http_403');
     assert.equal(await routeDecision('stylesheet', 'https://rimskie.com/challenge.css'), 'abort');
     assert.equal(await routeDecision('script', 'https://evil.example/challenge.js'), 'abort');
-    await transport.enableChallengeMode(whiteUrl);
-    assert.equal(await routeDecision('document', whiteUrl), 'continue');
+    assert.equal(await routeDecision('document', whiteUrl), 'abort');
     assert.equal(await routeDecision(
         'document', 'https://rimskie.com/catalog/rimskie-shtory/black',
     ), 'abort');
-    assert.equal(await routeDecision('stylesheet', 'https://rimskie.com/challenge.css'), 'continue');
+    assert.equal(await routeDecision('stylesheet', 'https://rimskie.com/challenge.css'), 'abort');
     assert.equal(await routeDecision('fetch', 'https://rimskie.com/api/catalog'), 'abort');
     assert.equal(await routeDecision('script', 'https://rimskie.com/challenge.js', 'POST'), 'abort');
     assert.equal(await routeDecision('websocket', 'https://rimskie.com/challenge/socket'), 'abort');
@@ -853,8 +941,101 @@ test('playwright transport reports typed 403 and visible challenge failures', as
     });
     await assert.rejects(
         forbiddenChallengeTransport.getHtml(whiteUrl),
+        (error) => error instanceof DonorRequestError && error.kind === 'http_403',
+    );
+});
+
+test('playwright transport clicks the exact simple challenge retry button once', async () => {
+    let html = '<html><body>BotHunt verification<button>Попробовать снова</button></body></html>';
+    let retryClicks = 0;
+    const response = {
+        status: () => 200,
+        url: () => whiteUrl,
+    };
+    const locator = {
+        count: async () => 1,
+        isVisible: async () => true,
+        isEnabled: async () => true,
+        click: async () => {
+            retryClicks += 1;
+            html = categoryHtml([]);
+        },
+    };
+    const page = {
+        goto: async () => response,
+        content: async () => html,
+        evaluate: async () => {},
+        url: () => whiteUrl,
+        getByRole: (role, options) => {
+            assert.equal(role, 'button');
+            assert.match('Попробовать снова', options.name);
+            return locator;
+        },
+        locator: () => ({ count: async () => 0 }),
+        waitForNavigation: async () => response,
+    };
+    const transport = new PlaywrightTransport({ close: async () => {} }, page);
+
+    await assert.rejects(
+        transport.getHtml(whiteUrl, { kind: 'category' }),
         (error) => error instanceof DonorRequestError && error.kind === 'challenge',
     );
+    const result = await transport.retrySimpleChallenge(whiteUrl, { kind: 'category' });
+
+    assert.equal(result, categoryHtml([]));
+    assert.equal(retryClicks, 1);
+});
+
+test('playwright transport never clicks retry when full CAPTCHA controls are present', async () => {
+    let retryClicks = 0;
+    const page = {
+        url: () => whiteUrl,
+        locator: () => ({ count: async () => 1 }),
+        getByRole: () => ({
+            count: async () => 1,
+            isVisible: async () => true,
+            isEnabled: async () => true,
+            click: async () => { retryClicks += 1; },
+        }),
+    };
+    const transport = new PlaywrightTransport({ close: async () => {} }, page);
+
+    await assert.rejects(
+        transport.retrySimpleChallenge(whiteUrl, { kind: 'category' }),
+        (error) => error instanceof DonorRequestError && error.kind === 'challenge'
+            && /full CAPTCHA/i.test(error.message),
+    );
+    assert.equal(retryClicks, 0);
+});
+
+test('playwright transport pauses when a simple retry opens a full CAPTCHA', async () => {
+    let retryClicks = 0;
+    let fullCaptchaVisible = false;
+    const response = { status: () => 200, url: () => whiteUrl };
+    const page = {
+        url: () => whiteUrl,
+        locator: () => ({ count: async () => fullCaptchaVisible ? 1 : 0 }),
+        getByRole: () => ({
+            count: async () => 1,
+            isVisible: async () => true,
+            isEnabled: async () => true,
+            click: async () => {
+                retryClicks += 1;
+                fullCaptchaVisible = true;
+            },
+        }),
+        waitForNavigation: async () => response,
+        content: async () => '<html><body><canvas></canvas></body></html>',
+        evaluate: async () => {},
+    };
+    const transport = new PlaywrightTransport({ close: async () => {} }, page);
+
+    await assert.rejects(
+        transport.retrySimpleChallenge(whiteUrl, { kind: 'category' }),
+        (error) => error instanceof DonorRequestError && error.kind === 'challenge'
+            && /full CAPTCHA/i.test(error.message),
+    );
+    assert.equal(retryClicks, 1);
 });
 
 test('playwright transport reports typed timeout and network navigation failures', async () => {
@@ -939,8 +1120,7 @@ test('playwright transport rejects 403 HTML challenge bytes without writing an i
 
     await assert.rejects(
         transport.downloadFirstImage(imageUrl, destination),
-        (error) => error instanceof DonorRequestError && error.kind === 'challenge'
-            && error.challengeDocumentUrl === productUrl && error.pageKind === 'product',
+        (error) => error instanceof DonorRequestError && error.kind === 'http_403',
     );
     await assert.rejects(readFile(destination), /ENOENT/);
 });
@@ -1363,6 +1543,7 @@ test('status pause stop and export CLI commands never open the donor transport',
         sources: [configuredSource],
         limits: {
             html_delay_ms: [20_000, 40_000], image_delay_ms: [10_000, 20_000],
+            challenge_delay_ms: [10_000, 20_000],
             hourly_requests: 120, backoff_ms: [120_000, 300_000, 900_000],
             concurrency: 1, max_requests: null, max_products: null,
         },

@@ -86,7 +86,7 @@ test('challenge state is durable before diagnostics and survives event-log failu
     assert.equal(transport.calls, 1);
 });
 
-test('collector enables challenge routing only after the pause checkpoint is durable', async () => {
+test('collector never enables legacy challenge mode when no guarded retry action exists', async () => {
     const store = memoryStore(initialState());
     const observations = [];
     const transport = {
@@ -104,7 +104,7 @@ test('collector enables challenge routing only after the pause checkpoint is dur
     const result = await new Collector().run({ store, transport, policy: policy() });
 
     assert.equal(result.status, 'paused');
-    assert.deepEqual(observations, [['paused', 'challenge', sourceUrl]]);
+    assert.deepEqual(observations, []);
 });
 
 test('persisted challenge pause requires explicit resume acknowledgement', async () => {

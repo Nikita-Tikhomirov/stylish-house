@@ -47,6 +47,7 @@ async function prepareCompletedRun(store) {
         sources: [configuredSource],
         limits: {
             html_delay_ms: [20_000, 40_000], image_delay_ms: [10_000, 20_000],
+            challenge_delay_ms: [10_000, 20_000],
             hourly_requests: 120, backoff_ms: [120_000, 300_000, 900_000],
             concurrency: 1, max_requests: null, max_products: null,
         },
@@ -220,6 +221,7 @@ test('export preserves immutable source order independent of filenames', async (
         sources: configuredSources,
         limits: {
             html_delay_ms: [20_000, 40_000], image_delay_ms: [10_000, 20_000],
+            challenge_delay_ms: [10_000, 20_000],
             hourly_requests: 120, backoff_ms: [120_000, 300_000, 900_000],
             concurrency: 1, max_requests: null, max_products: null,
         },
@@ -342,6 +344,7 @@ test('export rejects running, empty, and inconsistent runs', async (t) => {
         sources: [runningSource],
         limits: {
             html_delay_ms: [20_000, 40_000], image_delay_ms: [10_000, 20_000],
+            challenge_delay_ms: [10_000, 20_000],
             hourly_requests: 120, backoff_ms: [120_000, 300_000, 900_000],
             concurrency: 1, max_requests: null, max_products: null,
         },

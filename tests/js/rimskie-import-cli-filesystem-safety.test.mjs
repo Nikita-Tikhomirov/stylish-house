@@ -16,9 +16,14 @@ import {
     isLiveProcess,
     lookupProcessFingerprint,
     parseArguments,
+    runCollector,
     savedPolicyOptions,
 } from '../../scripts/rimskie-import/cli.mjs';
-import { configSchemaVersion, RunStore } from '../../scripts/rimskie-import/lib/run-store.mjs';
+import {
+    configDigest,
+    configSchemaVersion,
+    RunStore,
+} from '../../scripts/rimskie-import/lib/run-store.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -140,6 +145,7 @@ test('run config is create-once and immutable', async (t) => {
         }],
         limits: {
             html_delay_ms: [20_000, 40_000], image_delay_ms: [10_000, 20_000],
+            challenge_delay_ms: [10_000, 20_000],
             hourly_requests: 120, backoff_ms: [120_000, 300_000, 900_000],
             concurrency: 1, max_requests: 3, max_products: 1,
         },
@@ -167,6 +173,7 @@ test('concurrent differing config initializers have exactly one winner', async (
         }],
         limits: {
             html_delay_ms: [20_000, 40_000], image_delay_ms: [10_000, 20_000],
+            challenge_delay_ms: [10_000, 20_000],
             hourly_requests: 120, backoff_ms: [120_000, 300_000, 900_000],
             concurrency: 1, max_requests: 3, max_products: 1,
         },
@@ -257,11 +264,59 @@ test('resume allows mutable state source progress to differ from initial config'
     assert.deepEqual(resumed.state.sources[0], progressed.sources[0]);
 });
 
+test('network resume rejects a run created with the obsolete aggressive request profile', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-obsolete-profile-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const store = await RunStore.open({ rootDir, runId: 'run-001' });
+    const options = {
+        maxRequests: 3, maxProducts: 1,
+        maxRequestsExplicit: false, maxProductsExplicit: false,
+    };
+    const initialized = await initializeRun(store, options);
+    const obsoleteConfig = structuredClone(initialized.config);
+    obsoleteConfig.limits.html_delay_ms = [20_000, 40_000];
+    obsoleteConfig.limits.image_delay_ms = [10_000, 20_000];
+    obsoleteConfig.limits.hourly_requests = 120;
+    await writeFile(store.configPath, `${JSON.stringify(obsoleteConfig, null, 2)}\n`, 'utf8');
+    const obsoleteState = structuredClone(initialized.state);
+    obsoleteState.configDigest = configDigest(obsoleteConfig);
+    await store.checkpoint(obsoleteState);
+
+    await assert.rejects(
+        initializeRun(store, options),
+        /obsolete aggressive request profile.*new run/i,
+    );
+});
+
+test('config-only crash window rejects an obsolete aggressive request profile', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-obsolete-config-only-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const store = await RunStore.open({ rootDir, runId: 'run-001' });
+    const options = {
+        maxRequests: 3, maxProducts: 1,
+        maxRequestsExplicit: false, maxProductsExplicit: false,
+    };
+    const initialized = await initializeRun(store, options);
+    const obsoleteConfig = structuredClone(initialized.config);
+    obsoleteConfig.limits.html_delay_ms = [20_000, 40_000];
+    obsoleteConfig.limits.image_delay_ms = [10_000, 20_000];
+    obsoleteConfig.limits.hourly_requests = 120;
+    await rm(store.statePath);
+    await writeFile(store.configPath, `${JSON.stringify(obsoleteConfig, null, 2)}\n`, 'utf8');
+
+    await assert.rejects(
+        initializeRun(store, options),
+        /obsolete aggressive request profile.*new run/i,
+    );
+    await assert.rejects(readFile(store.statePath), /ENOENT/);
+});
+
 test('resumed request policy uses the validated saved limits', () => {
     const config = {
         limits: {
             html_delay_ms: [21_000, 22_000],
             image_delay_ms: [11_000, 12_000],
+            challenge_delay_ms: [13_000, 14_000],
             hourly_requests: 17,
             backoff_ms: [1_000, 2_000, 3_000],
         },
@@ -270,9 +325,47 @@ test('resumed request policy uses the validated saved limits', () => {
     assert.deepEqual(savedPolicyOptions(config), {
         htmlDelayMs: [21_000, 22_000],
         imageDelayMs: [11_000, 12_000],
+        challengeDelayMs: [13_000, 14_000],
         hourlyLimit: 17,
         backoffMs: [1_000, 2_000, 3_000],
     });
+});
+
+test('challenge terminal path closes the collector browser exactly once', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-challenge-close-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const store = await RunStore.open({ rootDir, runId: 'run-001' });
+    const controlCalls = [];
+    const control = {
+        read: async () => ({ pause: false, stop: false, ownerPid: null }),
+        claim: async () => controlCalls.push('claim'),
+        release: async () => controlCalls.push('release'),
+    };
+    let closeCalls = 0;
+    const transport = { close: async () => { closeCalls += 1; } };
+    class FakeTransport {
+        static async open() { return transport; }
+    }
+    class FakePolicy {
+        constructor() {}
+    }
+    class FakeCollector {
+        async run() { return { status: 'paused', pauseReason: 'challenge' }; }
+    }
+
+    const result = await runCollector({
+        command: 'start', chrome: 'chrome.exe',
+        maxRequests: 3, maxProducts: 1,
+        maxRequestsExplicit: false, maxProductsExplicit: false,
+    }, store, control, {
+        Collector: FakeCollector,
+        PlaywrightTransport: FakeTransport,
+        RequestPolicy: FakePolicy,
+    });
+
+    assert.deepEqual(result, { status: 'paused', pauseReason: 'challenge' });
+    assert.equal(closeCalls, 1);
+    assert.deepEqual(controlCalls, ['claim', 'release']);
 });
 
 test('existing run config rejects an incomplete request-policy schema', async (t) => {
@@ -288,6 +381,37 @@ test('existing run config rejects an incomplete request-policy schema', async (t
     await assert.rejects(store.readConfig(), /config.*limits|request-policy schema/i);
 });
 
+test('legacy config stays readable offline but is rejected for network initialization', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-challenge-delay-schema-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const store = await RunStore.open({ rootDir, runId: 'run-001' });
+    const initialized = await initializeRun(store, {
+        maxRequests: 3, maxProducts: 1,
+        maxRequestsExplicit: false, maxProductsExplicit: false,
+    });
+    const missingChallengeDelay = structuredClone(initialized.config);
+    delete missingChallengeDelay.limits.challenge_delay_ms;
+    await writeFile(
+        store.configPath,
+        `${JSON.stringify(missingChallengeDelay, null, 2)}\n`,
+        'utf8',
+    );
+    const legacyState = await store.readState();
+    legacyState.configDigest = configDigest(missingChallengeDelay);
+    await store.checkpoint(legacyState);
+
+    const legacyConfig = await store.readConfig();
+    assert.equal(legacyConfig.limits.challenge_delay_ms, undefined);
+    await assert.doesNotReject(store.requireInitialized());
+    await assert.rejects(
+        initializeRun(store, {
+            maxRequests: 3, maxProducts: 1,
+            maxRequestsExplicit: false, maxProductsExplicit: false,
+        }),
+        /obsolete aggressive request profile.*new run/i,
+    );
+});
+
 test('existing run config rejects an incomplete immutable source schema', async (t) => {
     const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-source-schema-'));
     t.after(() => rm(rootDir, { recursive: true, force: true }));
@@ -297,6 +421,7 @@ test('existing run config rejects an incomplete immutable source schema', async 
         sources: [{ sourceSlug: 'white', sourceUrl: 'https://rimskie.com/catalog/rimskie-shtory/white' }],
         limits: {
             html_delay_ms: [20_000, 40_000], image_delay_ms: [10_000, 20_000],
+            challenge_delay_ms: [10_000, 20_000],
             hourly_requests: 120, backoff_ms: [120_000, 300_000, 900_000],
             concurrency: 1, max_requests: null, max_products: null,
         },

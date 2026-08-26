@@ -32,7 +32,7 @@ test('third consecutive donor failure pauses after 2m, 5m, and 15m backoff', asy
     assert.deepEqual(sleeps, [120_000, 300_000, 900_000]);
 });
 
-test('rolling hour budget rejects request 121 without transport access', async () => {
+test('default rolling hour budget rejects request 21 without transport access', async () => {
     const fakeClock = createFakeClock();
     const policy = new RequestPolicy({
         clock: fakeClock,
@@ -40,7 +40,7 @@ test('rolling hour budget rejects request 121 without transport access', async (
         sleep: async () => {},
     });
 
-    for (let count = 0; count < 120; count += 1) {
+    for (let count = 0; count < 20; count += 1) {
         await policy.beforeRequest('html');
     }
 
@@ -49,7 +49,7 @@ test('rolling hour budget rejects request 121 without transport access', async (
     await assert.doesNotReject(policy.beforeRequest('html'));
 });
 
-test('new policy process hydrates durable timestamps and rejects request 121', async () => {
+test('new policy process hydrates durable timestamps and rejects request 21', async () => {
     let durableState = null;
     const fakeClock = createFakeClock(50_000);
     const firstProcess = new RequestPolicy({
@@ -59,7 +59,7 @@ test('new policy process hydrates durable timestamps and rejects request 121', a
         htmlDelayMs: [0, 0],
         persistState: async (state) => { durableState = structuredClone(state); },
     });
-    for (let count = 0; count < 120; count += 1) {
+    for (let count = 0; count < 20; count += 1) {
         await firstProcess.beforeRequest('html');
     }
 
@@ -121,7 +121,11 @@ test('new policy process waits the unfinished durable backoff before proceeding'
     assert.equal(durableState.backoffUntil, null);
 });
 
-test('request delay uses the exact per-kind ranges before recording access', async () => {
+test('default request delay spaces pages, images, and one guarded challenge click', async () => {
+    assert.deepEqual(DEFAULT_LIMITS.htmlDelayMs, [120_000, 240_000]);
+    assert.deepEqual(DEFAULT_LIMITS.imageDelayMs, [60_000, 120_000]);
+    assert.deepEqual(DEFAULT_LIMITS.challengeDelayMs, [10_000, 20_000]);
+
     const events = [];
     const fakeClock = createFakeClock(10_000);
     const policy = new RequestPolicy({
@@ -133,20 +137,16 @@ test('request delay uses the exact per-kind ranges before recording access', asy
 
     await policy.beforeRequest('html');
     await policy.beforeRequest('image');
+    await policy.beforeRequest('challenge');
 
     assert.deepEqual(events, [
-        { type: 'delay', kind: 'html', milliseconds: 30_000, at: 10_000 },
-        { type: 'request', kind: 'html', at: 40_000 },
-        { type: 'delay', kind: 'image', milliseconds: 15_000, at: 40_000 },
-        { type: 'request', kind: 'image', at: 55_000 },
+        { type: 'delay', kind: 'html', milliseconds: 180_000, at: 10_000 },
+        { type: 'request', kind: 'html', at: 190_000 },
+        { type: 'delay', kind: 'image', milliseconds: 90_000, at: 190_000 },
+        { type: 'request', kind: 'image', at: 280_000 },
+        { type: 'delay', kind: 'challenge', milliseconds: 15_000, at: 280_000 },
+        { type: 'request', kind: 'challenge', at: 295_000 },
     ]);
-    assert.deepEqual(DEFAULT_LIMITS, {
-        htmlDelayMs: [20_000, 40_000],
-        imageDelayMs: [10_000, 20_000],
-        hourlyLimit: 120,
-        backoffMs: [120_000, 300_000, 900_000],
-        concurrency: 1,
-    });
 });
 
 test('success resets consecutive failures to the first backoff', async () => {

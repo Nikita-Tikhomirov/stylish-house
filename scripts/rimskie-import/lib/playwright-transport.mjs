@@ -21,7 +21,17 @@ const analyticsHosts = [
     'analytics.yandex.ru',
 ];
 const challengePattern = /bothunt|captcha|challenge-platform|cf-chl-|verify you are human|подтвердите[^<]{0,40}человек/i;
-const challengeAssetPathPattern = /(?:^|\/)(?:bothunt|captcha|challenge|cdn-cgi\/challenge-platform)(?:[\/._-]|$)/i;
+const simpleChallengeRetryPattern = /^(?:Попробовать снова|Повторить|Try again)$/i;
+const fullCaptchaControlSelector = [
+    'iframe[src*="captcha" i]',
+    'iframe[title*="captcha" i]',
+    'input[name*="captcha" i]',
+    'input[id*="captcha" i]',
+    '[data-sitekey]',
+    '[class*="puzzle" i]',
+    '[id*="puzzle" i]',
+    'canvas',
+].join(', ');
 const htmlDocumentPattern = /^\s*(?:<!doctype\s+html\b|<html\b|<head\b|<body\b)/i;
 export class DonorRequestError extends Error {
     constructor(kind, message, details = {}) {
@@ -119,12 +129,7 @@ export function shouldAllowBrowserRequest({
 }) {
     if (resourceType === 'websocket' || method !== 'GET') return false;
     if (!isApprovedDonorOriginUrl(url) || isAnalyticsUrl(url)) return false;
-    if (routeMode === 'challenge') {
-        if (activeOperation?.kind !== 'challenge') return false;
-        if (resourceType === 'document') return url === activeOperation.url;
-        const allowedTypes = new Set(['stylesheet', 'script', 'image', 'font', 'fetch', 'xhr']);
-        return allowedTypes.has(resourceType) && challengeAssetPathPattern.test(new URL(url).pathname);
-    }
+    if (routeMode !== 'collecting') return false;
 
     if (activeOperation?.kind === 'html' && resourceType === 'document'
         && isApprovedDonorUrl(url, { kind: activeOperation.pageKind || 'html' })) {
@@ -146,6 +151,11 @@ function statusFailure(status, url) {
     }
 
     return null;
+}
+
+async function hasFullCaptchaControls(page) {
+    const controls = page.locator?.(fullCaptchaControlSelector);
+    return !controls || await controls.count() > 0;
 }
 
 export class PlaywrightTransport {
@@ -256,6 +266,8 @@ export class PlaywrightTransport {
                     url: finalUrl,
                 });
             }
+            const failure = statusFailure(response.status(), finalUrl);
+            if (failure) throw failure;
             if (challengePattern.test(html)) {
                 throw new DonorRequestError(
                     'challenge',
@@ -263,9 +275,6 @@ export class PlaywrightTransport {
                     { url: finalUrl },
                 );
             }
-            const failure = statusFailure(response.status(), finalUrl);
-            if (failure) throw failure;
-
             return html;
         } finally {
             this.routeMode = 'idle';
@@ -274,13 +283,97 @@ export class PlaywrightTransport {
         }
     }
 
-    async enableChallengeMode(url, { kind: pageKind = 'html' } = {}) {
-        const documentUrl = approvedUrl(url, {
+    async retrySimpleChallenge(url, { kind: pageKind = 'html' } = {}) {
+        const requestedUrl = approvedUrl(url, {
             kind: pageKind,
-            label: 'persisted challenge document URL',
+            label: 'queued donor challenge URL',
         });
-        this.activeOperation = { kind: 'challenge', url: documentUrl };
-        this.routeMode = 'challenge';
+        const currentUrl = approvedUrl(this.page.url?.() || requestedUrl, {
+            kind: pageKind,
+            label: 'visible donor challenge URL',
+        });
+        if (currentUrl !== requestedUrl) {
+            throw new DonorRequestError(
+                'invalid_url',
+                'Visible challenge page differs from the exact counted request boundary',
+                { url: currentUrl, pageKind },
+            );
+        }
+
+        if (await hasFullCaptchaControls(this.page)) {
+            throw new DonorRequestError(
+                'challenge',
+                'Full CAPTCHA controls are present or challenge eligibility cannot be verified',
+                { url: requestedUrl, pageKind },
+            );
+        }
+        const retryButton = this.page.getByRole?.('button', {
+            name: simpleChallengeRetryPattern,
+            exact: true,
+        });
+        if (!retryButton || await retryButton.count() !== 1
+            || !await retryButton.isVisible() || !await retryButton.isEnabled()) {
+            throw new DonorRequestError(
+                'challenge',
+                'No single visible simple challenge retry button is available',
+                { url: requestedUrl, pageKind },
+            );
+        }
+
+        this.activeOperation = { kind: 'html', pageKind, url: requestedUrl, consumed: false };
+        this.routeMode = 'collecting';
+        try {
+            let response;
+            try {
+                [response] = await Promise.all([
+                    this.page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+                    retryButton.click(),
+                ]);
+            } catch (error) {
+                const failureKind = error?.name === 'TimeoutError' ? 'timeout' : 'network';
+                throw new DonorRequestError(
+                    failureKind,
+                    error?.message || `Simple challenge retry failed at ${requestedUrl}`,
+                    { url: requestedUrl, pageKind },
+                );
+            }
+            if (!response) {
+                throw new DonorRequestError('network', 'Challenge retry returned no response', {
+                    url: requestedUrl, pageKind,
+                });
+            }
+            const finalUrl = approvedUrl(response.url?.() || this.page.url?.() || requestedUrl, {
+                kind: pageKind,
+                label: 'final donor challenge URL',
+            });
+            if (finalUrl !== requestedUrl) {
+                throw new DonorRequestError(
+                    'invalid_url',
+                    'Challenge retry redirected outside the exact counted request boundary',
+                    { url: finalUrl, pageKind },
+                );
+            }
+            const html = await this.page.content();
+            const failure = statusFailure(response.status(), finalUrl);
+            if (failure) throw failure;
+            if (await hasFullCaptchaControls(this.page)) {
+                throw new DonorRequestError(
+                    'challenge',
+                    'Full CAPTCHA controls appeared after the simple challenge retry',
+                    { url: finalUrl, pageKind },
+                );
+            }
+            if (challengePattern.test(html)) {
+                throw new DonorRequestError('challenge', 'Challenge remained after one retry click', {
+                    url: finalUrl, pageKind,
+                });
+            }
+            return html;
+        } finally {
+            this.routeMode = 'idle';
+            this.activeOperation = null;
+            await this.page.evaluate(() => globalThis.stop?.()).catch(() => {});
+        }
     }
 
     async downloadFirstImage(url, destination) {
@@ -321,6 +414,13 @@ export class PlaywrightTransport {
                 .trim()
                 .toLowerCase();
             const bodyPrefix = bytes.subarray(0, 2_048).toString('utf8');
+            const failure = statusFailure(status, finalUrl);
+            if (failure) throw failure;
+            if (status < 200 || status >= 300) {
+                throw new DonorRequestError('http_error', `Donor returned HTTP ${status}`, {
+                    status, url: finalUrl,
+                });
+            }
             if (contentType === 'text/html' || htmlDocumentPattern.test(bodyPrefix)
                 || challengePattern.test(bodyPrefix)) {
                 throw new DonorRequestError(
@@ -333,12 +433,6 @@ export class PlaywrightTransport {
                         pageKind: 'product',
                     },
                 );
-            }
-            if (status < 200 || status >= 300) {
-                throw statusFailure(status, finalUrl)
-                    || new DonorRequestError('http_error', `Donor returned HTTP ${status}`, {
-                        status, url: finalUrl,
-                    });
             }
             const declaredFormat = contentType === 'image/webp' ? 'webp' : null;
             const detectedFormat = detectImageFormat(bytes);

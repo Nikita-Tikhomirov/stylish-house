@@ -77,7 +77,10 @@ function validateConfig(config) {
     const validBackoff = Array.isArray(limits.backoff_ms) && limits.backoff_ms.length === 3
         && limits.backoff_ms.every((entry) => Number.isInteger(entry) && entry >= 0);
     const validCap = (value) => value === null || (Number.isInteger(value) && value > 0);
+    const validChallengeDelay = limits.challenge_delay_ms === undefined
+        || validRange(limits.challenge_delay_ms);
     if (!validRange(limits.html_delay_ms) || !validRange(limits.image_delay_ms)
+        || !validChallengeDelay
         || !Number.isInteger(limits.hourly_requests) || limits.hourly_requests <= 0
         || !validBackoff || limits.concurrency !== 1
         || !validCap(limits.max_requests) || !validCap(limits.max_products)) {
