@@ -1,0 +1,11 @@
+@echo off
+setlocal
+cd /d "%~dp0"
+where node >nul 2>nul
+if errorlevel 1 (
+    echo Node.js not found. Install Node.js 20 or newer.
+    pause
+    exit /b 1
+)
+node scripts\rimskie-import\gui.mjs
+if errorlevel 1 pause

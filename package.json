@@ -4,6 +4,7 @@
     "scripts": {
         "dev": "vite",
         "build": "vite build",
+        "rimskie:gui": "node scripts/rimskie-import/gui.mjs",
         "test:shop": "node --test tests/js/*.test.mjs"
     },
     "devDependencies": {

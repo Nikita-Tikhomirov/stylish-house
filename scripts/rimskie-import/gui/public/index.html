@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>Сборщик римских штор</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="run-sidebar">
+            <div class="brand"><span class="brand-mark" aria-hidden="true">СД</span><div><strong>Стильный дом</strong><small>Локальный сборщик</small></div></div>
+            <div class="sidebar-heading"><div><span class="eyebrow">История</span><h2>Запуски</h2></div><button class="icon-button" data-action="refresh" aria-label="Обновить список">↻</button></div>
+            <div class="run-list" data-role="runs" aria-live="polite"></div>
+            <div class="local-note"><span class="local-dot"></span><div><strong>Только этот компьютер</strong><span>Панель недоступна из сети</span></div></div>
+        </aside>
+
+        <main class="workspace">
+            <header class="topbar">
+                <div><span class="eyebrow">Управление выгрузкой</span><h1>Сборщик римских штор</h1></div>
+                <button class="button button-primary" data-action="start">Начать новый сбор</button>
+            </header>
+
+            <div class="storage-line">
+                <span class="storage-icon" aria-hidden="true">G:</span>
+                <div><span>Папка хранения</span><strong data-role="data-root">Подключение…</strong></div>
+                <button class="button button-quiet" data-action="open-folder" disabled>Открыть папку</button>
+            </div>
+            <div class="notice notice-hidden" data-role="notice" role="alert"></div>
+
+            <section class="status-card">
+                <div class="status-main">
+                    <div class="status-line"><span class="status-badge status-idle" data-role="status-badge">Ожидание</span><span class="run-id" data-role="run-id">Запуск не выбран</span></div>
+                    <h2 data-role="status-title">Можно начинать полный сбор</h2>
+                    <p data-role="status-detail">Будут последовательно обработаны все страницы 46 категорий. Уже сохранённые товары не скачиваются повторно.</p>
+                    <div class="progress-track" aria-label="Прогресс по категориям"><span data-role="progress-bar" style="width: 0%"></span></div>
+                    <div class="progress-copy"><span data-role="current-source">Нет активной категории</span><strong data-role="progress-copy">0 из 46</strong></div>
+                    <div class="runtime-copy"><span data-role="next-request">Следующий запрос: после запуска</span><span data-role="last-url">Последний URL: —</span></div>
+                </div>
+                <div class="status-actions">
+                    <button class="button button-secondary" data-action="pause" disabled>Пауза</button>
+                    <button class="button button-primary" data-action="resume" disabled>Продолжить</button>
+                    <button class="button button-danger" data-action="stop" disabled>Остановить</button>
+                    <button class="button button-secondary" data-action="export" disabled>Сформировать пакет</button>
+                </div>
+            </section>
+
+            <section class="metrics" aria-label="Показатели запуска">
+                <article><span>Категории</span><strong data-metric="categories">0 / 46</strong><small>завершено</small></article>
+                <article><span>Страницы</span><strong data-metric="pages">0</strong><small>обработано</small></article>
+                <article><span>Товары</span><strong data-metric="products">0</strong><small>уникальных</small></article>
+                <article><span>Фотографии</span><strong data-metric="images">0</strong><small>сохранено на G:</small></article>
+                <article><span>Связи</span><strong data-metric="memberships">0</strong><small>товар–категория</small></article>
+                <article><span>Запросы</span><strong data-metric="requests">0</strong><small data-role="request-budget">0 из 20 за последний час</small></article>
+            </section>
+
+            <section class="panel category-panel">
+                <div class="panel-heading"><div><span class="eyebrow">Очередь</span><h2>Прогресс по категориям</h2></div><span class="panel-count" data-role="category-count">46 категорий</span></div>
+                <div class="table-scroll"><table><thead><tr><th>Категория</th><th>Страниц</th><th>В очереди</th><th>Состояние</th></tr></thead><tbody data-role="categories"><tr><td colspan="4" class="empty-cell">Выберите запуск</td></tr></tbody></table></div>
+            </section>
+
+            <section class="panel details-panel">
+                <div class="tabs" role="tablist">
+                    <button class="tab is-active" data-tab="products" role="tab">Товары <span data-role="product-count">0</span></button>
+                    <button class="tab" data-tab="events" role="tab">Журнал <span data-role="event-count">0</span></button>
+                </div>
+                <div class="tab-content" data-panel="products">
+                    <div class="product-grid" data-role="products"><div class="empty-state">Товары появятся здесь после сохранения</div></div>
+                    <div class="product-pagination"><button class="button button-quiet" data-page-action="previous" disabled>Назад</button><span data-role="product-page">Страница 1 из 1</span><button class="button button-quiet" data-page-action="next" disabled>Дальше</button></div>
+                </div>
+                <div class="tab-content is-hidden" data-panel="events"><div class="event-list" data-role="events"><div class="empty-state">Событий пока нет</div></div></div>
+            </section>
+        </main>
+    </div>
+    <script src="/app.js"></script>
+</body>
+</html>

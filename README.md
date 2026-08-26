@@ -21,6 +21,16 @@ Laravel is a web application framework with expressive, elegant syntax. We belie
 
 Laravel is accessible, powerful, and provides tools required for large, robust applications.
 
+## Локальная панель сборщика римских штор
+
+Запуск на Windows: дважды нажмите `start-rimskie-gui.cmd`. Откроется локальная панель `http://127.0.0.1:43127`; она недоступна с других компьютеров и не размещается на VPS.
+
+Кнопка `Начать новый сбор` запускает полный режим без тестовых ограничений: сборщик последовательно проходит все страницы всех 46 категорий, сохраняет уникальные товары, их принадлежность к категориям, цену донора и первую фотографию. Все данные находятся только в `G:\stylish-house-data\rimskie-imports`.
+
+Если сбор остановился или компьютер был перезагружен, снова откройте панель, выберите запуск слева и нажмите `Продолжить`. Сбор начнётся с durable checkpoint; уже сохранённые товары и проверенные фотографии повторно не скачиваются. `Пауза` безопасно завершает текущую операцию, а `Остановить` терминально закрывает запуск и требует отдельного подтверждения.
+
+После полного завершения нажмите `Сформировать пакет`. В каталоге запуска появится проверенный `export.json`, а фотографии останутся рядом в `images`. Это пакет для отдельного будущего импорта в staging сайта. Панель не подключается к production-БД; перед любой будущей production-мутацией обязателен свежий проверенный бэкап базы.
+
 ## Private Rimskie catalog collection
 
 The collector creates a private, non-publishing import bundle. It does not modify the public catalog or publish donor content. Node.js 22+ and an installed Chrome, Edge, or Chromium browser are required; `playwright-core` does not download a browser.
