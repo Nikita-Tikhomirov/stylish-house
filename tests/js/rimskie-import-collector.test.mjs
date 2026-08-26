@@ -1306,8 +1306,15 @@ test('concurrent stale-lock reclaimers cannot remove a newly acquired control lo
     const controlPath = join(rootDir, 'control.json');
     const lockPath = `${controlPath}.lock`;
     const processCheck = (processId) => processId === process.pid;
-    const first = new ControlFile(controlPath, { isLiveProcess: processCheck });
-    const second = new ControlFile(controlPath, { isLiveProcess: processCheck });
+    const processFingerprintLookup = async (processId) => `process-start-${processId}`;
+    const first = new ControlFile(controlPath, {
+        isLiveProcess: processCheck,
+        processFingerprintLookup,
+    });
+    const second = new ControlFile(controlPath, {
+        isLiveProcess: processCheck,
+        processFingerprintLookup,
+    });
     await writeFile(lockPath, JSON.stringify({
         pid: 999999, token: 'dead-token', processFingerprint: 'dead-process-start',
     }), 'utf8');
