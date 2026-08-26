@@ -59,6 +59,31 @@ php artisan catalog-import:ingest 'G:\stylish-house-data\rimskie-imports\<run-id
 
 After a successful dry run, omit `--dry-run` to create a private staging run. The command validates the complete manifest and every local WebP before database or storage writes, copies verified images to the private Laravel `local` disk, and leaves all product and landing drafts in `needs_review`. It does not publish products, enable calculator pricing, or expose the donor price. Repeating the identical package is a verified no-op that preserves manual rewrite and review fields; a changed digest or damaged staging facts/image is rejected for operator review.
 
+## Controlled catalog publication and rollback
+
+Publication is disabled by default. Configure the private backup destination and enable the gate only for the controlled release window:
+
+The built-in verified database backup uses POSIX ownership and mode checks and therefore runs only on Linux/macOS. On Windows it fails closed before creating a lock, dump, or archive because PHP mode bits do not prove that `Users` or `Everyone` lack ACL access. The backup, publication, and rollback commands remain unavailable on Windows until an ACL-aware hardener is implemented; creating an external backup does not bypass that guard. Run this release workflow on the Linux VPS.
+
+```bash
+export CATALOG_IMPORT_BACKUP_PATH=/var/backups/stylish-house/catalog-import
+export RIMSKIE_IMPORT_PUBLICATION_ENABLED=true
+php artisan catalog:backup --run=<run-id>
+php artisan catalog-import:preflight <run-id>
+php artisan catalog-import:publish <run-id>
+```
+
+`catalog:backup` creates a fresh private dump, independently verifies its compressed and raw hashes, and only then records the artifact metadata on the unpublished run. It does not acknowledge warnings or publish catalog rows.
+
+If the exact reviewed warning set needs approval, publish with both `--acknowledge-warnings` and `--acknowledged-by=<operator>`. The acknowledgement is not written until after a fresh database backup has been created and independently verified. Publication accepts only the complete unbounded 46-source package, approved rewrites and memberships, exact local WebP hashes, and the existing visible `story/rimskieshtory` catalog roots. It keeps donor identity and price fields private, disables calculator pricing for imported products, and generates the sitemap only after the catalog transaction commits.
+
+```bash
+php artisan catalog-import:publish <run-id> --acknowledge-warnings --acknowledged-by=operator
+php artisan catalog-import:rollback <run-id>
+```
+
+Rollback creates and verifies a separate fresh database backup before recording its durable media journal or changing catalog data. Repeated publication and rollback commands verify recorded backup artifacts, immutable row/pivot/media snapshots, and ownership before doing anything. Conflicts, changed files, junctions, or uncertain commit state fail closed and preserve recovery evidence in private storage; retry the same rollback command after resolving the reported diagnostic.
+
 ## Learning Laravel
 
 Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
