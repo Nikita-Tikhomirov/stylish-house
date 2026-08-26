@@ -77,6 +77,13 @@ class GenerateSitemapTest extends TestCase
         ], $locations);
     }
 
+    public function test_sitemap_generation_is_registered_in_the_daily_scheduler(): void
+    {
+        $this->artisan('schedule:list')
+            ->expectsOutputToContain('sitemap:generate')
+            ->assertSuccessful();
+    }
+
     private function createSitemapTables(): void
     {
         Schema::create('categories', function (Blueprint $table): void {
