@@ -82,6 +82,31 @@ test('rimskie import parser supports the current product description and image m
     assert.equal(result.sourcePrice, '4799.00');
 });
 
+test('rimskie import parser reads current reversed characteristic cells and list values', () => {
+    const currentProductHtml = `<!doctype html><html><body>
+        <div class="product-code">Код товара: 463</div>
+        <h1>Римская штора день-ночь, лён синий</h1>
+        <table class="characteristics">
+            <tr><td>Уровень затемнения:</td><th>Лёгкое затемнение</th></tr>
+            <tr><td>Установка:</td><th>На всё окно</th></tr>
+            <tr><td>Тип римской шторы:</td><th>День-ночь, С электроприводом</th></tr>
+            <tr><td>Помещение:</td><th>В гостиную, В кухню, В офис</th></tr>
+        </table>
+    </body></html>`;
+
+    const result = parseProductPage(
+        currentProductHtml,
+        'https://rimskie.com/products/463-current',
+    );
+
+    assert.deepEqual(result.attributes, {
+        uroven_zatemneniya: ['Лёгкое затемнение'],
+        ustanovka: ['На всё окно'],
+        tip_rimskoi_shtory: ['День-ночь', 'С электроприводом'],
+        pomeshchenie: ['В гостиную', 'В кухню', 'В офис'],
+    });
+});
+
 test('rimskie import parser source contract has 46 unique rimskie.com collection definitions', async () => {
     const sources = JSON.parse(await readFile(
         new URL('../../config/rimskie-import-sources.json', import.meta.url),

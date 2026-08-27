@@ -1000,6 +1000,20 @@ export async function runCollector(options, store, control, dependencies = {}) {
         if (state.status === 'completed') {
             return printableSnapshot(state, await control.read());
         }
+        if (options.command === 'resume') {
+            let browserSeedExists = true;
+            try {
+                await fsLstat(join(store.runDir, 'browser-seed'));
+            } catch (error) {
+                if (error?.code !== 'ENOENT') throw error;
+                browserSeedExists = false;
+            }
+            if (browserSeedExists) {
+                const importBrowserSeed = dependencies.importBrowserSeed
+                    || (await import('./lib/browser-seed-import.mjs')).importBrowserSeed;
+                await importBrowserSeed({ store });
+            }
+        }
         transport = await PlaywrightTransport.open({
             profileDir: join(store.runDir, 'profile'),
             headed: true,

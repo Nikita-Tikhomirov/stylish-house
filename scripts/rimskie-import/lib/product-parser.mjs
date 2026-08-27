@@ -62,12 +62,22 @@ function readAttributes(document) {
     const attributes = {};
 
     for (const row of document.querySelectorAll('.characteristics tr')) {
-        const key = attributeKey(normalizedText(row.querySelector('th, dt, .name')));
-        const value = normalizedText(row.querySelector('td, dd, .value'));
-        if (!key || !value) continue;
+        const heading = normalizedText(row.querySelector('th'));
+        const cell = normalizedText(row.querySelector('td'));
+        const reversedCells = Boolean(heading && cell.endsWith(':'));
+        const label = reversedCells
+            ? cell
+            : normalizedText(row.querySelector('th, dt, .name'));
+        const rawValue = reversedCells
+            ? heading
+            : normalizedText(row.querySelector('td, dd, .value'));
+        const key = attributeKey(label.replace(/:\s*$/, ''));
+        if (!key || !rawValue) continue;
 
         const values = attributes[key] || [];
-        if (!values.includes(value)) values.push(value);
+        for (const value of rawValue.split(',').map(normalizedValue).filter(Boolean)) {
+            if (!values.includes(value)) values.push(value);
+        }
         attributes[key] = values;
     }
 

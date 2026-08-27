@@ -368,6 +368,58 @@ test('challenge terminal path closes the collector browser exactly once', async 
     assert.deepEqual(controlCalls, ['claim', 'release']);
 });
 
+test('resume imports a persisted browser seed before opening Playwright', async (t) => {
+    const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-browser-seed-resume-'));
+    t.after(() => rm(rootDir, { recursive: true, force: true }));
+    const store = await RunStore.open({ rootDir, runId: 'run-001' });
+    const options = {
+        command: 'resume', chrome: 'chrome.exe',
+        maxRequests: Number.POSITIVE_INFINITY, maxProducts: Number.POSITIVE_INFINITY,
+        maxRequestsExplicit: false, maxProductsExplicit: false,
+    };
+    await initializeRun(store, { ...options, command: 'start' });
+    const paused = await store.readState();
+    paused.status = 'paused';
+    paused.pauseReason = 'operator';
+    await store.checkpoint(paused);
+    await mkdir(join(store.runDir, 'browser-seed'));
+
+    const calls = [];
+    const control = {
+        read: async () => ({ pause: true, stop: false, ownerPid: null }),
+        ownerStatus: async () => 'dead',
+        claim: async () => calls.push('claim'),
+        release: async () => calls.push('release'),
+    };
+    class FakeTransport {
+        static async open() {
+            calls.push('transport');
+            return { close: async () => calls.push('close') };
+        }
+    }
+    class FakePolicy {
+        constructor() {}
+    }
+    class FakeCollector {
+        async run() {
+            calls.push('collector');
+            return { status: 'paused', pauseReason: 'operator' };
+        }
+    }
+
+    await runCollector(options, store, control, {
+        Collector: FakeCollector,
+        PlaywrightTransport: FakeTransport,
+        RequestPolicy: FakePolicy,
+        importBrowserSeed: async () => {
+            calls.push('import');
+            return { imported: 1, skipped: 0, completedProducts: 1 };
+        },
+    });
+
+    assert.deepEqual(calls, ['claim', 'import', 'transport', 'collector', 'close', 'release']);
+});
+
 test('existing run config rejects an incomplete request-policy schema', async (t) => {
     const rootDir = await mkdtemp(join(tmpdir(), 'rimskie-config-schema-'));
     t.after(() => rm(rootDir, { recursive: true, force: true }));
