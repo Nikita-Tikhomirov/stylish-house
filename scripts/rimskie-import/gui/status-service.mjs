@@ -191,6 +191,8 @@ export async function createStatusService({ dataRoot, now = Date.now }) {
         const nextRequestAt = candidates.filter((value) => Number.isFinite(value) && value > nowMs)
             .reduce((latest, value) => Math.max(latest, value), 0) || null;
         const browserActive = browserSeed.progress?.active === true;
+        const browserNeedsConfirmation = browserSeed.progress?.status === 'needs_confirmation'
+            && browserSeed.progress.stage === 'verification_required';
         const uniqueProductIds = new Set([
             ...(state.completedProductIds || []),
             ...browserSeed.completeIds,
@@ -198,8 +200,10 @@ export async function createStatusService({ dataRoot, now = Date.now }) {
         const imageIds = new Set([...mainImageIds, ...browserSeed.imageIds]);
         return {
             id: runId,
-            status: browserActive ? 'running' : state.status,
-            pauseReason: browserActive ? null : state.pauseReason || null,
+            status: browserActive ? 'running' : browserNeedsConfirmation ? 'paused' : state.status,
+            pauseReason: browserActive
+                ? null
+                : browserNeedsConfirmation ? 'challenge' : state.pauseReason || null,
             exportReady: Boolean(exportStats?.isFile()),
             limits: config.limits,
             currentSource: currentSource ? sourceSnapshot(currentSource) : null,
@@ -220,7 +224,7 @@ export async function createStatusService({ dataRoot, now = Date.now }) {
             nextRequestAt: browserActive
                 ? browserSeed.progress.nextActionAt || nextRequestAt
                 : nextRequestAt,
-            lastUrl: browserActive
+            lastUrl: browserActive || browserNeedsConfirmation
                 ? browserSeed.progress.currentProduct?.url || null
                 : [...events].reverse().find((event) => typeof event.url === 'string')?.url || null,
             browserSeed: browserSeed.progress,

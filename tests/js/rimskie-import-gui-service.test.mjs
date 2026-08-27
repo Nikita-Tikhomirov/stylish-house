@@ -159,6 +159,26 @@ test('status service exposes active browser-seed collection and its saved produc
         'Римская штора из исходной карточки');
     assert.equal(products.items.find((item) => item.externalId === '5741').sourcePrice, '7835.00');
     assert.equal(imagePath, join(seedImages, '5741.webp'));
+
+    await writeFile(join(seedRoot, 'progress.json'), `${JSON.stringify({
+        schemaVersion: 1,
+        status: 'needs_confirmation',
+        stage: 'verification_required',
+        targetProducts: 50,
+        completedProducts: 2,
+        requestsLastHour: 7,
+        updatedAt: '2026-08-26T09:00:45.000Z',
+        currentProduct: {
+            externalId: '129',
+            url: 'https://rimskie.com/products/129-test',
+        },
+    }, null, 2)}\n`, 'utf8');
+    const verificationSnapshot = await service.getRunSnapshot(runId);
+
+    assert.equal(verificationSnapshot.status, 'paused');
+    assert.equal(verificationSnapshot.pauseReason, 'challenge');
+    assert.equal(verificationSnapshot.lastUrl, 'https://rimskie.com/products/129-test');
+    assert.equal(verificationSnapshot.browserSeed.stage, 'verification_required');
 });
 
 test('status service rejects traversal identifiers before reading a run', async (t) => {
