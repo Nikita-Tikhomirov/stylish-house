@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,8 +16,10 @@ import {
 } from '../../scripts/rimskie-import/cli.mjs';
 import { Collector } from '../../scripts/rimskie-import/lib/collector.mjs';
 import {
+    chromeCdpArguments,
     DonorRequestError,
     findBrowserExecutable,
+    launchChromeCdp,
     PlaywrightTransport,
     shouldAllowBrowserRequest,
 } from '../../scripts/rimskie-import/lib/playwright-transport.mjs';
@@ -495,30 +498,43 @@ test('stop requested during delay prevents request reservation and transport acc
     assert.deepEqual(snapshot.requestPolicy.requestTimes, []);
 });
 
-test('exhausted rolling budget pauses cleanly without transport access', async (t) => {
-    const store = await createStore(t, initialState([source('white', whiteUrl)]));
-    const fakeTransport = new FakeTransport(new Map());
+test('exhausted rolling budget waits and continues without operator intervention', async (t) => {
+    const state = initialState([source('white', whiteUrl)]);
+    state.requestPolicy = {
+        requestTimes: [1_000],
+        consecutiveFailures: 0,
+        pauseRequired: false,
+        lastFailureKind: null,
+        backoffUntil: null,
+    };
+    const store = await createStore(t, state);
+    const fakeTransport = new FakeTransport(new Map([[whiteUrl, categoryHtml([])]]));
+    const clock = {
+        value: 1_000,
+        now() { return this.value; },
+    };
     const policy = new RequestPolicy({
+        clock,
         htmlDelayMs: [0, 0],
         imageDelayMs: [0, 0],
-        hourlyLimit: 0,
-        sleep: async () => {},
+        hourlyLimit: 1,
+        budgetCheckIntervalMs: 3_600_001,
+        sleep: async (milliseconds) => { clock.value += milliseconds; },
         onEvent: (event) => store.appendEvent(event),
     });
 
     const snapshot = await new Collector().run({ store, transport: fakeTransport, policy });
 
-    assert.equal(snapshot.status, 'paused');
-    assert.equal(snapshot.pauseReason, 'hourly-budget');
-    assert.deepEqual(fakeTransport.calls, []);
-    assert.equal((await readEvents(store)).some((event) => event.type === 'pause'
-        && event.reason === 'hourly-budget'), true);
+    assert.equal(snapshot.status, 'completed');
+    assert.deepEqual(fakeTransport.calls, [['html', whiteUrl]]);
+    assert.equal((await readEvents(store)).some((event) => event.type === 'hourly_wait'), true);
 });
 
-test('challenge writes an event and checkpoints the run as paused', async (t) => {
+test('full CAPTCHA writes an event and checkpoints the run as paused', async (t) => {
     const store = await createStore(t, initialState([source('white', whiteUrl)]));
     const challenge = Object.assign(new Error('BotHunt challenge requires a visible authorized click'), {
         kind: 'challenge',
+        manual: true,
     });
     const fakeTransport = new FakeTransport(new Map([[whiteUrl, challenge]]));
 
@@ -561,80 +577,177 @@ test('simple challenge button is clicked once and its request is durably counted
 
     assert.equal(snapshot.status, 'completed');
     assert.equal(snapshot.requestCount, 2);
-    assert.deepEqual(snapshot.challengeRetryUrls, [whiteUrl]);
+    assert.deepEqual(snapshot.challengeRetryUrls, []);
     assert.deepEqual(calls, [
         ['html', whiteUrl],
         ['challenge', whiteUrl, 'category'],
     ]);
 });
 
-test('a failed challenge click is never repeated for the same URL', async (t) => {
+test('an uncertain challenge click is recovered by retrying the original page after backoff', async (t) => {
     const state = initialState([source('white', whiteUrl)]);
     state.challengeRetryUrls = [whiteUrl];
     const store = await createStore(t, state);
     const calls = [];
+    const sleeps = [];
+    let htmlAttempts = 0;
     const transport = {
         async getHtml(url) {
             calls.push(['html', url]);
-            throw Object.assign(new Error('challenge returned again'), {
-                kind: 'challenge', url, pageKind: 'category',
-            });
+            htmlAttempts += 1;
+            if (htmlAttempts === 1) {
+                throw Object.assign(new Error('challenge returned again'), {
+                    kind: 'challenge', url, pageKind: 'category',
+                });
+            }
+            return categoryHtml([]);
         },
         async retrySimpleChallenge() {
             calls.push(['unexpected-challenge-click']);
             return categoryHtml([]);
         },
     };
+    const policy = new RequestPolicy({
+        htmlDelayMs: [0, 0],
+        imageDelayMs: [0, 0],
+        challengeDelayMs: [0, 0],
+        backoffMs: [120_000, 300_000, 900_000],
+        sleep: async (milliseconds) => sleeps.push(milliseconds),
+        random: () => 0,
+        onEvent: (event) => store.appendEvent(event),
+    });
+
+    const snapshot = await new Collector().run({
+        store, transport, policy, acknowledgeChallenge: true,
+    });
+
+    assert.equal(snapshot.status, 'completed');
+    assert.equal(snapshot.pauseReason, undefined);
+    assert.deepEqual(snapshot.challengeRetryUrls, []);
+    assert.deepEqual(calls, [['html', whiteUrl], ['html', whiteUrl]]);
+    assert.deepEqual(sleeps, [0, 30_000, 30_000, 30_000, 30_000, 0]);
+});
+
+test('a successful page load clears a stale challenge crash marker', async (t) => {
+    const state = initialState([source('white', whiteUrl)]);
+    state.challengeRetryUrls = [whiteUrl];
+    const store = await createStore(t, state);
+    const transport = new FakeTransport(new Map([[whiteUrl, categoryHtml([])]]));
 
     const snapshot = await new Collector().run({
         store, transport, policy: createPolicy(store), acknowledgeChallenge: true,
     });
 
-    assert.equal(snapshot.status, 'paused');
-    assert.equal(snapshot.pauseReason, 'challenge');
-    assert.deepEqual(calls, [['html', whiteUrl]]);
+    assert.equal(snapshot.status, 'completed');
+    assert.deepEqual(snapshot.challengeRetryUrls, []);
+    assert.deepEqual(transport.calls, [['html', whiteUrl]]);
 });
 
-test('an image challenge pauses without clicking or marking the image complete', async (t) => {
+test('an image challenge backs off and retries without clicking a page control', async (t) => {
     const store = await createStore(t, initialState([source('white', whiteUrl)]));
     const transport = new FakeTransport(new Map([
         [whiteUrl, categoryHtml([{ externalId: '11889', url: productUrl }])],
         [productUrl, productHtml('11889')],
     ]));
     let retryClicks = 0;
-    transport.downloadFirstImage = async (url) => {
+    let imageAttempts = 0;
+    transport.downloadFirstImage = async (url, destination) => {
         transport.calls.push(['image', url]);
-        throw Object.assign(new Error('image fetch returned challenge HTML'), {
-            kind: 'challenge',
-            challengeDocumentUrl: productUrl,
-            pageKind: 'product',
-        });
+        imageAttempts += 1;
+        if (imageAttempts === 1) {
+            throw Object.assign(new Error('image fetch returned challenge HTML'), {
+                kind: 'challenge',
+                challengeDocumentUrl: productUrl,
+                pageKind: 'product',
+            });
+        }
+        await writeFile(destination, firstImageBytes);
+        return firstImageBytes;
     };
     transport.retrySimpleChallenge = async () => {
         retryClicks += 1;
         return productHtml('11889');
     };
 
-    const snapshot = await new Collector().run({
-        store, transport, policy: createPolicy(store),
+    const sleeps = [];
+    const policy = new RequestPolicy({
+        htmlDelayMs: [0, 0],
+        imageDelayMs: [0, 0],
+        challengeDelayMs: [0, 0],
+        backoffMs: [120_000, 300_000, 900_000],
+        sleep: async (milliseconds) => sleeps.push(milliseconds),
+        random: () => 0,
+        onEvent: (event) => store.appendEvent(event),
     });
+    const snapshot = await new Collector().run({ store, transport, policy });
 
-    assert.equal(snapshot.status, 'paused');
-    assert.equal(snapshot.pauseReason, 'challenge');
+    assert.equal(snapshot.status, 'completed');
+    assert.equal(snapshot.pauseReason, undefined);
     assert.equal(retryClicks, 0);
-    assert.deepEqual(snapshot.completedProductIds, []);
-    assert.equal(snapshot.sources[0].pendingProducts[0].stage, 'html-complete');
-    await assert.rejects(readFile(join(store.imagesDir, '11889.webp')), /ENOENT/);
+    assert.deepEqual(snapshot.completedProductIds, ['11889']);
+    assert.equal(transport.calls.filter(([kind]) => kind === 'image').length, 2);
+    assert.deepEqual(sleeps, [0, 0, 0, 30_000, 30_000, 30_000, 30_000, 0]);
+    assert.deepEqual(await readFile(join(store.imagesDir, '11889.webp')), firstImageBytes);
 });
 
-test('first transient or protection failure pauses without an automatic retry', async (t) => {
+test('a failed simple challenge retry backs off and retries the original HTML', async (t) => {
+    const store = await createStore(t, initialState([source('white', whiteUrl)]));
+    const calls = [];
+    let htmlAttempts = 0;
+    const transport = {
+        async getHtml(url) {
+            calls.push(['html', url]);
+            htmlAttempts += 1;
+            if (htmlAttempts === 1) {
+                throw Object.assign(new Error('simple challenge'), {
+                    kind: 'challenge', url, pageKind: 'category',
+                });
+            }
+            return categoryHtml([]);
+        },
+        async retrySimpleChallenge(url) {
+            calls.push(['challenge', url]);
+            throw Object.assign(new Error('temporary 403 after retry'), { kind: 'http_403' });
+        },
+    };
+    const sleeps = [];
+    const policy = new RequestPolicy({
+        htmlDelayMs: [0, 0],
+        imageDelayMs: [0, 0],
+        challengeDelayMs: [0, 0],
+        backoffMs: [120_000, 300_000, 900_000],
+        sleep: async (milliseconds) => sleeps.push(milliseconds),
+        random: () => 0,
+        onEvent: (event) => store.appendEvent(event),
+    });
+
+    const snapshot = await new Collector().run({ store, transport, policy });
+
+    assert.equal(snapshot.status, 'completed');
+    assert.deepEqual(snapshot.challengeRetryUrls, []);
+    assert.deepEqual(calls, [
+        ['html', whiteUrl],
+        ['challenge', whiteUrl],
+        ['html', whiteUrl],
+    ]);
+    assert.deepEqual(sleeps, [0, 0, 30_000, 30_000, 30_000, 30_000, 0]);
+});
+
+test('transient and protection failures back off and retry without an operator', async (t) => {
     for (const failureKind of ['network', 'timeout', 'http_403', 'http_429']) {
         await t.test(failureKind, async (subtest) => {
             const store = await createStore(subtest, initialState([source('white', whiteUrl)]));
             const fakeTransport = new FakeTransport(new Map());
+            let attempts = 0;
             fakeTransport.getHtml = async (url) => {
                 fakeTransport.calls.push(['html', url]);
-                throw Object.assign(new Error(`typed ${failureKind} failure`), { kind: failureKind });
+                attempts += 1;
+                if (attempts === 1) {
+                    throw Object.assign(new Error(`typed ${failureKind} failure`), {
+                        kind: failureKind,
+                    });
+                }
+                return categoryHtml([]);
             };
             const sleeps = [];
             const policy = new RequestPolicy({
@@ -647,10 +760,12 @@ test('first transient or protection failure pauses without an automatic retry', 
 
             const snapshot = await new Collector().run({ store, transport: fakeTransport, policy });
 
-            assert.equal(snapshot.status, 'paused');
-            assert.equal(snapshot.pauseReason, failureKind);
-            assert.equal(fakeTransport.calls.length, 1);
-            assert.deepEqual(sleeps, [0]);
+            assert.equal(snapshot.status, 'completed');
+            assert.equal(snapshot.pauseReason, undefined);
+            assert.equal(fakeTransport.calls.length, 2);
+            assert.deepEqual(sleeps, [0, 30_000, 30_000, 30_000, 30_000, 0]);
+            assert.equal((await readEvents(store)).some((event) => event.type === 'retry'
+                && event.kind === failureKind), true);
         });
     }
 });
@@ -687,7 +802,7 @@ test('restart during the third failure backoff cannot make a fourth automatic re
     assert.deepEqual(fakeTransport.calls, [['html', whiteUrl]]);
 });
 
-test('protective pause is durable before its error event and blocks an implicit restart', async (t) => {
+test('event-log failure is durable and blocks an implicit retry', async (t) => {
     const state = initialState([source('white', whiteUrl)]);
     const store = await createStore(t, state);
     const firstTransport = new FakeTransport(new Map());
@@ -710,8 +825,9 @@ test('protective pause is durable before its error event and blocks an implicit 
         transport: firstTransport,
         policy: createPolicy(store),
     });
-    assert.equal(crashed.status, 'paused');
-    assert.equal((await store.readState()).pauseReason, 'network');
+    assert.equal(crashed.status, 'error');
+    assert.equal((await store.readState()).status, 'error');
+    assert.equal((await store.readState()).pauseReason, undefined);
     assert.equal(firstTransport.calls.length, 1);
 
     const resumedTransport = new FakeTransport(new Map([[whiteUrl, categoryHtml([])]]));
@@ -720,7 +836,7 @@ test('protective pause is durable before its error event and blocks an implicit 
         transport: resumedTransport,
         policy: createPolicy(store),
     });
-    assert.equal(recovered.status, 'paused');
+    assert.equal(recovered.status, 'error');
     assert.deepEqual(resumedTransport.calls, []);
 });
 
@@ -813,69 +929,169 @@ function fakePlaywright({
             return context;
         },
     };
+    const browser = {
+        contexts: () => [context],
+        close: async () => {},
+    };
+    const cdpLauncher = async () => ({
+        browser,
+        browserProcess: { exitCode: 0, kill: () => {} },
+    });
 
-    return { chromium, context, page, launchCalls, routes };
+    return { chromium, context, page, launchCalls, routes, cdpLauncher };
 }
 
-test('playwright transport opens the supplied persistent profile in headed sandboxed Chrome', async () => {
+test('Chrome CDP arguments use a nonzero local port without automation flags', () => {
+    const args = chromeCdpArguments('G:\\rimskie-imports\\run-001\\profile', 43_123);
+
+    assert.equal(args.includes('--user-data-dir=G:\\rimskie-imports\\run-001\\profile'), true);
+    assert.equal(args.includes('--remote-debugging-port=43123'), true);
+    assert.equal(args.includes('--remote-debugging-port=0'), false);
+    assert.equal(args.includes('--new-window'), true);
+    assert.equal(args.at(-1), 'about:blank');
+    assert.equal(args.some((arg) => /enable-automation|no-sandbox|headless/i.test(arg)), false);
+});
+
+test('Chrome CDP launcher spawns native Chrome and attaches Playwright over localhost', async () => {
+    const spawnCalls = [];
+    const connectCalls = [];
+    const endpointCalls = [];
+    const browser = { contexts: () => [] };
+    const child = { exitCode: null, kill: () => {} };
+    const result = await launchChromeCdp({
+        executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        profileDir: 'G:\\rimskie-imports\\run-001\\profile',
+        chromium: {
+            connectOverCDP: async (endpoint) => {
+                connectCalls.push(endpoint);
+                return browser;
+            },
+        },
+        reservePort: async () => 43_123,
+        spawnProcess: (...args) => {
+            spawnCalls.push(args);
+            return child;
+        },
+        prepareProfile: async () => {},
+        waitForEndpoint: async (options) => {
+            endpointCalls.push(options.endpoint);
+            return options.endpoint;
+        },
+    });
+
+    assert.equal(spawnCalls.length, 1);
+    assert.equal(spawnCalls[0][0], 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe');
+    assert.equal(spawnCalls[0][1].includes('--remote-debugging-port=43123'), true);
+    assert.deepEqual(spawnCalls[0][2], {
+        detached: false,
+        stdio: 'ignore',
+        windowsHide: false,
+    });
+    assert.deepEqual(connectCalls, ['http://127.0.0.1:43123']);
+    assert.deepEqual(endpointCalls, ['http://127.0.0.1:43123']);
+    assert.equal(result.browser, browser);
+    assert.equal(result.browserProcess, child);
+});
+
+test('Chrome CDP launcher reports an asynchronous spawn failure without crashing Node', async () => {
+    const child = Object.assign(new EventEmitter(), {
+        exitCode: null,
+        killed: false,
+        kill() { this.killed = true; },
+    });
+    const launch = launchChromeCdp({
+        executablePath: 'Z:\\missing\\chrome.exe',
+        profileDir: 'G:\\rimskie-imports\\run-001\\profile',
+        spawnProcess: () => {
+            setImmediate(() => child.emit('error', Object.assign(new Error('spawn ENOENT'), {
+                code: 'ENOENT',
+            })));
+            return child;
+        },
+        prepareProfile: async () => {},
+        reservePort: async () => 43_123,
+        waitForEndpoint: async () => {
+            await new Promise((resolve) => setTimeout(resolve, 50));
+            throw new Error('endpoint timeout');
+        },
+    });
+
+    await assert.rejects(launch, (error) => error.code === 'ENOENT');
+    assert.equal(child.killed, true);
+});
+
+test('playwright transport opens the supplied profile through native Chrome CDP', async () => {
     const fake = fakePlaywright();
+    const launcherCalls = [];
+    const browser = {
+        contexts: () => [fake.context],
+        close: async () => {},
+    };
     const transport = await PlaywrightTransport.open({
-        profileDir: 'C:\\runs\\run-001\\profile',
+        profileDir: 'G:\\runs\\run-001\\profile',
         headed: true,
         executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
         chromium: fake.chromium,
+        cdpLauncher: async (options) => {
+            launcherCalls.push(options);
+            return { browser, browserProcess: { exitCode: 0, kill: () => {} } };
+        },
     });
 
-    assert.deepEqual(fake.launchCalls, [[
-        'C:\\runs\\run-001\\profile',
-        {
-            headless: false,
-            chromiumSandbox: true,
-            executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-            serviceWorkers: 'block',
-            offline: true,
-        },
-    ]]);
+    assert.equal(launcherCalls.length, 1);
+    assert.equal(launcherCalls[0].profileDir, 'G:\\runs\\run-001\\profile');
+    assert.equal(launcherCalls[0].executablePath,
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe');
+    assert.equal(launcherCalls[0].chromium, fake.chromium);
+    assert.deepEqual(fake.launchCalls, []);
     assert.equal(fake.routes.length, 1);
     await transport.close();
 });
 
-test('HTML navigation permits only essential same-origin browser resources', () => {
+test('HTML navigation looks like a normal browser without loading uncounted product photos', () => {
     const base = {
         routeMode: 'collecting',
         activeOperation: {
             kind: 'html', pageKind: 'category', url: whiteUrl, consumed: true,
         },
     };
-    for (const resourceType of ['stylesheet', 'script', 'fetch', 'xhr']) {
+    for (const resourceType of ['stylesheet', 'script', 'fetch', 'xhr', 'font', 'image', 'media']) {
         assert.equal(shouldAllowBrowserRequest({
             ...base,
             resourceType,
             url: `https://rimskie.com/assets/challenge.${resourceType}`,
         }), true, resourceType);
     }
-    for (const resourceType of ['image', 'font', 'media', 'websocket']) {
-        assert.equal(shouldAllowBrowserRequest({
-            ...base,
-            resourceType,
-            url: 'https://rimskie.com/assets/blocked.bin',
-        }), false, resourceType);
-    }
     assert.equal(shouldAllowBrowserRequest({
         ...base,
         resourceType: 'script',
         url: 'https://mc.yandex.ru/metrika/tag.js',
-    }), false);
+    }), true);
     assert.equal(shouldAllowBrowserRequest({
         ...base,
         resourceType: 'script',
-        url: 'https://evil.example/challenge.js',
-    }), false);
+        url: 'https://smartcaptcha.yandexcloud.net/captcha.js',
+    }), true);
     assert.equal(shouldAllowBrowserRequest({
         ...base,
         resourceType: 'fetch',
-        url: 'https://rimskie.com/api/challenge',
+        url: 'https://smartcaptcha.yandexcloud.net/check',
         method: 'POST',
+    }), true);
+    assert.equal(shouldAllowBrowserRequest({
+        ...base,
+        resourceType: 'image',
+        url: 'https://rimskie.com/media/output/product-card.webp',
+    }), false);
+    assert.equal(shouldAllowBrowserRequest({
+        ...base,
+        resourceType: 'document',
+        url: 'https://external.example/unrequested-page',
+    }), false);
+    assert.equal(shouldAllowBrowserRequest({
+        ...base,
+        resourceType: 'websocket',
+        url: 'wss://rimskie.com/events',
     }), false);
 });
 
@@ -905,6 +1121,7 @@ test('playwright transport keeps only essential donor resources alive while chal
         profileDir: 'profile',
         executablePath: 'chrome.exe',
         chromium: fake.chromium,
+        cdpLauncher: fake.cdpLauncher,
     });
     const handler = fake.routes[0][1];
 
@@ -937,13 +1154,15 @@ test('playwright transport keeps only essential donor resources alive while chal
     assert.equal(await routeDecision('stylesheet', 'https://rimskie.com/challenge.css'), 'continue');
     assert.equal(await routeDecision('script', 'https://rimskie.com/challenge.js'), 'continue');
     assert.equal(await routeDecision('fetch', 'https://rimskie.com/api/challenge'), 'continue');
-    assert.equal(await routeDecision('script', 'https://evil.example/challenge.js'), 'abort');
+    assert.equal(await routeDecision('script', 'https://smartcaptcha.yandexcloud.net/captcha.js'), 'continue');
+    assert.equal(await routeDecision('fetch', 'https://smartcaptcha.yandexcloud.net/check', 'POST'), 'continue');
     assert.equal(await routeDecision('document', whiteUrl), 'abort');
     assert.equal(await routeDecision(
         'document', 'https://rimskie.com/catalog/rimskie-shtory/black',
     ), 'abort');
-    assert.equal(await routeDecision('image', 'https://rimskie.com/challenge.webp'), 'abort');
-    assert.equal(await routeDecision('script', 'https://rimskie.com/challenge.js', 'POST'), 'abort');
+    assert.equal(await routeDecision('image', 'https://rimskie.com/resources/img/challenge.webp'), 'continue');
+    assert.equal(await routeDecision('image', 'https://rimskie.com/media/output/card.webp'), 'abort');
+    assert.equal(await routeDecision('script', 'https://rimskie.com/challenge.js', 'POST'), 'continue');
     assert.equal(await routeDecision('websocket', 'https://rimskie.com/challenge/socket'), 'abort');
     await transport.close();
 });
@@ -954,6 +1173,7 @@ test('playwright transport reports typed 403 and visible challenge failures', as
         profileDir: 'profile',
         executablePath: 'chrome.exe',
         chromium: forbiddenFake.chromium,
+        cdpLauncher: forbiddenFake.cdpLauncher,
     });
     await assert.rejects(
         forbiddenTransport.getHtml(whiteUrl),
@@ -965,6 +1185,7 @@ test('playwright transport reports typed 403 and visible challenge failures', as
         profileDir: 'profile',
         executablePath: 'chrome.exe',
         chromium: challengeFake.chromium,
+        cdpLauncher: challengeFake.cdpLauncher,
     });
     await assert.rejects(
         challengeTransport.getHtml(whiteUrl),
@@ -979,11 +1200,33 @@ test('playwright transport reports typed 403 and visible challenge failures', as
         profileDir: 'profile',
         executablePath: 'chrome.exe',
         chromium: forbiddenChallengeFake.chromium,
+        cdpLauncher: forbiddenChallengeFake.cdpLauncher,
     });
     await assert.rejects(
         forbiddenChallengeTransport.getHtml(whiteUrl),
         (error) => error instanceof DonorRequestError && error.kind === 'challenge',
     );
+});
+
+test('normal donor HTML may load BotHunt and SmartCaptcha scripts without becoming a challenge', async () => {
+    const html = `<!doctype html>
+        <html>
+            <head>
+                <script src="https://rimskie.com/assets/bothunt.js"></script>
+                <script src="https://smartcaptcha.yandexcloud.net/captcha.js"></script>
+            </head>
+            <body><main>Каталог римских штор</main></body>
+        </html>`;
+    const fake = fakePlaywright({ html });
+    const transport = await PlaywrightTransport.open({
+        profileDir: 'profile',
+        executablePath: 'chrome.exe',
+        chromium: fake.chromium,
+        cdpLauncher: fake.cdpLauncher,
+    });
+
+    assert.equal(await transport.getHtml(whiteUrl), html);
+    await transport.close();
 });
 
 test('playwright transport clicks the exact simple challenge retry button once', async () => {
@@ -1086,9 +1329,37 @@ test('playwright transport never clicks retry when full CAPTCHA controls are pre
     await assert.rejects(
         transport.retrySimpleChallenge(whiteUrl, { kind: 'category' }),
         (error) => error instanceof DonorRequestError && error.kind === 'challenge'
-            && /full CAPTCHA/i.test(error.message),
+            && error.manual === true && /full CAPTCHA/i.test(error.message),
     );
     assert.equal(retryClicks, 0);
+});
+
+test('hidden fingerprint canvas does not turn a simple retry into a full CAPTCHA', async () => {
+    let retryClicks = 0;
+    const response = { status: () => 200, url: () => whiteUrl };
+    const page = {
+        url: () => whiteUrl,
+        locator: () => ({
+            count: async () => 1,
+            nth: () => ({ isVisible: async () => false }),
+        }),
+        getByRole: () => ({
+            count: async () => 1,
+            isVisible: async () => true,
+            isEnabled: async () => true,
+            click: async () => { retryClicks += 1; },
+        }),
+        waitForNavigation: async () => response,
+        content: async () => categoryHtml([]),
+        evaluate: async () => {},
+    };
+    const transport = new PlaywrightTransport({ close: async () => {} }, page);
+
+    assert.equal(
+        await transport.retrySimpleChallenge(whiteUrl, { kind: 'category' }),
+        categoryHtml([]),
+    );
+    assert.equal(retryClicks, 1);
 });
 
 test('playwright transport pauses when a simple retry opens a full CAPTCHA', async () => {
@@ -1116,7 +1387,7 @@ test('playwright transport pauses when a simple retry opens a full CAPTCHA', asy
     await assert.rejects(
         transport.retrySimpleChallenge(whiteUrl, { kind: 'category' }),
         (error) => error instanceof DonorRequestError && error.kind === 'challenge'
-            && /full CAPTCHA/i.test(error.message),
+            && error.manual === true && /full CAPTCHA/i.test(error.message),
     );
     assert.equal(retryClicks, 1);
 });
@@ -1129,6 +1400,7 @@ test('playwright transport reports typed timeout and network navigation failures
         profileDir: 'profile',
         executablePath: 'chrome.exe',
         chromium: timeoutFake.chromium,
+        cdpLauncher: timeoutFake.cdpLauncher,
     });
     await assert.rejects(
         timeoutTransport.getHtml(whiteUrl),
@@ -1140,6 +1412,7 @@ test('playwright transport reports typed timeout and network navigation failures
         profileDir: 'profile',
         executablePath: 'chrome.exe',
         chromium: networkFake.chromium,
+        cdpLauncher: networkFake.cdpLauncher,
     });
     await assert.rejects(
         networkTransport.getHtml(whiteUrl),
@@ -1149,6 +1422,7 @@ test('playwright transport reports typed timeout and network navigation failures
     const contentFake = fakePlaywright({ contentError: new Error('Target page closed while reading DOM') });
     const contentTransport = await PlaywrightTransport.open({
         profileDir: 'profile', executablePath: 'chrome.exe', chromium: contentFake.chromium,
+        cdpLauncher: contentFake.cdpLauncher,
     });
     await assert.rejects(
         contentTransport.getHtml(whiteUrl),
@@ -1163,6 +1437,7 @@ test('playwright transport reports a typed network image failure without writing
     const fake = fakePlaywright({ imageError: new Error('net::ERR_CONNECTION_RESET') });
     const transport = await PlaywrightTransport.open({
         profileDir: 'profile', executablePath: 'chrome.exe', chromium: fake.chromium,
+        cdpLauncher: fake.cdpLauncher,
     });
 
     await assert.rejects(
@@ -1181,6 +1456,7 @@ test('playwright transport writes the exact first-image response to destination'
         profileDir: 'profile',
         executablePath: 'chrome.exe',
         chromium: fake.chromium,
+        cdpLauncher: fake.cdpLauncher,
     });
 
     await transport.downloadFirstImage(imageUrl, destination);
@@ -1199,6 +1475,7 @@ test('playwright transport rejects 403 HTML challenge bytes without writing an i
     });
     const transport = await PlaywrightTransport.open({
         profileDir: 'profile', executablePath: 'chrome.exe', chromium: fake.chromium,
+        cdpLauncher: fake.cdpLauncher,
     });
 
     await assert.rejects(
@@ -1215,6 +1492,7 @@ test('playwright transport rejects non-2xx and invalid image signatures without 
     const redirectedFake = fakePlaywright({ status: 302 });
     const redirected = await PlaywrightTransport.open({
         profileDir: 'profile', executablePath: 'chrome.exe', chromium: redirectedFake.chromium,
+        cdpLauncher: redirectedFake.cdpLauncher,
     });
     await assert.rejects(
         redirected.downloadFirstImage(imageUrl, destination),
@@ -1224,6 +1502,7 @@ test('playwright transport rejects non-2xx and invalid image signatures without 
     const invalidFake = fakePlaywright({ image: Buffer.from('not-an-image') });
     const invalid = await PlaywrightTransport.open({
         profileDir: 'profile', executablePath: 'chrome.exe', chromium: invalidFake.chromium,
+        cdpLauncher: invalidFake.cdpLauncher,
     });
     await assert.rejects(
         invalid.downloadFirstImage(imageUrl, destination),
@@ -1242,6 +1521,7 @@ test('playwright transport rejects JPEG bytes instead of saving them under a Web
     });
     const transport = await PlaywrightTransport.open({
         profileDir: 'profile', executablePath: 'chrome.exe', chromium: jpegFake.chromium,
+        cdpLauncher: jpegFake.cdpLauncher,
     });
 
     await assert.rejects(

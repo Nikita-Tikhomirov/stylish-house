@@ -68,7 +68,10 @@ test('challenge state is durable before diagnostics and survives event-log failu
         calls: 0,
         async getHtml() {
             this.calls += 1;
-            throw Object.assign(new Error('visible BotHunt challenge'), { kind: 'challenge' });
+            throw Object.assign(new Error('visible full CAPTCHA'), {
+                kind: 'challenge',
+                manual: true,
+            });
         },
     };
 
@@ -86,13 +89,14 @@ test('challenge state is durable before diagnostics and survives event-log failu
     assert.equal(transport.calls, 1);
 });
 
-test('collector never enables legacy challenge mode when no guarded retry action exists', async () => {
+test('collector pauses for a manual challenge without enabling legacy challenge mode', async () => {
     const store = memoryStore(initialState());
     const observations = [];
     const transport = {
         async getHtml() {
             throw Object.assign(new Error('visible BotHunt challenge'), {
                 kind: 'challenge',
+                manual: true,
                 url: sourceUrl,
             });
         },

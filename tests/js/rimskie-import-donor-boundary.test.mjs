@@ -33,7 +33,6 @@ function fakePlaywright({
 } = {}) {
     const calls = { evaluate: [], goto: [], setup: [] };
     const routes = [];
-    const webSocketRoutes = [];
     const page = {
         goto: async (url) => {
             calls.goto.push(url);
@@ -64,21 +63,19 @@ function fakePlaywright({
             calls.setup.push('http-route');
             routes.push([pattern, handler]);
         },
-        routeWebSocket: async (pattern, handler) => {
-            calls.setup.push('websocket-route');
-            webSocketRoutes.push([pattern, handler]);
-        },
-        setOffline: async (offline) => calls.setup.push(`offline:${offline}`),
         close: async () => {},
     };
-    const chromium = {
-        launchPersistentContext: async (...args) => {
-            calls.setup.push(`launch-offline:${args[1].offline}`);
-            return context;
-        },
+    const browser = {
+        contexts: () => [context],
+        close: async () => {},
+    };
+    const chromium = {};
+    const cdpLauncher = async () => {
+        calls.setup.push('cdp-launch');
+        return { browser, browserProcess: { exitCode: 0, kill: () => {} } };
     };
 
-    return { calls, chromium, routes, webSocketRoutes };
+    return { calls, chromium, routes, cdpLauncher };
 }
 
 async function openFakeTransport(options = {}) {
@@ -87,6 +84,7 @@ async function openFakeTransport(options = {}) {
         profileDir: 'profile',
         executablePath: 'chrome.exe',
         chromium: fake.chromium,
+        cdpLauncher: fake.cdpLauncher,
     });
 
     return { fake, transport };
@@ -195,7 +193,7 @@ test('download rejects unapproved image URLs before browser fetch', async (t) =>
     }
 });
 
-test('browser routing permits only the exact counted operation and never challenge assets', () => {
+test('browser routing keeps exact documents and normal subresources separate', () => {
     const activeHtml = { kind: 'html', url: categoryUrl };
     assert.equal(shouldAllowBrowserRequest({
         routeMode: 'collecting', activeOperation: activeHtml, resourceType: 'document', url: categoryUrl,
@@ -203,11 +201,11 @@ test('browser routing permits only the exact counted operation and never challen
     assert.equal(shouldAllowBrowserRequest({
         routeMode: 'collecting', activeOperation: activeHtml, resourceType: 'script',
         url: 'https://rimskie.com/catalog/rimskie-shtory/app.js',
-    }), false);
+    }), true);
     assert.equal(shouldAllowBrowserRequest({
         routeMode: 'collecting', activeOperation: activeHtml, resourceType: 'xhr',
         url: 'https://rimskie.com/catalog/rimskie-shtory/api',
-    }), false);
+    }), true);
     assert.equal(shouldAllowBrowserRequest({
         routeMode: 'collecting', activeOperation: activeHtml, resourceType: 'document',
         url: 'https://evil.example/redirected', redirectsFromActive: true,
@@ -226,42 +224,29 @@ test('browser routing permits only the exact counted operation and never challen
         url: 'https://rimskie.com/media/output/second.webp',
     }), false);
     assert.equal(shouldAllowBrowserRequest({
-        routeMode: 'challenge', activeOperation: { kind: 'challenge', url: categoryUrl },
+        routeMode: 'challenge', activeOperation: { kind: 'html', url: categoryUrl },
         resourceType: 'script',
         url: 'https://rimskie.com/challenge/script.js',
-    }), false);
+    }), true);
     assert.equal(shouldAllowBrowserRequest({
-        routeMode: 'challenge', activeOperation: { kind: 'challenge', url: categoryUrl },
+        routeMode: 'challenge', activeOperation: { kind: 'html', url: categoryUrl },
         resourceType: 'script',
-        url: 'https://evil.example/challenge.js',
-    }), false);
+        url: 'https://smartcaptcha.yandexcloud.net/captcha.js',
+    }), true);
     assert.equal(shouldAllowBrowserRequest({
-        routeMode: 'challenge', activeOperation: { kind: 'challenge', url: categoryUrl },
+        routeMode: 'challenge', activeOperation: { kind: 'html', url: categoryUrl },
         resourceType: 'websocket',
-        url: 'https://rimskie.com/challenge/socket', method: 'GET',
+        url: 'wss://rimskie.com/challenge/socket', method: 'GET',
     }), false);
 });
 
-test('browser context blocks WebSockets before enabling network connectivity', async () => {
+test('native CDP context installs the HTTP boundary without forcing offline mode', async () => {
     const { fake, transport } = await openFakeTransport();
 
     assert.deepEqual(fake.calls.setup, [
-        'launch-offline:true',
+        'cdp-launch',
         'http-route',
-        'websocket-route',
-        'offline:false',
     ]);
-    assert.equal(fake.webSocketRoutes.length, 1);
-    assert.equal(fake.webSocketRoutes[0][0], '**/*');
-
-    let closeOptions = null;
-    await fake.webSocketRoutes[0][1]({
-        close: async (options) => { closeOptions = options; },
-    });
-    assert.deepEqual(closeOptions, {
-        code: 1008,
-        reason: 'WebSocket connections are disabled',
-    });
 
     await transport.close();
 });
@@ -292,13 +277,16 @@ test('one HTML operation authorizes only its first exact document request', asyn
     const context = {
         pages: () => [page],
         route: async (_pattern, handler) => { routeHandler = handler; },
-        routeWebSocket: async () => {},
-        setOffline: async () => {},
         close: async () => {},
     };
+    const browser = { contexts: () => [context], close: async () => {} };
     const transport = await PlaywrightTransport.open({
         profileDir: 'profile', executablePath: 'chrome.exe',
-        chromium: { launchPersistentContext: async () => context },
+        chromium: {},
+        cdpLauncher: async () => ({
+            browser,
+            browserProcess: { exitCode: 0, kill: () => {} },
+        }),
     });
 
     await transport.getHtml(categoryUrl);

@@ -87,7 +87,8 @@ export class Collector {
                 await store.checkpoint(state);
             },
         });
-        if (policy.requiresFailurePause()) {
+        const requiresFailureAcknowledgement = policy.requiresFailurePause();
+        if (requiresFailureAcknowledgement) {
             if (!acknowledgeFailurePause) {
                 const pauseReason = policy.snapshot().lastFailureKind || 'failure-limit';
                 const isNewPause = state.status !== 'paused' || state.pauseReason !== pauseReason;
@@ -101,10 +102,6 @@ export class Collector {
                 }
                 return snapshot(state);
             }
-            await policy.resumePendingBackoff();
-            await policy.acknowledgeFailurePause();
-        } else {
-            await policy.resumePendingBackoff();
         }
         const previousStatus = state.status;
         state.status = 'running';
@@ -113,6 +110,9 @@ export class Collector {
         if (previousStatus === 'paused' || previousStatus === 'limited' || previousStatus === 'error') {
             await this.#appendEvent(context, { type: 'resume', previousStatus });
         }
+        const backoffResult = await policy.resumePendingBackoff();
+        if (backoffResult === 'cancelled' || state.status !== 'running') return snapshot(state);
+        if (requiresFailureAcknowledgement) await policy.acknowledgeFailurePause();
 
         try {
             for (const source of state.sources) {
@@ -303,6 +303,7 @@ export class Collector {
             if (await this.#mustHalt(context)) return null;
             try {
                 const result = await operation();
+                if (kind === 'html') await this.#clearChallengeAttempt(context, url);
                 await context.policy.recordSuccess();
                 return result;
             } catch (error) {
@@ -313,20 +314,33 @@ export class Collector {
                     url,
                     message: error?.message || String(error),
                 };
+                if (error?.manual === true) errorEvent.manual = true;
                 if (failureKind === 'challenge') {
+                    if (error?.manual === true) {
+                        await this.#pauseForFailure(context, 'challenge', errorEvent);
+                        return null;
+                    }
+                    if (kind !== 'html') {
+                        await this.#appendEvent(context, errorEvent);
+                        if (context.state.status !== 'running') return null;
+                        const action = await context.policy.recordFailure('challenge');
+                        if (action === 'cancelled' || await this.#mustHalt(context)) return null;
+                        continue;
+                    }
                     const retry = await this.#retrySimpleChallenge(
                         context, kind, url, error, errorEvent,
                     );
                     if (retry.succeeded) return retry.result;
+                    if (retry.retry) continue;
                     return null;
                 }
                 if (protectivePauseFailureKinds.has(failureKind)) {
-                    context.state.status = 'paused';
-                    context.state.pauseReason = failureKind;
-                    await context.store.checkpoint(context.state);
                     await this.#appendEvent(context, errorEvent);
-                    await this.#appendEvent(context, { type: 'pause', reason: failureKind });
-                    return null;
+                    if (context.state.status !== 'running') return null;
+                    const action = await context.policy.recordFailure(failureKind);
+                    if (action === 'cancelled') return null;
+                    if (await this.#mustHalt(context)) return null;
+                    continue;
                 }
                 context.state.status = 'error';
                 delete context.state.pauseReason;
@@ -344,11 +358,22 @@ export class Collector {
             ? context.state.challengeRetryUrls
             : [];
         context.state.challengeRetryUrls = attemptedUrls;
+        if (attemptedUrls.includes(url)) {
+            await this.#clearChallengeAttempt(context, url);
+            await this.#appendEvent(context, challengeEvent);
+            await this.#appendEvent(context, {
+                type: 'challenge_retry', outcome: 'uncertain-recovery', url,
+            });
+            if (context.state.status !== 'running') return { succeeded: false };
+            const action = await context.policy.recordFailure('challenge');
+            return { succeeded: false, retry: action !== 'cancelled' };
+        }
         if (requestKind !== 'html'
-            || typeof context.transport.retrySimpleChallenge !== 'function'
-            || attemptedUrls.includes(url)) {
-            await this.#pauseForFailure(context, 'challenge', challengeEvent);
-            return { succeeded: false };
+            || typeof context.transport.retrySimpleChallenge !== 'function') {
+            await this.#appendEvent(context, challengeEvent);
+            if (context.state.status !== 'running') return { succeeded: false };
+            const action = await context.policy.recordFailure('challenge');
+            return { succeeded: false, retry: action !== 'cancelled' };
         }
         if (context.state.requestCount >= context.maxRequests) {
             await this.#setLimited(context, 'max-requests');
@@ -363,7 +388,10 @@ export class Collector {
         try {
             await context.policy.beforeRequest('challenge');
         } catch (error) {
-            if (error?.code === 'request_cancelled') return { succeeded: false };
+            if (error?.code === 'request_cancelled') {
+                await this.#clearChallengeAttempt(context, url);
+                return { succeeded: false };
+            }
             const isHourlyBudget = error?.code === 'hourly_budget_exhausted';
             if (isHourlyBudget) {
                 await this.#pauseForFailure(context, 'hourly-budget');
@@ -375,16 +403,21 @@ export class Collector {
             }
             return { succeeded: false };
         }
-        if (await this.#mustHalt(context)) return { succeeded: false };
+        if (await this.#mustHalt(context)) {
+            await this.#clearChallengeAttempt(context, url);
+            return { succeeded: false };
+        }
 
         try {
             const result = await context.transport.retrySimpleChallenge(url, {
                 kind: challengeError?.pageKind || 'html',
             });
+            await this.#clearChallengeAttempt(context, url);
             await context.policy.recordSuccess();
             await this.#appendEvent(context, { type: 'challenge_retry', outcome: 'success', url });
             return { succeeded: true, result };
         } catch (error) {
+            await this.#clearChallengeAttempt(context, url);
             const failureKind = error?.kind || 'error';
             const retryErrorEvent = {
                 type: failureKind === 'challenge' ? 'challenge' : 'error',
@@ -392,8 +425,14 @@ export class Collector {
                 url,
                 message: error?.message || String(error),
             };
-            if (failureKind === 'challenge' || protectivePauseFailureKinds.has(failureKind)) {
+            if (error?.manual === true) retryErrorEvent.manual = true;
+            if (error?.manual === true) {
                 await this.#pauseForFailure(context, failureKind, retryErrorEvent);
+            } else if (failureKind === 'challenge' || protectivePauseFailureKinds.has(failureKind)) {
+                await this.#appendEvent(context, retryErrorEvent);
+                if (context.state.status !== 'running') return { succeeded: false };
+                const action = await context.policy.recordFailure(failureKind);
+                return { succeeded: false, retry: action !== 'cancelled' };
             } else {
                 context.state.status = 'error';
                 delete context.state.pauseReason;
@@ -402,6 +441,17 @@ export class Collector {
             }
             return { succeeded: false };
         }
+    }
+
+    async #clearChallengeAttempt(context, url) {
+        if (!Array.isArray(context.state.challengeRetryUrls)) {
+            context.state.challengeRetryUrls = [];
+            return;
+        }
+        const index = context.state.challengeRetryUrls.indexOf(url);
+        if (index === -1) return;
+        context.state.challengeRetryUrls.splice(index, 1);
+        await context.store.checkpoint(context.state);
     }
 
     async #mustHalt(context) {

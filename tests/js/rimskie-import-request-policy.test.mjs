@@ -17,7 +17,7 @@ function createFakeClock(initialTime = 0) {
     };
 }
 
-test('third consecutive donor failure pauses after 2m, 5m, and 15m backoff', async () => {
+test('third consecutive donor failure cools down and starts a new retry cycle', async () => {
     const sleeps = [];
     const fakeClock = createFakeClock();
     const policy = new RequestPolicy({
@@ -28,28 +28,59 @@ test('third consecutive donor failure pauses after 2m, 5m, and 15m backoff', asy
 
     assert.equal(await policy.recordFailure('http_403'), 'retry');
     assert.equal(await policy.recordFailure('http_429'), 'retry');
-    assert.equal(await policy.recordFailure('network'), 'pause');
-    assert.deepEqual(sleeps, [120_000, 300_000, 900_000]);
+    assert.equal(await policy.recordFailure('network'), 'retry');
+    assert.equal(sleeps.reduce((total, milliseconds) => total + milliseconds, 0), 1_320_000);
+    assert.equal(policy.snapshot().consecutiveFailures, 0);
+    assert.equal(policy.requiresFailurePause(), false);
 });
 
-test('default rolling hour budget rejects request 21 without transport access', async () => {
+test('failure backoff checks pause and stop controls every 30 seconds', async () => {
+    const sleeps = [];
+    let controlChecks = 0;
+    const policy = new RequestPolicy({
+        clock: createFakeClock(10_000),
+        backoffMs: [90_000],
+        budgetCheckIntervalMs: 30_000,
+        sleep: async (milliseconds) => sleeps.push(milliseconds),
+        beforeReserve: async () => {
+            controlChecks += 1;
+            return controlChecks < 2;
+        },
+    });
+
+    assert.equal(await policy.recordFailure('http_403'), 'cancelled');
+    assert.deepEqual(sleeps, [30_000, 30_000]);
+    assert.equal(policy.snapshot().backoffUntil, 100_000);
+});
+
+test('default rolling hour budget waits for request 21 and continues automatically', async () => {
     const fakeClock = createFakeClock();
+    const sleeps = [];
+    const events = [];
     const policy = new RequestPolicy({
         clock: fakeClock,
         random: () => 0,
-        sleep: async () => {},
+        htmlDelayMs: [0, 0],
+        budgetCheckIntervalMs: 3_600_001,
+        sleep: async (milliseconds) => {
+            sleeps.push(milliseconds);
+            fakeClock.advance(milliseconds);
+        },
+        onEvent: async (event) => events.push(event),
     });
 
     for (let count = 0; count < 20; count += 1) {
         await policy.beforeRequest('html');
     }
 
-    await assert.rejects(policy.beforeRequest('html'), /hourly request budget exhausted/);
-    fakeClock.advance(3_600_001);
     await assert.doesNotReject(policy.beforeRequest('html'));
+    assert.equal(sleeps.at(-1), 3_600_001);
+    assert.equal(events.some((event) => event.type === 'hourly_wait'
+        && event.milliseconds === 3_600_001), true);
+    assert.equal(policy.snapshot().requestTimes.length, 1);
 });
 
-test('new policy process hydrates durable timestamps and rejects request 21', async () => {
+test('new policy process hydrates durable timestamps and waits for request 21', async () => {
     let durableState = null;
     const fakeClock = createFakeClock(50_000);
     const firstProcess = new RequestPolicy({
@@ -66,12 +97,14 @@ test('new policy process hydrates durable timestamps and rejects request 21', as
     const resumedProcess = new RequestPolicy({
         clock: fakeClock,
         random: () => 0,
-        sleep: async () => {},
+        sleep: async (milliseconds) => fakeClock.advance(milliseconds),
         htmlDelayMs: [0, 0],
+        budgetCheckIntervalMs: 3_600_001,
         state: durableState,
     });
 
-    await assert.rejects(resumedProcess.beforeRequest('html'), /hourly request budget exhausted/);
+    await assert.doesNotReject(resumedProcess.beforeRequest('html'));
+    assert.equal(resumedProcess.snapshot().requestTimes.length, 1);
 });
 
 test('new policy process resumes the durable failure backoff sequence', async () => {
@@ -89,11 +122,11 @@ test('new policy process resumes the durable failure backoff sequence', async ()
     });
     assert.equal(await resumedProcess.recordFailure('timeout'), 'retry');
 
-    assert.deepEqual(sleeps, [120_000, 300_000]);
+    assert.equal(sleeps.reduce((total, milliseconds) => total + milliseconds, 0), 420_000);
     assert.equal(resumedProcess.snapshot().consecutiveFailures, 2);
 });
 
-test('new policy process waits the unfinished durable backoff before proceeding', async () => {
+test('new policy process checks controls while waiting an unfinished durable backoff', async () => {
     let durableState = null;
     const fakeClock = createFakeClock(1_000);
     const firstProcess = new RequestPolicy({
@@ -106,18 +139,25 @@ test('new policy process waits the unfinished durable backoff before proceeding'
     assert.equal(durableState.backoffUntil, 121_000);
 
     const resumedSleeps = [];
+    let controlChecks = 0;
     const resumedProcess = new RequestPolicy({
         clock: fakeClock,
+        budgetCheckIntervalMs: 30_000,
         sleep: async (milliseconds) => {
             resumedSleeps.push(milliseconds);
             fakeClock.advance(milliseconds);
+        },
+        beforeReserve: async () => {
+            controlChecks += 1;
+            return true;
         },
         state: durableState,
         persistState: async (state) => { durableState = structuredClone(state); },
     });
     await resumedProcess.resumePendingBackoff();
 
-    assert.deepEqual(resumedSleeps, [120_000]);
+    assert.deepEqual(resumedSleeps, [30_000, 30_000, 30_000, 30_000]);
+    assert.equal(controlChecks, 4);
     assert.equal(durableState.backoffUntil, null);
 });
 
@@ -161,5 +201,5 @@ test('success resets consecutive failures to the first backoff', async () => {
     policy.recordSuccess();
 
     assert.equal(await policy.recordFailure('http_429'), 'retry');
-    assert.deepEqual(sleeps, [120_000, 120_000]);
+    assert.equal(sleeps.reduce((total, milliseconds) => total + milliseconds, 0), 240_000);
 });

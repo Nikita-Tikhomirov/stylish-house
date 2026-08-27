@@ -44,6 +44,7 @@ export class RequestPolicy {
         imageDelayMs = DEFAULT_LIMITS.imageDelayMs,
         challengeDelayMs = DEFAULT_LIMITS.challengeDelayMs,
         hourlyLimit = DEFAULT_LIMITS.hourlyLimit,
+        budgetCheckIntervalMs = 30_000,
         backoffMs = DEFAULT_LIMITS.backoffMs,
         onEvent = async () => {},
         persistState = async () => {},
@@ -55,6 +56,7 @@ export class RequestPolicy {
         this.sleep = sleep;
         this.delays = { html: htmlDelayMs, image: imageDelayMs, challenge: challengeDelayMs };
         this.hourlyLimit = hourlyLimit;
+        this.budgetCheckIntervalMs = budgetCheckIntervalMs;
         this.backoffMs = backoffMs;
         this.onEvent = onEvent;
         this.persistState = persistState;
@@ -107,9 +109,9 @@ export class RequestPolicy {
     }
 
     async resumePendingBackoff() {
-        if (!Number.isFinite(this.backoffUntil)) return false;
+        if (!Number.isFinite(this.backoffUntil)) return 'none';
 
-        const milliseconds = Math.max(0, this.backoffUntil - this.clock.now());
+        let milliseconds = Math.max(0, this.backoffUntil - this.clock.now());
         if (milliseconds > 0) {
             await this.onEvent({
                 type: 'backoff_resume',
@@ -117,12 +119,19 @@ export class RequestPolicy {
                 milliseconds,
                 at: this.clock.now(),
             });
-            await this.sleep(milliseconds);
+            while (milliseconds > 0) {
+                await this.sleep(Math.min(milliseconds, this.budgetCheckIntervalMs));
+                if (!await this.beforeReserve()) return 'cancelled';
+                milliseconds = Math.max(0, this.backoffUntil - this.clock.now());
+            }
         }
         this.backoffUntil = null;
+        if (this.consecutiveFailures >= this.backoffMs.length) {
+            this.consecutiveFailures = 0;
+        }
         await this.persistState(this.snapshot(), 'backoff-complete');
 
-        return true;
+        return 'completed';
     }
 
     async beforeRequest(kind) {
@@ -134,15 +143,35 @@ export class RequestPolicy {
         await this.sleep(milliseconds);
         if (!await this.beforeReserve()) throw new RequestCancelledError();
 
+        await this.#waitForHourlySlot(kind);
+
         const now = this.clock.now();
         this.requestTimes = this.requestTimes.filter((timestamp) => now - timestamp < HOUR_MS);
-        if (this.requestTimes.length >= this.hourlyLimit) {
-            throw new RequestBudgetError();
-        }
-
         this.requestTimes.push(now);
         await this.persistState(this.snapshot(), 'reservation');
         await this.onEvent({ type: 'request', kind, at: now });
+    }
+
+    async #waitForHourlySlot(kind) {
+        if (!Number.isInteger(this.hourlyLimit) || this.hourlyLimit <= 0) {
+            throw new RequestBudgetError();
+        }
+        while (true) {
+            const now = this.clock.now();
+            this.requestTimes = this.requestTimes.filter((timestamp) => now - timestamp < HOUR_MS);
+            if (this.requestTimes.length < this.hourlyLimit) return;
+
+            const waitUntil = this.requestTimes[0] + HOUR_MS + 1;
+            const milliseconds = Math.max(1, waitUntil - now);
+            await this.onEvent({ type: 'hourly_wait', kind, milliseconds, at: now });
+
+            let remaining = milliseconds;
+            while (remaining > 0) {
+                await this.sleep(Math.min(remaining, this.budgetCheckIntervalMs));
+                if (!await this.beforeReserve()) throw new RequestCancelledError();
+                remaining = Math.max(0, waitUntil - this.clock.now());
+            }
+        }
     }
 
     recordSuccess() {
@@ -154,14 +183,16 @@ export class RequestPolicy {
     }
 
     async recordFailure(kind, { afterPersist = async () => {} } = {}) {
-        if (this.consecutiveFailures >= this.backoffMs.length) return 'pause';
+        if (this.consecutiveFailures >= this.backoffMs.length) {
+            this.consecutiveFailures = 0;
+        }
 
         const failureNumber = this.consecutiveFailures + 1;
         const milliseconds = this.backoffMs[this.consecutiveFailures];
         this.consecutiveFailures = failureNumber;
-        const action = failureNumber >= this.backoffMs.length ? 'pause' : 'retry';
+        const action = 'retry';
         this.lastFailureKind = kind;
-        this.pauseRequired = action === 'pause';
+        this.pauseRequired = false;
         this.backoffUntil = this.clock.now() + milliseconds;
 
         await this.persistState(this.snapshot(), 'failure');
@@ -174,8 +205,15 @@ export class RequestPolicy {
             milliseconds,
             at: this.clock.now(),
         });
-        await this.sleep(milliseconds);
+        let remaining = milliseconds;
+        while (remaining > 0) {
+            const chunk = Math.min(remaining, this.budgetCheckIntervalMs);
+            await this.sleep(chunk);
+            remaining -= chunk;
+            if (!await this.beforeReserve()) return 'cancelled';
+        }
         this.backoffUntil = null;
+        if (failureNumber >= this.backoffMs.length) this.consecutiveFailures = 0;
         await this.persistState(this.snapshot(), 'backoff-complete');
 
         return action;

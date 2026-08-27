@@ -1,5 +1,12 @@
-import { access as fsAccess, mkdir } from 'node:fs/promises';
+import { spawn as defaultSpawnProcess } from 'node:child_process';
+import {
+    access as fsAccess,
+    mkdir,
+    rm,
+} from 'node:fs/promises';
+import { createServer } from 'node:net';
 import { dirname, extname, join } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 import { chromium as defaultChromium } from 'playwright-core';
 
@@ -13,13 +20,6 @@ import { detectImageFormat, validateImageFile } from './webp.mjs';
 
 export { detectImageFormat, validateImageFile } from './webp.mjs';
 
-const analyticsHosts = [
-    'google-analytics.com',
-    'googletagmanager.com',
-    'mc.yandex.ru',
-    'metrika.yandex.ru',
-    'analytics.yandex.ru',
-];
 const challengePattern = /bothunt|captcha|challenge-platform|cf-chl-|verify you are human|подтвердите[^<]{0,40}человек/i;
 const simpleChallengeRetryPattern = /^(?:Попробовать снова|Повторить|Try again)$/i;
 const fullCaptchaControlSelector = [
@@ -33,12 +33,116 @@ const fullCaptchaControlSelector = [
     'canvas',
 ].join(', ');
 const htmlDocumentPattern = /^\s*(?:<!doctype\s+html\b|<html\b|<head\b|<body\b)/i;
+const devToolsPortFileName = 'DevToolsActivePort';
+
+function visibleDocumentText(html) {
+    return String(html)
+        .replace(/<!--[\s\S]*?-->/g, ' ')
+        .replace(/<(?:script|style|template|noscript)\b[^>]*>[\s\S]*?<\/(?:script|style|template|noscript)>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ');
+}
+
+function isChallengeDocument(html) {
+    return challengePattern.test(visibleDocumentText(html));
+}
+
 export class DonorRequestError extends Error {
     constructor(kind, message, details = {}) {
         super(message);
         this.name = 'DonorRequestError';
         this.kind = kind;
         Object.assign(this, details);
+    }
+}
+
+export function chromeCdpArguments(profileDir, debuggingPort) {
+    if (!Number.isInteger(debuggingPort) || debuggingPort < 1 || debuggingPort > 65_535) {
+        throw new Error('Chrome CDP requires a nonzero local debugging port');
+    }
+    return [
+        `--remote-debugging-port=${debuggingPort}`,
+        `--user-data-dir=${profileDir}`,
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--new-window',
+        'about:blank',
+    ];
+}
+
+async function prepareCdpProfile(profileDir) {
+    await mkdir(profileDir, { recursive: true });
+    await rm(join(profileDir, devToolsPortFileName), { force: true });
+}
+
+async function reserveLocalPort() {
+    return new Promise((resolve, reject) => {
+        const server = createServer();
+        server.once('error', reject);
+        server.listen(0, '127.0.0.1', () => {
+            const address = server.address();
+            const port = typeof address === 'object' ? address?.port : null;
+            server.close((error) => {
+                if (error) reject(error);
+                else if (!Number.isInteger(port)) reject(new Error('Could not reserve a local CDP port'));
+                else resolve(port);
+            });
+        });
+    });
+}
+
+async function waitForChromeEndpoint({
+    endpoint,
+    browserProcess,
+    fetchImpl = fetch,
+    wait = sleep,
+    timeoutMs = 20_000,
+}) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        if (browserProcess.exitCode !== null) {
+            throw new Error(`Chrome exited before its DevTools port was ready (${browserProcess.exitCode})`);
+        }
+        try {
+            const response = await fetchImpl(`${endpoint}/json/version`);
+            if (response.ok) return endpoint;
+        } catch {}
+        await wait(100);
+    }
+
+    throw new Error(`Chrome DevTools port was not ready within ${timeoutMs} ms`);
+}
+
+export async function launchChromeCdp({
+    executablePath,
+    profileDir,
+    chromium = defaultChromium,
+    spawnProcess = defaultSpawnProcess,
+    prepareProfile = prepareCdpProfile,
+    reservePort = reserveLocalPort,
+    waitForEndpoint = waitForChromeEndpoint,
+}) {
+    await prepareProfile(profileDir);
+    const debuggingPort = await reservePort();
+    const endpoint = `http://127.0.0.1:${debuggingPort}`;
+    const browserProcess = spawnProcess(executablePath, chromeCdpArguments(profileDir, debuggingPort), {
+        detached: false,
+        stdio: 'ignore',
+        windowsHide: false,
+    });
+    const spawnFailure = typeof browserProcess.once === 'function'
+        ? new Promise((_, reject) => browserProcess.once('error', reject))
+        : new Promise(() => {});
+    try {
+        const readyEndpoint = await Promise.race([
+            waitForEndpoint({ endpoint, browserProcess }),
+            spawnFailure,
+        ]);
+        const browser = await chromium.connectOverCDP(readyEndpoint);
+        return { browser, browserProcess };
+    } catch (error) {
+        if (browserProcess.exitCode === null) browserProcess.kill();
+        throw error;
     }
 }
 
@@ -84,17 +188,6 @@ export async function findBrowserExecutable({
     throw new Error('No installed Chrome, Edge, or Chromium executable was found');
 }
 
-function isAnalyticsUrl(value) {
-    let hostname;
-    try {
-        hostname = new URL(value).hostname;
-    } catch {
-        return false;
-    }
-
-    return analyticsHosts.some((host) => hostname === host || hostname.endsWith(`.${host}`));
-}
-
 function donorRequestError(error, label, value) {
     return new DonorRequestError('invalid_url', error?.message || `${label} is not approved`, {
         url: value,
@@ -127,21 +220,32 @@ export function shouldAllowBrowserRequest({
     method = 'GET',
     redirectsFromActive = false,
 }) {
-    if (resourceType === 'websocket' || method !== 'GET') return false;
-    if (!isApprovedDonorOriginUrl(url) || isAnalyticsUrl(url)) return false;
     if (!['collecting', 'challenge'].includes(routeMode)) return false;
+    if (resourceType === 'websocket') return false;
 
     if (routeMode === 'collecting' && activeOperation?.kind === 'html'
         && resourceType === 'document'
         && isApprovedDonorUrl(url, { kind: activeOperation.pageKind || 'html' })) {
         return url === activeOperation.url && !activeOperation.consumed && !redirectsFromActive;
     }
-    if (activeOperation?.kind === 'html'
-        && ['stylesheet', 'script', 'fetch', 'xhr'].includes(resourceType)) {
-        return true;
-    }
     if (activeOperation?.kind === 'image' && url === activeOperation.url) {
-        return ['fetch', 'xhr', 'image'].includes(resourceType);
+        return method === 'GET' && ['fetch', 'xhr', 'image'].includes(resourceType);
+    }
+    if (activeOperation?.kind === 'html' && resourceType !== 'document') {
+        if (!['GET', 'HEAD', 'POST', 'OPTIONS'].includes(method)) return false;
+        let parsed;
+        try {
+            parsed = new URL(url);
+        } catch {
+            return false;
+        }
+        if (parsed.protocol !== 'https:') return false;
+        if (resourceType === 'image'
+            && isApprovedDonorOriginUrl(url)
+            && parsed.pathname.startsWith('/media/output/')) {
+            return false;
+        }
+        return true;
     }
 
     return false;
@@ -160,7 +264,14 @@ function statusFailure(status, url) {
 
 async function hasFullCaptchaControls(page) {
     const controls = page.locator?.(fullCaptchaControlSelector);
-    return !controls || await controls.count() > 0;
+    if (!controls) return true;
+    const count = await controls.count();
+    for (let index = 0; index < count; index += 1) {
+        const control = typeof controls.nth === 'function' ? controls.nth(index) : controls;
+        if (typeof control.isVisible !== 'function' || await control.isVisible()) return true;
+    }
+
+    return false;
 }
 
 export class PlaywrightTransport {
@@ -169,38 +280,36 @@ export class PlaywrightTransport {
         headed = true,
         executablePath,
         chromium = defaultChromium,
+        cdpLauncher = launchChromeCdp,
     }) {
         if (!headed) {
             throw new Error('Headless donor collection is disabled; a visible browser is required');
         }
         const browserPath = executablePath || await findBrowserExecutable();
-        const context = await chromium.launchPersistentContext(profileDir, {
-            headless: false,
-            chromiumSandbox: true,
+        const { browser, browserProcess } = await cdpLauncher({
+            profileDir,
             executablePath: browserPath,
-            serviceWorkers: 'block',
-            offline: true,
+            chromium,
         });
         try {
+            const [context] = browser.contexts();
+            if (!context) throw new Error('Native Chrome did not expose its default browser context');
             const page = context.pages()[0] || await context.newPage();
-            const transport = new PlaywrightTransport(context, page);
+            const transport = new PlaywrightTransport(context, page, { browser, browserProcess });
             await context.route('**/*', (route) => transport.#route(route));
-            await context.routeWebSocket('**/*', (webSocket) => webSocket.close({
-                code: 1008,
-                reason: 'WebSocket connections are disabled',
-            }));
-            await context.setOffline(false);
-
             return transport;
         } catch (error) {
-            await context.close().catch(() => {});
+            await browser.close().catch(() => {});
+            if (browserProcess.exitCode === null) browserProcess.kill();
             throw error;
         }
     }
 
-    constructor(context, page) {
+    constructor(context, page, { browser = null, browserProcess = null } = {}) {
         this.context = context;
         this.page = page;
+        this.browser = browser;
+        this.browserProcess = browserProcess;
         this.activeOperation = null;
         this.pendingChallenge = null;
         this.routeMode = 'idle';
@@ -271,12 +380,16 @@ export class PlaywrightTransport {
                     url: finalUrl,
                 });
             }
-            if (challengePattern.test(html)) {
+            if (isChallengeDocument(html)) {
                 this.pendingChallenge = { url: finalUrl, pageKind };
                 throw new DonorRequestError(
                     'challenge',
                     'BotHunt/challenge requires an explicitly authorized click in the visible browser',
-                    { url: finalUrl, pageKind },
+                    {
+                        url: finalUrl,
+                        pageKind,
+                        manual: await hasFullCaptchaControls(this.page),
+                    },
                 );
             }
             const failure = statusFailure(response.status(), finalUrl);
@@ -338,7 +451,7 @@ export class PlaywrightTransport {
                 throw new DonorRequestError(
                     'challenge',
                     'Full CAPTCHA controls are present or challenge eligibility cannot be verified',
-                    { url: requestedUrl, pageKind },
+                    { url: requestedUrl, pageKind, manual: true },
                 );
             }
             if (!retryButtonAvailable) {
@@ -394,10 +507,10 @@ export class PlaywrightTransport {
                 throw new DonorRequestError(
                     'challenge',
                     'Full CAPTCHA controls appeared after the simple challenge retry',
-                    { url: finalUrl, pageKind },
+                    { url: finalUrl, pageKind, manual: true },
                 );
             }
-            if (challengePattern.test(html)) {
+            if (isChallengeDocument(html)) {
                 throw new DonorRequestError('challenge', 'Challenge remained after one retry click', {
                     url: finalUrl, pageKind,
                 });
@@ -495,6 +608,11 @@ export class PlaywrightTransport {
     }
 
     async close() {
+        if (this.browser) {
+            await this.browser.close();
+            if (this.browserProcess?.exitCode === null) this.browserProcess.kill();
+            return;
+        }
         await this.context.close();
     }
 }
