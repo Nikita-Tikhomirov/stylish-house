@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
@@ -90,6 +90,75 @@ test('status service restores persisted run, products and events after restart',
     assert.equal(products.items[0].externalId, '11889');
     assert.equal(products.items[0].name, 'Римская штора тестовая');
     assert.equal(products.items[0].sourcePrice.amount, 4799);
+});
+
+test('status service exposes active browser-seed collection and its saved products', async (t) => {
+    const { dataRoot, runId, store } = await createRunFixture(t);
+    const seedRoot = join(store.runDir, 'browser-seed');
+    const seedProducts = join(seedRoot, 'products');
+    const seedImages = join(seedRoot, 'images');
+    await mkdir(seedProducts, { recursive: true });
+    await mkdir(seedImages, { recursive: true });
+    await writeFile(join(seedProducts, '5741.json'), `${JSON.stringify({
+        externalId: '5741',
+        sourceUrl: 'https://rimskie.com/products/5741-test',
+        sourceTitle: 'Римская штора из исходной карточки',
+        sourceDescription: 'Полный исходный текст товара.',
+        sourcePrice: '7835.00',
+        firstImageUrl: 'https://rimskie.com/media/output/test.webp',
+        firstImagePath: 'images/5741.webp',
+        attributes: {},
+        sourceSlugs: ['rimskie-shtory-na-arochnoe-okno'],
+    }, null, 2)}\n`, 'utf8');
+    await writeFile(join(seedImages, '5741.webp'), Buffer.from('RIFF0000WEBPseed'));
+    await writeFile(join(seedProducts, '11889.json'), `${JSON.stringify({
+        externalId: '11889',
+        sourceUrl: 'https://rimskie.com/products/11889-test',
+        sourceTitle: 'Римская штора первая',
+        sourceDescription: 'Полный исходный текст первого товара.',
+        sourcePrice: '4799.00',
+        firstImageUrl: 'https://rimskie.com/media/output/first.webp',
+        firstImagePath: 'images/11889.webp',
+        attributes: {},
+        sourceSlugs: ['rimskie-shtory-na-arochnoe-okno'],
+    }, null, 2)}\n`, 'utf8');
+    await writeFile(join(seedImages, '11889.webp'), Buffer.from('RIFF0000WEBPseed'));
+    await writeFile(join(seedRoot, 'progress.json'), `${JSON.stringify({
+        schemaVersion: 1,
+        status: 'running',
+        stage: 'waiting_before_html',
+        targetProducts: 50,
+        completedProducts: 2,
+        requestsLastHour: 6,
+        updatedAt: '2026-08-26T09:00:30.000Z',
+        nextActionAt: '2026-08-26T09:04:00.000Z',
+        currentProduct: {
+            externalId: '129',
+            url: 'https://rimskie.com/products/129-test',
+        },
+    }, null, 2)}\n`, 'utf8');
+
+    const service = await createStatusService({
+        dataRoot,
+        now: () => Date.parse('2026-08-26T09:01:00.000Z'),
+    });
+    const snapshot = await service.getRunSnapshot(runId);
+    const products = await service.listProducts(runId, 1, 20);
+    const imagePath = await service.getImagePath(runId, '5741');
+
+    assert.equal(snapshot.status, 'running');
+    assert.equal(snapshot.pauseReason, null);
+    assert.equal(snapshot.metrics.uniqueProducts, 2);
+    assert.equal(snapshot.metrics.images, 2);
+    assert.equal(snapshot.metrics.requestsLastHour, 6);
+    assert.equal(snapshot.nextRequestAt, Date.parse('2026-08-26T09:04:00.000Z'));
+    assert.equal(snapshot.lastUrl, 'https://rimskie.com/products/129-test');
+    assert.equal(snapshot.browserSeed.completedProducts, 2);
+    assert.equal(products.total, 2);
+    assert.equal(products.items.find((item) => item.externalId === '5741').name,
+        'Римская штора из исходной карточки');
+    assert.equal(products.items.find((item) => item.externalId === '5741').sourcePrice, '7835.00');
+    assert.equal(imagePath, join(seedImages, '5741.webp'));
 });
 
 test('status service rejects traversal identifiers before reading a run', async (t) => {
