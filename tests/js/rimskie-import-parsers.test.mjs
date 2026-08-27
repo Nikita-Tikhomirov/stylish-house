@@ -49,6 +49,39 @@ test('rimskie import parser product keeps the first gallery photo and factual at
     });
 });
 
+test('rimskie import parser supports the current product description and image markup', () => {
+    const currentProductHtml = `<!doctype html><html><head>
+        <meta itemprop="description" content="SEO-анонс карточки">
+        <meta itemprop="price" content="2476">
+    </head><body>
+        <div class="product-code">Код товара: 11889</div>
+        <h1>Римская штора вельвет белоснежный, для проёма</h1>
+        <img src="/uploads/settings/logo.svg">
+        <img src="/media/output/first-current.webp"
+             alt="Римская штора вельвет белоснежный, для проёма">
+        <div class="prices"><span class="price current">4 799 ₽</span></div>
+        <section class="text" itemprop="description">
+            Классическая римская штора из белоснежного вельвета.
+        </section>
+        <meta itemprop="description" content="Описание рекомендованного товара">
+    </body></html>`;
+
+    const result = parseProductPage(
+        currentProductHtml,
+        'https://rimskie.com/products/11889-current',
+    );
+
+    assert.equal(
+        result.sourceDescription,
+        'Классическая римская штора из белоснежного вельвета.',
+    );
+    assert.equal(
+        result.firstImageUrl,
+        'https://rimskie.com/media/output/first-current.webp',
+    );
+    assert.equal(result.sourcePrice, '4799.00');
+});
+
 test('rimskie import parser source contract has 46 unique rimskie.com collection definitions', async () => {
     const sources = JSON.parse(await readFile(
         new URL('../../config/rimskie-import-sources.json', import.meta.url),

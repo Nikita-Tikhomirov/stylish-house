@@ -19,6 +19,10 @@ function normalizedText(node) {
     return node?.textContent?.replace(/\s+/g, ' ').trim() || '';
 }
 
+function normalizedValue(value) {
+    return String(value ?? '').replace(/\s+/g, ' ').trim();
+}
+
 function normalizeMoney(value) {
     const numeric = String(value ?? '')
         .replace(/\s/g, '')
@@ -70,20 +74,53 @@ function readAttributes(document) {
     return attributes;
 }
 
+function readDescription(document) {
+    const candidates = document.querySelectorAll('.product-description, [itemprop="description"]');
+
+    for (const candidate of candidates) {
+        if (candidate.tagName === 'META') continue;
+        const value = normalizedText(candidate);
+        if (value) return value;
+    }
+
+    return '';
+}
+
+function readFirstImage(document, title) {
+    const galleryImage = document.querySelector(
+        '.product-gallery img, [data-gallery] img, .gallery img',
+    );
+    if (galleryImage?.getAttribute('src')) return galleryImage;
+
+    return [...document.querySelectorAll('img[src]')].find((image) => {
+        const source = image.getAttribute('src') || '';
+        return source.includes('/media/output/')
+            && normalizedValue(image.getAttribute('alt')) === title;
+    }) || null;
+}
+
+function readPrice(document) {
+    const visiblePrice = normalizedText(document.querySelector('.prices .price.current, .price.current'));
+    if (visiblePrice) return normalizeMoney(visiblePrice);
+
+    return normalizeMoney(document.querySelector('meta[itemprop="price"]')?.getAttribute('content'));
+}
+
 export function parseProductPage(html, pageUrl) {
     const approvedPageUrl = resolveDonorUrl(pageUrl, {
         kind: 'product',
         label: 'product page URL',
     });
     const document = new JSDOM(html, { url: approvedPageUrl }).window.document;
-    const firstImage = document.querySelector('.product-gallery img, [data-gallery] img, .gallery img');
+    const sourceTitle = normalizedText(document.querySelector('h1'));
+    const firstImage = readFirstImage(document, sourceTitle);
 
     return {
         externalId: externalIdFromDocument(document, approvedPageUrl),
         sourceUrl: approvedPageUrl,
-        sourceTitle: normalizedText(document.querySelector('h1')),
-        sourceDescription: normalizedText(document.querySelector('.product-description, [itemprop="description"]')),
-        sourcePrice: normalizeMoney(document.querySelector('meta[itemprop="price"]')?.getAttribute('content')),
+        sourceTitle,
+        sourceDescription: readDescription(document),
+        sourcePrice: readPrice(document),
         firstImageUrl: firstImage?.getAttribute('src')
             ? resolveDonorUrl(firstImage.getAttribute('src'), {
                 baseUrl: approvedPageUrl,

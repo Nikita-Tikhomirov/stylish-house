@@ -1343,6 +1343,7 @@ test('playwright transport clicks the exact simple challenge retry button once',
         getByRole: (role, options) => {
             assert.equal(role, 'button');
             assert.match('Попробовать снова', options.name);
+            assert.match('Я не робот', options.name);
             return locator;
         },
         locator: () => ({ count: async () => 0 }),
