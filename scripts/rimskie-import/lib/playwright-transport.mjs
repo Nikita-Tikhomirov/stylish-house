@@ -21,7 +21,8 @@ import { detectImageFormat, validateImageFile } from './webp.mjs';
 export { detectImageFormat, validateImageFile } from './webp.mjs';
 
 const challengePattern = /bothunt|captcha|challenge-platform|cf-chl-|verify you are human|подтвердите[^<]{0,40}человек|не удалось выполнить проверку|попроб(?:овать|уйте)\s+(?:снова|ещ[её]\s+раз)/i;
-const simpleChallengeRetryPattern = /^(?:Попробовать снова|Повторить|Я не робот|Try again)$/i;
+const simpleChallengeRetryPattern = /^(?:Попробовать снова|Повторить|Try again)$/i;
+const manualChallengePattern = /(?:подтвердите[^<]{0,60}(?:не\s+)?робот|я\s+не\s+робот|verify[^<]{0,60}human)/i;
 const fullCaptchaControlSelector = [
     'iframe[src*="captcha" i]',
     'iframe[title*="captcha" i]',
@@ -45,6 +46,10 @@ function visibleDocumentText(html) {
 
 function isChallengeDocument(html) {
     return challengePattern.test(visibleDocumentText(html));
+}
+
+function isManualChallengeDocument(html) {
+    return manualChallengePattern.test(visibleDocumentText(html));
 }
 
 function isProtectionChromeError(pageUrl, html, status) {
@@ -433,8 +438,8 @@ export class PlaywrightTransport {
                 for (let poll = 0; poll < 20 && !protectionChromeError; poll += 1) {
                     await this.page.waitForTimeout(500);
                     visibleUrl = this.page.url?.() || finalUrl;
-                    if (!/^chrome-error:\/\/chromewebdata\/?$/i.test(visibleUrl)) continue;
                     html = await this.page.content();
+                    if (isChallengeDocument(html)) break;
                     protectionChromeError = isProtectionChromeError(
                         visibleUrl,
                         html,
@@ -454,7 +459,8 @@ export class PlaywrightTransport {
                         pageKind,
                         manual: protectionChromeError
                             ? false
-                            : await hasFullCaptchaControls(this.page),
+                            : isManualChallengeDocument(html)
+                                || await hasFullCaptchaControls(this.page),
                     },
                 );
             }

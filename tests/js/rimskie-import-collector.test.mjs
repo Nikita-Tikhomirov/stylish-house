@@ -1316,6 +1316,36 @@ test('visible donor verification retry copy is a challenge even on HTTP 403', as
     await transport.close();
 });
 
+test('delayed I am not a robot page is classified as a manual challenge', async () => {
+    let html = '<html><body>Доступ временно запрещён</body></html>';
+    let settleWaitCalls = 0;
+    const response = { status: () => 403, url: () => whiteUrl };
+    const page = {
+        goto: async () => response,
+        content: async () => html,
+        evaluate: async () => {},
+        url: () => whiteUrl,
+        waitForTimeout: async () => {
+            settleWaitCalls += 1;
+            if (settleWaitCalls < 3) return;
+            html = `<html><body>
+                <p>Подтвердите, что вы не робот</p>
+                <button>Я не робот</button>
+                <footer>BotHunt</footer>
+            </body></html>`;
+        },
+        locator: () => ({ count: async () => 0 }),
+    };
+    const transport = new PlaywrightTransport({ close: async () => {} }, page);
+
+    await assert.rejects(
+        transport.getHtml(whiteUrl, { kind: 'category' }),
+        (error) => error instanceof DonorRequestError
+            && error.kind === 'challenge' && error.manual === true,
+    );
+    assert.equal(settleWaitCalls, 3);
+});
+
 test('playwright transport clicks the exact simple challenge retry button once', async () => {
     let html = '<html><body>BotHunt verification<button>Попробовать снова</button></body></html>';
     let retryClicks = 0;
@@ -1343,7 +1373,7 @@ test('playwright transport clicks the exact simple challenge retry button once',
         getByRole: (role, options) => {
             assert.equal(role, 'button');
             assert.match('Попробовать снова', options.name);
-            assert.match('Я не робот', options.name);
+            assert.doesNotMatch('Я не робот', options.name);
             return locator;
         },
         locator: () => ({ count: async () => 0 }),
