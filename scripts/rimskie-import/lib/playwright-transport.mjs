@@ -47,6 +47,12 @@ function isChallengeDocument(html) {
     return challengePattern.test(visibleDocumentText(html));
 }
 
+function isProtectionChromeError(pageUrl, html, status) {
+    return (status === 403 || status === 429)
+        && /^chrome-error:\/\/chromewebdata\/?$/i.test(pageUrl)
+        && /\bERR_FAILED\b/i.test(visibleDocumentText(html));
+}
+
 export class DonorRequestError extends Error {
     constructor(kind, message, details = {}) {
         super(message);
@@ -411,19 +417,47 @@ export class PlaywrightTransport {
                     url: finalUrl,
                 });
             }
-            if (isChallengeDocument(html)) {
+            const responseStatus = response.status();
+            let visibleUrl = this.page.url?.() || finalUrl;
+            let protectionChromeError = isProtectionChromeError(
+                visibleUrl,
+                html,
+                responseStatus,
+            );
+            if ((responseStatus === 403 || responseStatus === 429)
+                && !isChallengeDocument(html)
+                && !protectionChromeError
+                && typeof this.page.waitForTimeout === 'function') {
+                // Chrome can replace a rejected donor response with its internal
+                // ERR_FAILED document just after page.content() becomes readable.
+                await this.page.waitForTimeout(500);
+                visibleUrl = this.page.url?.() || finalUrl;
+                if (/^chrome-error:\/\/chromewebdata\/?$/i.test(visibleUrl)) {
+                    html = await this.page.content();
+                    protectionChromeError = isProtectionChromeError(
+                        visibleUrl,
+                        html,
+                        responseStatus,
+                    );
+                }
+            }
+            if (isChallengeDocument(html) || protectionChromeError) {
                 this.pendingChallenge = { url: finalUrl, pageKind };
                 throw new DonorRequestError(
                     'challenge',
-                    'BotHunt/challenge requires an explicitly authorized click in the visible browser',
+                    protectionChromeError
+                        ? 'Donor protection response opened Chrome ERR_FAILED; guarded reload required'
+                        : 'BotHunt/challenge requires an explicitly authorized click in the visible browser',
                     {
                         url: finalUrl,
                         pageKind,
-                        manual: await hasFullCaptchaControls(this.page),
+                        manual: protectionChromeError
+                            ? false
+                            : await hasFullCaptchaControls(this.page),
                     },
                 );
             }
-            const failure = statusFailure(response.status(), finalUrl);
+            const failure = statusFailure(responseStatus, finalUrl);
             if (failure) throw failure;
             return html;
         } finally {

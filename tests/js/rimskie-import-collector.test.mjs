@@ -1364,18 +1364,23 @@ test('playwright transport clicks the exact simple challenge retry button once',
 });
 
 test('playwright transport retries the counted donor URL from Chrome error page', async () => {
-    let html = '<html><body>BotHunt verification</body></html>';
+    let html = '<html><body>Доступ временно запрещён</body></html>';
+    let chromeErrorVisible = false;
     let reloadCalls = 0;
     let roleLookupCalls = 0;
     const response = {
-        status: () => 200,
+        status: () => reloadCalls === 0 ? 403 : 200,
         url: () => whiteUrl,
     };
     const page = {
         goto: async () => response,
         content: async () => html,
         evaluate: async () => {},
-        url: () => 'chrome-error://chromewebdata/',
+        url: () => chromeErrorVisible ? 'chrome-error://chromewebdata/' : whiteUrl,
+        waitForTimeout: async () => {
+            chromeErrorVisible = true;
+            html = '<html><body>Не удается получить доступ к сайту ERR_FAILED</body></html>';
+        },
         locator: () => ({ count: async () => 0 }),
         getByRole: () => {
             roleLookupCalls += 1;
@@ -1383,6 +1388,7 @@ test('playwright transport retries the counted donor URL from Chrome error page'
         },
         reload: async () => {
             reloadCalls += 1;
+            chromeErrorVisible = false;
             html = categoryHtml([]);
             return response;
         },
