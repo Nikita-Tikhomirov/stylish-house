@@ -1048,6 +1048,32 @@ test('playwright transport opens the supplied profile through native Chrome CDP'
     await transport.close();
 });
 
+test('playwright transport lets native Chrome exit cleanly before forcing termination', async () => {
+    const browserProcess = Object.assign(new EventEmitter(), {
+        exitCode: null,
+        killed: false,
+        kill() { this.killed = true; },
+    });
+    const browser = {
+        close: async () => {
+            setImmediate(() => {
+                browserProcess.exitCode = 0;
+                browserProcess.emit('exit', 0);
+            });
+        },
+    };
+    const transport = new PlaywrightTransport(
+        { close: async () => {} },
+        {},
+        { browser, browserProcess },
+    );
+
+    await transport.close();
+
+    assert.equal(browserProcess.killed, false);
+    assert.equal(browserProcess.exitCode, 0);
+});
+
 test('HTML navigation looks like a normal browser without loading uncounted product photos', () => {
     const base = {
         routeMode: 'collecting',

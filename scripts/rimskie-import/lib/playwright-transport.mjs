@@ -113,6 +113,38 @@ async function waitForChromeEndpoint({
     throw new Error(`Chrome DevTools port was not ready within ${timeoutMs} ms`);
 }
 
+function waitForProcessExit(browserProcess, timeoutMs = 5_000) {
+    if (!browserProcess || browserProcess.exitCode !== null) return Promise.resolve(true);
+    if (typeof browserProcess.once !== 'function') return Promise.resolve(false);
+
+    return new Promise((resolve) => {
+        let timer;
+        const finish = (exited) => {
+            if (timer) clearTimeout(timer);
+            resolve(exited);
+        };
+        const onExit = () => finish(true);
+        timer = setTimeout(() => {
+            browserProcess.removeListener?.('exit', onExit);
+            finish(false);
+        }, timeoutMs);
+        browserProcess.once('exit', onExit);
+    });
+}
+
+async function closeNativeBrowser(browser, browserProcess) {
+    let closeError = null;
+    try {
+        await browser.close();
+    } catch (error) {
+        closeError = error;
+    }
+
+    const exited = await waitForProcessExit(browserProcess);
+    if (!exited && browserProcess?.exitCode === null) browserProcess.kill();
+    if (closeError) throw closeError;
+}
+
 export async function launchChromeCdp({
     executablePath,
     profileDir,
@@ -299,8 +331,7 @@ export class PlaywrightTransport {
             await context.route('**/*', (route) => transport.#route(route));
             return transport;
         } catch (error) {
-            await browser.close().catch(() => {});
-            if (browserProcess.exitCode === null) browserProcess.kill();
+            await closeNativeBrowser(browser, browserProcess).catch(() => {});
             throw error;
         }
     }
@@ -609,8 +640,7 @@ export class PlaywrightTransport {
 
     async close() {
         if (this.browser) {
-            await this.browser.close();
-            if (this.browserProcess?.exitCode === null) this.browserProcess.kill();
+            await closeNativeBrowser(this.browser, this.browserProcess);
             return;
         }
         await this.context.close();
