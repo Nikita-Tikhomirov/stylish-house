@@ -1380,7 +1380,7 @@ test('playwright transport retries the counted donor URL from Chrome error page'
         url: () => chromeErrorVisible ? 'chrome-error://chromewebdata/' : whiteUrl,
         waitForTimeout: async () => {
             settleWaitCalls += 1;
-            if (settleWaitCalls < 3) return;
+            if (settleWaitCalls < 15) return;
             chromeErrorVisible = true;
             html = '<html><body>Не удается получить доступ к сайту ERR_FAILED</body></html>';
         },
@@ -1407,7 +1407,7 @@ test('playwright transport retries the counted donor URL from Chrome error page'
     assert.equal(result, categoryHtml([]));
     assert.equal(reloadCalls, 1);
     assert.equal(roleLookupCalls, 1);
-    assert.equal(settleWaitCalls, 3);
+    assert.equal(settleWaitCalls, 15);
 });
 
 test('playwright transport never clicks retry when full CAPTCHA controls are present', async () => {

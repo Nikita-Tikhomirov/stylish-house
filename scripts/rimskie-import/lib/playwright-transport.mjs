@@ -430,7 +430,7 @@ export class PlaywrightTransport {
                 && typeof this.page.waitForTimeout === 'function') {
                 // Chrome can replace a rejected donor response with its internal
                 // ERR_FAILED document just after page.content() becomes readable.
-                for (let poll = 0; poll < 6 && !protectionChromeError; poll += 1) {
+                for (let poll = 0; poll < 20 && !protectionChromeError; poll += 1) {
                     await this.page.waitForTimeout(500);
                     visibleUrl = this.page.url?.() || finalUrl;
                     if (!/^chrome-error:\/\/chromewebdata\/?$/i.test(visibleUrl)) continue;
