@@ -31,6 +31,13 @@ async function createFixture(t) {
     const seedImages = join(seedRoot, 'images');
     await mkdir(seedProducts, { recursive: true });
     await mkdir(seedImages, { recursive: true });
+    const seedRequestTimes = [Date.now() - 2_000, Date.now() - 1_000];
+    await writeFile(join(seedRoot, 'progress.json'), `${JSON.stringify({
+        schemaVersion: 1,
+        runId,
+        status: 'paused',
+        requestTimes: seedRequestTimes,
+    }, null, 2)}\n`, 'utf8');
     const sourceSlug = state.sources[0].sourceSlug;
     const product = {
         externalId: '11889',
@@ -49,11 +56,11 @@ async function createFixture(t) {
     ));
     await writeFile(join(seedImages, '11889.webp'), fixtureImage);
 
-    return { store, sourceSlug, product };
+    return { store, sourceSlug, product, seedRequestTimes };
 }
 
 test('browser seed import durably merges completed products into the collector checkpoint', async (t) => {
-    const { store, sourceSlug, product } = await createFixture(t);
+    const { store, sourceSlug, product, seedRequestTimes } = await createFixture(t);
 
     const first = await importBrowserSeed({ store });
     const second = await importBrowserSeed({ store });
@@ -63,6 +70,9 @@ test('browser seed import durably merges completed products into the collector c
     assert.deepEqual(first, { imported: 1, skipped: 0, completedProducts: 1 });
     assert.deepEqual(second, { imported: 0, skipped: 1, completedProducts: 1 });
     assert.deepEqual(state.completedProductIds, ['11889']);
+    assert.equal(state.requestCount, seedRequestTimes.length);
+    assert.deepEqual(state.requestPolicy.requestTimes, seedRequestTimes);
+    assert.deepEqual(state.browserSeedImportedRequestTimes, seedRequestTimes);
     assert.deepEqual(await store.readProduct('11889'), product);
     assert.deepEqual(memberships, [{ sourceSlug, externalId: '11889' }]);
     assert.equal(await validateImageFile(join(store.imagesDir, '11889.webp'), 'webp'), true);
@@ -75,5 +85,16 @@ test('browser seed import rejects a product whose image is missing', async (t) =
     await rm(join(store.runDir, 'browser-seed', 'images', '11889.webp'));
 
     await assert.rejects(importBrowserSeed({ store }), /missing.*image.*11889/i);
+    assert.deepEqual((await store.readState()).completedProductIds, []);
+});
+
+test('browser seed import rejects a live writer before reading its artifacts', async (t) => {
+    const { store } = await createFixture(t);
+    const progressPath = join(store.runDir, 'browser-seed', 'progress.json');
+    const progress = JSON.parse(await readFile(progressPath, 'utf8'));
+    progress.status = 'running';
+    await writeFile(progressPath, `${JSON.stringify(progress, null, 2)}\n`, 'utf8');
+
+    await assert.rejects(importBrowserSeed({ store }), /browser seed.*running/i);
     assert.deepEqual((await store.readState()).completedProductIds, []);
 });

@@ -16,6 +16,55 @@ function stableJson(value) {
     return JSON.stringify(value, null, 2);
 }
 
+function validateProgress(progress, store) {
+    if (!progress || progress.schemaVersion !== 1 || progress.runId !== store.runId) {
+        throw new Error('Browser seed progress does not match this run');
+    }
+    if (progress.status === 'running') {
+        throw new Error('Cannot import browser seed while its writer is running');
+    }
+    if (!Array.isArray(progress.requestTimes)
+        || progress.requestTimes.some((timestamp) => !Number.isSafeInteger(timestamp) || timestamp < 0)) {
+        throw new Error('Browser seed progress has an invalid request ledger');
+    }
+
+    return [...new Set(progress.requestTimes)].sort((left, right) => left - right);
+}
+
+async function mergeRequestLedger(store, state, seedRequestTimes) {
+    const importedRequestTimes = new Set(
+        Array.isArray(state.browserSeedImportedRequestTimes)
+            ? state.browserSeedImportedRequestTimes.filter(Number.isSafeInteger)
+            : [],
+    );
+    const requestPolicy = state.requestPolicy && typeof state.requestPolicy === 'object'
+        ? state.requestPolicy
+        : {};
+    const rollingRequestTimes = new Set(
+        Array.isArray(requestPolicy.requestTimes)
+            ? requestPolicy.requestTimes.filter(Number.isSafeInteger)
+            : [],
+    );
+    let newlyImportedRequests = 0;
+
+    for (const timestamp of seedRequestTimes) {
+        rollingRequestTimes.add(timestamp);
+        if (importedRequestTimes.has(timestamp)) continue;
+        importedRequestTimes.add(timestamp);
+        newlyImportedRequests += 1;
+    }
+
+    state.requestCount = (Number.isSafeInteger(state.requestCount) ? state.requestCount : 0)
+        + newlyImportedRequests;
+    state.requestPolicy = {
+        ...requestPolicy,
+        requestTimes: [...rollingRequestTimes].sort((left, right) => left - right),
+    };
+    state.browserSeedImportedRequestTimes = [...importedRequestTimes]
+        .sort((left, right) => left - right);
+    await store.checkpoint(state);
+}
+
 function validateAttributes(attributes, externalId) {
     if (!attributes || typeof attributes !== 'object' || Array.isArray(attributes)) {
         throw new Error(`Browser seed product ${externalId} requires normalized attributes`);
@@ -93,6 +142,13 @@ export async function importBrowserSeed({ store }) {
     const seedProductsDir = join(seedRoot, 'products');
     const seedImagesDir = join(seedRoot, 'images');
     await requireRegularDirectory(store.runDir, seedRoot, 'browser seed');
+    const progress = JSON.parse(await readSafeFile(
+        store.runDir,
+        join(seedRoot, 'progress.json'),
+        'utf8',
+    ));
+    const seedRequestTimes = validateProgress(progress, store);
+    await mergeRequestLedger(store, state, seedRequestTimes);
     await requireRegularDirectory(store.runDir, seedProductsDir, 'browser seed products');
     await requireRegularDirectory(store.runDir, seedImagesDir, 'browser seed images');
 
