@@ -18,6 +18,7 @@ import {
     DonorRequestError,
     findBrowserExecutable,
     PlaywrightTransport,
+    shouldAllowBrowserRequest,
 } from '../../scripts/rimskie-import/lib/playwright-transport.mjs';
 import { RequestPolicy } from '../../scripts/rimskie-import/lib/request-policy.mjs';
 import {
@@ -839,6 +840,45 @@ test('playwright transport opens the supplied persistent profile in headed sandb
     await transport.close();
 });
 
+test('HTML navigation permits only essential same-origin browser resources', () => {
+    const base = {
+        routeMode: 'collecting',
+        activeOperation: {
+            kind: 'html', pageKind: 'category', url: whiteUrl, consumed: true,
+        },
+    };
+    for (const resourceType of ['stylesheet', 'script', 'fetch', 'xhr']) {
+        assert.equal(shouldAllowBrowserRequest({
+            ...base,
+            resourceType,
+            url: `https://rimskie.com/assets/challenge.${resourceType}`,
+        }), true, resourceType);
+    }
+    for (const resourceType of ['image', 'font', 'media', 'websocket']) {
+        assert.equal(shouldAllowBrowserRequest({
+            ...base,
+            resourceType,
+            url: 'https://rimskie.com/assets/blocked.bin',
+        }), false, resourceType);
+    }
+    assert.equal(shouldAllowBrowserRequest({
+        ...base,
+        resourceType: 'script',
+        url: 'https://mc.yandex.ru/metrika/tag.js',
+    }), false);
+    assert.equal(shouldAllowBrowserRequest({
+        ...base,
+        resourceType: 'script',
+        url: 'https://evil.example/challenge.js',
+    }), false);
+    assert.equal(shouldAllowBrowserRequest({
+        ...base,
+        resourceType: 'fetch',
+        url: 'https://rimskie.com/api/challenge',
+        method: 'POST',
+    }), false);
+});
+
 test('browser discovery checks Windows Chrome and Edge installations without downloads', async () => {
     const checked = [];
     const edgePath = 'D:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe';
@@ -859,7 +899,7 @@ test('browser discovery checks Windows Chrome and Edge installations without dow
     assert.equal(checked.some((candidate) => candidate.endsWith('Google\\Chrome\\Application\\chrome.exe')), true);
 });
 
-test('playwright transport denies every uncounted resource after a challenge', async () => {
+test('playwright transport keeps only essential donor resources alive while challenge waits', async () => {
     const fake = fakePlaywright();
     const transport = await PlaywrightTransport.open({
         profileDir: 'profile',
@@ -894,14 +934,15 @@ test('playwright transport denies every uncounted resource after a challenge', a
     fake.page.goto = async () => ({ status: () => 403 });
     fake.page.content = async () => '<html><body>BotHunt verification</body></html>';
     await assert.rejects(transport.getHtml(whiteUrl), (error) => error.kind === 'challenge');
-    assert.equal(await routeDecision('stylesheet', 'https://rimskie.com/challenge.css'), 'abort');
+    assert.equal(await routeDecision('stylesheet', 'https://rimskie.com/challenge.css'), 'continue');
+    assert.equal(await routeDecision('script', 'https://rimskie.com/challenge.js'), 'continue');
+    assert.equal(await routeDecision('fetch', 'https://rimskie.com/api/challenge'), 'continue');
     assert.equal(await routeDecision('script', 'https://evil.example/challenge.js'), 'abort');
     assert.equal(await routeDecision('document', whiteUrl), 'abort');
     assert.equal(await routeDecision(
         'document', 'https://rimskie.com/catalog/rimskie-shtory/black',
     ), 'abort');
-    assert.equal(await routeDecision('stylesheet', 'https://rimskie.com/challenge.css'), 'abort');
-    assert.equal(await routeDecision('fetch', 'https://rimskie.com/api/catalog'), 'abort');
+    assert.equal(await routeDecision('image', 'https://rimskie.com/challenge.webp'), 'abort');
     assert.equal(await routeDecision('script', 'https://rimskie.com/challenge.js', 'POST'), 'abort');
     assert.equal(await routeDecision('websocket', 'https://rimskie.com/challenge/socket'), 'abort');
     await transport.close();
@@ -989,6 +1030,43 @@ test('playwright transport clicks the exact simple challenge retry button once',
     assert.equal(result, categoryHtml([]));
     assert.equal(retryClicks, 1);
     assert.equal(stopCalls, 1);
+});
+
+test('playwright transport retries the counted donor URL from Chrome error page', async () => {
+    let html = '<html><body>BotHunt verification</body></html>';
+    let reloadCalls = 0;
+    let roleLookupCalls = 0;
+    const response = {
+        status: () => 200,
+        url: () => whiteUrl,
+    };
+    const page = {
+        goto: async () => response,
+        content: async () => html,
+        evaluate: async () => {},
+        url: () => 'chrome-error://chromewebdata/',
+        locator: () => ({ count: async () => 0 }),
+        getByRole: () => {
+            roleLookupCalls += 1;
+            return { count: async () => 0 };
+        },
+        reload: async () => {
+            reloadCalls += 1;
+            html = categoryHtml([]);
+            return response;
+        },
+    };
+    const transport = new PlaywrightTransport({ close: async () => {} }, page);
+
+    await assert.rejects(
+        transport.getHtml(whiteUrl, { kind: 'category' }),
+        (error) => error instanceof DonorRequestError && error.kind === 'challenge',
+    );
+    const result = await transport.retrySimpleChallenge(whiteUrl, { kind: 'category' });
+
+    assert.equal(result, categoryHtml([]));
+    assert.equal(reloadCalls, 1);
+    assert.equal(roleLookupCalls, 1);
 });
 
 test('playwright transport never clicks retry when full CAPTCHA controls are present', async () => {

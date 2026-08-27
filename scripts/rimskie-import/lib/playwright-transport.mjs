@@ -129,11 +129,16 @@ export function shouldAllowBrowserRequest({
 }) {
     if (resourceType === 'websocket' || method !== 'GET') return false;
     if (!isApprovedDonorOriginUrl(url) || isAnalyticsUrl(url)) return false;
-    if (routeMode !== 'collecting') return false;
+    if (!['collecting', 'challenge'].includes(routeMode)) return false;
 
-    if (activeOperation?.kind === 'html' && resourceType === 'document'
+    if (routeMode === 'collecting' && activeOperation?.kind === 'html'
+        && resourceType === 'document'
         && isApprovedDonorUrl(url, { kind: activeOperation.pageKind || 'html' })) {
-        return url === activeOperation.url && !redirectsFromActive;
+        return url === activeOperation.url && !activeOperation.consumed && !redirectsFromActive;
+    }
+    if (activeOperation?.kind === 'html'
+        && ['stylesheet', 'script', 'fetch', 'xhr'].includes(resourceType)) {
+        return true;
     }
     if (activeOperation?.kind === 'image' && url === activeOperation.url) {
         return ['fetch', 'xhr', 'image'].includes(resourceType);
@@ -206,11 +211,6 @@ export class PlaywrightTransport {
         const resourceType = request.resourceType();
         const url = request.url();
 
-        if (this.routeMode === 'collecting' && this.activeOperation?.consumed) {
-            await route.abort();
-            return;
-        }
-
         const allowed = shouldAllowBrowserRequest({
             routeMode: this.routeMode,
             activeOperation: this.activeOperation,
@@ -221,7 +221,10 @@ export class PlaywrightTransport {
                 && redirectedFromCountedTarget(request, this.activeOperation.url),
         });
         if (allowed) {
-            if (this.routeMode === 'collecting') this.activeOperation.consumed = true;
+            if (this.routeMode === 'collecting'
+                && (this.activeOperation?.kind === 'image' || resourceType === 'document')) {
+                this.activeOperation.consumed = true;
+            }
             await route.continue();
         } else {
             await route.abort();
@@ -280,9 +283,17 @@ export class PlaywrightTransport {
             if (failure) throw failure;
             return html;
         } finally {
-            this.routeMode = 'idle';
-            this.activeOperation = null;
-            if (!this.pendingChallenge) {
+            if (this.pendingChallenge) {
+                this.routeMode = 'challenge';
+                this.activeOperation = {
+                    kind: 'html',
+                    pageKind: this.pendingChallenge.pageKind,
+                    url: this.pendingChallenge.url,
+                    consumed: true,
+                };
+            } else {
+                this.routeMode = 'idle';
+                this.activeOperation = null;
                 await this.page.evaluate(() => globalThis.stop?.()).catch(() => {});
             }
         }
@@ -311,24 +322,32 @@ export class PlaywrightTransport {
             );
         }
 
-        if (await hasFullCaptchaControls(this.page)) {
-            throw new DonorRequestError(
-                'challenge',
-                'Full CAPTCHA controls are present or challenge eligibility cannot be verified',
-                { url: requestedUrl, pageKind },
-            );
-        }
-        const retryButton = this.page.getByRole?.('button', {
+        const isChromeErrorPage = pendingChallengeMatches
+            && /^chrome-error:\/\/chromewebdata\/?$/i.test(visibleUrl);
+        let retryButton = this.page.getByRole?.('button', {
             name: simpleChallengeRetryPattern,
             exact: true,
         });
-        if (!retryButton || await retryButton.count() !== 1
-            || !await retryButton.isVisible() || !await retryButton.isEnabled()) {
-            throw new DonorRequestError(
-                'challenge',
-                'No single visible simple challenge retry button is available',
-                { url: requestedUrl, pageKind },
-            );
+        let retryButtonAvailable = retryButton && await retryButton.count() === 1;
+        if (retryButtonAvailable) {
+            retryButtonAvailable = await retryButton.isVisible() && await retryButton.isEnabled();
+        }
+        const useChromeErrorReload = isChromeErrorPage && !retryButtonAvailable;
+        if (!isChromeErrorPage) {
+            if (await hasFullCaptchaControls(this.page)) {
+                throw new DonorRequestError(
+                    'challenge',
+                    'Full CAPTCHA controls are present or challenge eligibility cannot be verified',
+                    { url: requestedUrl, pageKind },
+                );
+            }
+            if (!retryButtonAvailable) {
+                throw new DonorRequestError(
+                    'challenge',
+                    'No single visible simple challenge retry button is available',
+                    { url: requestedUrl, pageKind },
+                );
+            }
         }
 
         this.activeOperation = { kind: 'html', pageKind, url: requestedUrl, consumed: false };
@@ -336,10 +355,14 @@ export class PlaywrightTransport {
         try {
             let response;
             try {
-                [response] = await Promise.all([
-                    this.page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
-                    retryButton.click(),
-                ]);
+                if (useChromeErrorReload) {
+                    response = await this.page.reload({ waitUntil: 'domcontentloaded' });
+                } else {
+                    [response] = await Promise.all([
+                        this.page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+                        retryButton.click(),
+                    ]);
+                }
             } catch (error) {
                 const failureKind = error?.name === 'TimeoutError' ? 'timeout' : 'network';
                 throw new DonorRequestError(
