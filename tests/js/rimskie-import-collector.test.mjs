@@ -1366,6 +1366,7 @@ test('playwright transport clicks the exact simple challenge retry button once',
 test('playwright transport retries the counted donor URL from Chrome error page', async () => {
     let html = '<html><body>Доступ временно запрещён</body></html>';
     let chromeErrorVisible = false;
+    let settleWaitCalls = 0;
     let reloadCalls = 0;
     let roleLookupCalls = 0;
     const response = {
@@ -1378,6 +1379,8 @@ test('playwright transport retries the counted donor URL from Chrome error page'
         evaluate: async () => {},
         url: () => chromeErrorVisible ? 'chrome-error://chromewebdata/' : whiteUrl,
         waitForTimeout: async () => {
+            settleWaitCalls += 1;
+            if (settleWaitCalls < 3) return;
             chromeErrorVisible = true;
             html = '<html><body>Не удается получить доступ к сайту ERR_FAILED</body></html>';
         },
@@ -1404,6 +1407,7 @@ test('playwright transport retries the counted donor URL from Chrome error page'
     assert.equal(result, categoryHtml([]));
     assert.equal(reloadCalls, 1);
     assert.equal(roleLookupCalls, 1);
+    assert.equal(settleWaitCalls, 3);
 });
 
 test('playwright transport never clicks retry when full CAPTCHA controls are present', async () => {
