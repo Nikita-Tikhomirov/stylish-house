@@ -1229,6 +1229,26 @@ test('normal donor HTML may load BotHunt and SmartCaptcha scripts without becomi
     await transport.close();
 });
 
+test('visible donor verification retry copy is a challenge even on HTTP 403', async () => {
+    const html = `<!doctype html><html><body>
+        <p>Не удалось выполнить проверку. Попробуйте ещё раз.</p>
+        <button>Попробовать снова</button>
+    </body></html>`;
+    const fake = fakePlaywright({ status: 403, html });
+    const transport = await PlaywrightTransport.open({
+        profileDir: 'profile',
+        executablePath: 'chrome.exe',
+        chromium: fake.chromium,
+        cdpLauncher: fake.cdpLauncher,
+    });
+
+    await assert.rejects(
+        transport.getHtml(whiteUrl),
+        (error) => error instanceof DonorRequestError && error.kind === 'challenge',
+    );
+    await transport.close();
+});
+
 test('playwright transport clicks the exact simple challenge retry button once', async () => {
     let html = '<html><body>BotHunt verification<button>Попробовать снова</button></body></html>';
     let retryClicks = 0;

@@ -20,7 +20,7 @@ import { detectImageFormat, validateImageFile } from './webp.mjs';
 
 export { detectImageFormat, validateImageFile } from './webp.mjs';
 
-const challengePattern = /bothunt|captcha|challenge-platform|cf-chl-|verify you are human|подтвердите[^<]{0,40}человек/i;
+const challengePattern = /bothunt|captcha|challenge-platform|cf-chl-|verify you are human|подтвердите[^<]{0,40}человек|не удалось выполнить проверку|попроб(?:овать|уйте)\s+(?:снова|ещ[её]\s+раз)/i;
 const simpleChallengeRetryPattern = /^(?:Попробовать снова|Повторить|Try again)$/i;
 const fullCaptchaControlSelector = [
     'iframe[src*="captcha" i]',
