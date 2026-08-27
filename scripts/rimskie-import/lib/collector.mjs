@@ -112,6 +112,7 @@ export class Collector {
         }
         const backoffResult = await policy.resumePendingBackoff();
         if (backoffResult === 'cancelled' || state.status !== 'running') return snapshot(state);
+        await this.#clearDefiniteFailureChallengeMarkers(context);
         if (requiresFailureAcknowledgement) await policy.acknowledgeFailurePause();
 
         try {
@@ -452,6 +453,24 @@ export class Collector {
         if (index === -1) return;
         context.state.challengeRetryUrls.splice(index, 1);
         await context.store.checkpoint(context.state);
+    }
+
+    async #clearDefiniteFailureChallengeMarkers(context) {
+        const markerUrls = context.state.challengeRetryUrls;
+        const { lastFailureKind } = context.policy.snapshot();
+        if (!Array.isArray(markerUrls) || markerUrls.length === 0
+            || !protectivePauseFailureKinds.has(lastFailureKind)) {
+            return;
+        }
+
+        context.state.challengeRetryUrls = [];
+        await context.store.checkpoint(context.state);
+        await this.#appendEvent(context, {
+            type: 'challenge_retry',
+            outcome: 'definite-failure-recovered',
+            kind: lastFailureKind,
+            urls: markerUrls,
+        });
     }
 
     async #mustHalt(context) {

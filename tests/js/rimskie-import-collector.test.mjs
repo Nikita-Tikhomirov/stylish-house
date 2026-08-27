@@ -628,6 +628,47 @@ test('an uncertain challenge click is recovered by retrying the original page af
     assert.deepEqual(sleeps, [0, 30_000, 30_000, 30_000, 30_000, 0]);
 });
 
+test('a definite legacy HTTP failure clears its stale challenge marker before a new click', async (t) => {
+    const state = initialState([source('white', whiteUrl)]);
+    state.status = 'paused';
+    state.pauseReason = 'operator';
+    state.challengeRetryUrls = [whiteUrl];
+    state.requestPolicy = {
+        requestTimes: [],
+        consecutiveFailures: 2,
+        pauseRequired: false,
+        lastFailureKind: 'http_403',
+        backoffUntil: null,
+    };
+    const store = await createStore(t, state);
+    const calls = [];
+    const transport = {
+        async getHtml(url) {
+            calls.push(['html', url]);
+            throw Object.assign(new Error('fresh profile verification page'), {
+                kind: 'challenge', url, pageKind: 'category',
+            });
+        },
+        async retrySimpleChallenge(url) {
+            calls.push(['challenge', url]);
+            return categoryHtml([]);
+        },
+    };
+
+    const snapshot = await new Collector().run({
+        store,
+        transport,
+        policy: createPolicy(store),
+    });
+
+    assert.equal(snapshot.status, 'completed');
+    assert.deepEqual(snapshot.challengeRetryUrls, []);
+    assert.deepEqual(calls, [
+        ['html', whiteUrl],
+        ['challenge', whiteUrl],
+    ]);
+});
+
 test('a successful page load clears a stale challenge crash marker', async (t) => {
     const state = initialState([source('white', whiteUrl)]);
     state.challengeRetryUrls = [whiteUrl];
