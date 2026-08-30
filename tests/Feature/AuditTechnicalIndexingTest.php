@@ -72,8 +72,8 @@ class AuditTechnicalIndexingTest extends TestCase
 
         $pagination = $get('/policy/?page=2');
         $pagination->assertOk()
-            ->assertHeaderMissing('X-Robots-Tag')
-            ->assertDontSee('name="robots"', false)
+            ->assertHeader('X-Robots-Tag', 'noindex, follow')
+            ->assertSee('<meta name="robots" content="noindex, follow" />', false)
             ->assertSee(
                 '<link rel="canonical" href="https://stylish-house.net/policy/?page=2" />',
                 false
@@ -81,8 +81,8 @@ class AuditTechnicalIndexingTest extends TestCase
 
         $tracking = $get('/policy/?utm_source=chatgpt.com');
         $tracking->assertOk()
-            ->assertHeaderMissing('X-Robots-Tag')
-            ->assertDontSee('name="robots"', false)
+            ->assertHeader('X-Robots-Tag', 'noindex, follow')
+            ->assertSee('<meta name="robots" content="noindex, follow" />', false)
             ->assertSee(
                 '<link rel="canonical" href="https://stylish-house.net/policy/" />',
                 false
@@ -115,12 +115,17 @@ class AuditTechnicalIndexingTest extends TestCase
         }
     }
 
-    public function test_robots_file_allows_query_pages_to_receive_indexing_directives(): void
+    public function test_robots_file_blocks_every_query_url_for_both_crawler_groups(): void
     {
         $robots = file_get_contents(public_path('robots.txt'));
 
-        $this->assertStringNotContainsString('Disallow: /*?*', $robots);
-        $this->assertStringNotContainsString('Disallow: /?*', $robots);
+        preg_match('/User-agent: \*\R(?<rules>.*?)(?=\RUser-agent: Yandex)/s', $robots, $allAgents);
+        preg_match('/User-agent: Yandex\R(?<rules>.*?)(?=\RHost:)/s', $robots, $yandex);
+
+        foreach ([$allAgents['rules'] ?? '', $yandex['rules'] ?? ''] as $rules) {
+            $this->assertSame(1, substr_count($rules, 'Disallow: /*?*'));
+            $this->assertSame(1, substr_count($rules, 'Disallow: /?*'));
+        }
         $this->assertStringContainsString('Host: https://stylish-house.net/', $robots);
         $this->assertStringContainsString(
             'Sitemap: https://stylish-house.net/sitemap.xml',

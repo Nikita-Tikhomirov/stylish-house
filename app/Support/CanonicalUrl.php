@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Illuminate\Http\Request;
 use Illuminate\Pagination\AbstractPaginator;
 use Illuminate\Support\Str;
 
@@ -78,6 +79,23 @@ final class CanonicalUrl
         $paginator->setPath(self::withConfiguredOrigin(self::path($path)));
 
         return $paginator;
+    }
+
+    /** Append the untouched server query string to a canonical path. */
+    public static function withQueryString(string $url, ?string $queryString): string
+    {
+        return $queryString === null || $queryString === ''
+            ? $url
+            : $url.'?'.$queryString;
+    }
+
+    /** Return the path exactly as it arrived before Laravel route normalization. */
+    public static function requestPath(Request $request): string
+    {
+        $requestUri = (string) $request->server->get('REQUEST_URI', '');
+        $path = parse_url($requestUri, PHP_URL_PATH);
+
+        return is_string($path) && $path !== '' ? $path : $request->getPathInfo();
     }
 
     public static function to(string $url): string

@@ -29,6 +29,6 @@ final class IndexingPolicy
             return 'noindex, nofollow, noarchive';
         }
 
-        return $request->query->has('model') ? 'noindex, follow' : null;
+        return $request->query->count() > 0 ? 'noindex, follow' : null;
     }
 }

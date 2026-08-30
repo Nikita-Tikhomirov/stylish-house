@@ -22,6 +22,12 @@ class TrailingSlashes
             return $next($request);
         }
 
+        // These controllers know the physical catalog hierarchy and must build the
+        // final URL themselves, otherwise a foreign slashless URL redirects twice.
+        if (in_array($request->route()?->getName(), ['subcategory.show', 'product.show'], true)) {
+            return $next($request);
+        }
+
         // Laravel can normalize a routed URI before middleware runs. REQUEST_URI
         // preserves whether the browser already sent the canonical trailing slash.
         $requestUri = (string) $request->server->get('REQUEST_URI', '');

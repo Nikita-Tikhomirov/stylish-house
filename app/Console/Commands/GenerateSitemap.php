@@ -43,9 +43,11 @@ class GenerateSitemap extends Command
 
         foreach (Product::query()
             ->where('show_in_catalog', true)
-            ->whereHas('category', fn ($query) => $query->where('show_in_catalog', true))
-            ->whereHas('subcategory', fn ($query) => $query->where('show_in_catalog', true))
-            ->with(['category:id,slug', 'subcategory:id,slug'])
+            ->whereHas('category', fn ($query) => $query->where('categories.show_in_catalog', true))
+            ->whereHas('subcategory', fn ($query) => $query
+                ->where('subcategories.show_in_catalog', true)
+                ->whereColumn('subcategories.category_id', 'products.category_id'))
+            ->with(['category:id,slug', 'subcategory:id,slug,category_id'])
             ->get() as $product) {
             $sitemap->add(Url::create($this->canonicalUrl(route('product.show', [
                 'category_slug' => $product->category->slug,

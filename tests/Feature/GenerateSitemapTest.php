@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -75,6 +77,45 @@ class GenerateSitemapTest extends TestCase
             'http://localhost/jaluzi/rulonnye-shtory/example-product/',
             'http://localhost/shop-pages/dostavka/',
         ], $locations);
+    }
+
+    public function test_sitemap_generation_is_scheduled_daily(): void
+    {
+        $this->assertSame(0, Artisan::call('schedule:list'));
+        $this->assertStringContainsString('sitemap:generate', Artisan::output());
+
+        $event = collect(app(Schedule::class)->events())
+            ->first(fn ($event) => str_contains($event->command, 'sitemap:generate'));
+
+        $this->assertNotNull($event);
+        $this->assertSame('15 3 * * *', $event->expression);
+        $this->assertTrue($event->withoutOverlapping);
+    }
+
+    public function test_sitemap_excludes_products_with_inconsistent_category_relations(): void
+    {
+        $now = Carbon::parse('2026-08-17 00:00:00');
+        DB::table('categories')->insert([
+            'id' => 2,
+            'slug' => 'story',
+            'show_in_catalog' => true,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        DB::table('products')->insert([
+            'id' => 2,
+            'category_id' => 2,
+            'subcategory_id' => 1,
+            'slug' => 'inconsistent-product',
+            'show_in_catalog' => true,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $this->artisan('sitemap:generate')->assertSuccessful();
+
+        $contents = file_get_contents($this->temporaryPublicPath.DIRECTORY_SEPARATOR.'sitemap.xml');
+        $this->assertStringNotContainsString('inconsistent-product', $contents);
     }
 
     private function createSitemapTables(): void

@@ -107,7 +107,30 @@ class ProductController extends Controller
         $product = Product::where('products.slug', $product_slug)
             ->leftJoin('prod_model', 'products.model_id', '=', 'prod_model.id')
             ->select('products.*', 'prod_model.title as model_title')
+            ->with(['category', 'subcategory'])
             ->firstOrFail();
+
+        $category = $product->category;
+        $subcategory = $product->subcategory;
+        abort_unless(
+            $category
+                && $subcategory
+                && (int) $product->category_id === (int) $subcategory->category_id,
+            404
+        );
+
+        $target = CanonicalUrl::route('product.show', [
+            'category_slug' => $category->slug,
+            'subcategory_slug' => $subcategory->slug,
+            'product_slug' => $product->slug,
+        ], false);
+
+        if (CanonicalUrl::requestPath($request) !== $target) {
+            return redirect()->away(CanonicalUrl::withQueryString(
+                $target,
+                (string) $request->server->get('QUERY_STRING', '')
+            ), 301);
+        }
             
         $tabs = $product->tabs()
             // ->where('title', '!=', 'Описание')
@@ -153,8 +176,6 @@ class ProductController extends Controller
                 ->limit(10)
                 ->get();
         }
-
-        $category = $product->category;
 
         $model = null;
         if ($product->model_id) {
