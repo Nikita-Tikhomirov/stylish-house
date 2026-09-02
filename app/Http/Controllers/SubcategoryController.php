@@ -273,7 +273,7 @@ class SubcategoryController extends Controller
             ->leftJoin('prod_model', 'products.model_id', '=', 'prod_model.id')
             ->select('products.*', 'prod_model.title as model_title')
             ->with(['category', 'subcategory'])
-            ->paginate(12));
+            ->paginate(30));
 
         $maxFilterPrice = (int) Product::where('subcategory_id', $sourceSubcategoryId)
             ->when(!empty($subcategory->start_material), function ($query) use ($subcategory) {
@@ -703,7 +703,7 @@ class SubcategoryController extends Controller
         $this->applyMinPriceFilter($query, $priceFilter);
 
         $products = CanonicalUrl::paginator(
-            $query->paginate(12, ['*'], 'page', $page),
+            $query->paginate(30, ['*'], 'page', $page),
             CanonicalUrl::route('subcategory.show', [
                 'category_slug' => $subcategory->category->slug,
                 'subcategory_slug' => $subcategory->slug,

@@ -122,7 +122,7 @@ class CategoryController extends Controller
             ->leftJoin('prod_model', 'products.model_id', '=', 'prod_model.id')
             ->select('products.*', 'prod_model.title as model_title')
             ->with(['category', 'subcategory'])
-            ->paginate(12));
+            ->paginate(30));
 
         $maxFilterPrice = (int) Product::where('category_id', $category->id)
             ->whereNotNull('min_price')
@@ -432,7 +432,7 @@ class CategoryController extends Controller
         $this->applyMinPriceFilter($query, $priceFilter);
 
         $products = CanonicalUrl::paginator(
-            $query->paginate(12, ['*'], 'page', $page),
+            $query->paginate(30, ['*'], 'page', $page),
             CanonicalUrl::route('category.show', ['slug' => $category->slug], false)
         );
 
