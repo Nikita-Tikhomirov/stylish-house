@@ -168,7 +168,24 @@ class SubcategoryController extends Controller
      */
     public function show(Request $request, string $category_slug, string $subcategory_slug)
     {
-        $subcategory = Subcategory::where('slug', $subcategory_slug)->firstOrFail();
+        $subcategory = Subcategory::where('slug', $subcategory_slug)
+            ->with('category')
+            ->firstOrFail();
+        $category = $subcategory->category;
+        abort_unless($category, 404);
+
+        $target = CanonicalUrl::route('subcategory.show', [
+            'category_slug' => $category->slug,
+            'subcategory_slug' => $subcategory->slug,
+        ], false);
+
+        if (CanonicalUrl::requestPath($request) !== $target) {
+            return redirect()->away(CanonicalUrl::withQueryString(
+                $target,
+                (string) $request->server->get('QUERY_STRING', '')
+            ), 301);
+        }
+
         $templateVariant = $this->resolveTemplateVariant($subcategory);
         $isRolletCategory = (int) $subcategory->category_id === self::TEMPLATE_CATEGORY_ID;
         $useOwnProductsForTemplate = $isRolletCategory && $templateVariant === 2;
@@ -188,8 +205,6 @@ class SubcategoryController extends Controller
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
-        $category = Category::where('slug', $category_slug)->firstOrFail();
-
         $filterColors = Product::where('subcategory_id', $sourceSubcategoryId)
             ->distinct()
             ->pluck('color');

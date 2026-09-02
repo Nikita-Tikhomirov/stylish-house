@@ -101,7 +101,7 @@ class CatalogPaginationTest extends TestCase
     public function test_subcategory_page_displays_thirty_products(): void
     {
         $request = Request::create(
-            '/'.$this->category->slug.'/'.$this->subcategory->slug,
+            '/'.$this->category->slug.'/'.$this->subcategory->slug.'/',
             'GET'
         );
         $session = app('session')->driver();
@@ -121,6 +121,26 @@ class CatalogPaginationTest extends TestCase
         $this->assertInstanceOf(LengthAwarePaginator::class, $products);
         $this->assertSame(30, $products->perPage());
         $this->assertCount(30, $products->items());
+    }
+
+    public function test_subcategory_page_redirects_an_incorrect_category_slug(): void
+    {
+        $request = Request::create(
+            '/wrong-category/'.$this->subcategory->slug.'?model=1%2C2',
+            'GET'
+        );
+
+        $response = app(SubcategoryController::class)->show(
+            $request,
+            'wrong-category',
+            $this->subcategory->slug
+        );
+
+        $this->assertSame(301, $response->getStatusCode());
+        $this->assertSame(
+            '/'.$this->category->slug.'/'.$this->subcategory->slug.'/?model=1%2C2',
+            $response->headers->get('Location')
+        );
     }
 
     public function test_subcategory_filter_returns_thirty_products(): void

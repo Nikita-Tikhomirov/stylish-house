@@ -49,4 +49,21 @@ class CanonicalPaginationTest extends TestCase
 
         $this->assertSame('https://stylish-house.net/jaluzi/?page=2', $paginator->url(2));
     }
+
+    public function test_raw_request_path_and_query_can_be_preserved_for_canonical_redirects(): void
+    {
+        $request = Request::create('/wrong-category/test-subcategory?model=1%2C2', 'GET');
+
+        $this->assertSame(
+            '/wrong-category/test-subcategory',
+            CanonicalUrl::requestPath($request)
+        );
+        $this->assertSame(
+            '/test-category/test-subcategory/?model=1%2C2',
+            CanonicalUrl::withQueryString(
+                '/test-category/test-subcategory/',
+                (string) $request->server->get('QUERY_STRING')
+            )
+        );
+    }
 }
