@@ -40,13 +40,14 @@
                     </div>
                     <div class="form-group" style="color: #000 !important;">
                         <label for="seoEditor">Контент</label>
-                        <button id="toggle-editor" type="button" style="margin-bottom: 10px;">Редактировать HTML</button>
-                        
+                        <button id="toggle-editor" type="button" class="btn btn-outline-secondary btn-sm"
+                            style="margin-bottom: 10px;">Редактировать HTML</button>
+
                         <div id="editor-container">
-                            <div id="seoEditor">{!! $page->content !!}</div>
+                            <div id="seoEditor"></div>
                             <textarea id="html-editor">{!! $page->content !!}</textarea>
                         </div>
-                    
+
                         <input type="hidden" name="content" id="content" value="">
                     </div>
 
@@ -106,23 +107,63 @@
         let toggleButton = document.getElementById("toggle-editor");
         let htmlEditor = document.getElementById("html-editor");
         let quillContainer = document.querySelector(".ql-container");
+        let quillToolbar = document.querySelector(".ql-toolbar");
         let isHtmlMode = false;
+        let quillHasContent = false;
+
+        const rawContent = htmlEditor.value;
+        const hasComplexMarkup = /<\s*(table|details|summary|iframe|video|svg|form)\b|faq-block/i.test(rawContent);
+
+        function syncContentField() {
+            document.getElementById("content").value = isHtmlMode ? htmlEditor.value : quill.root.innerHTML;
+        }
+
+        if (hasComplexMarkup) {
+            // Таблицы и аккордеоны визуальный редактор не поддерживает:
+            // сразу открываем исходный HTML, чтобы верстка не потерялась.
+            htmlEditor.style.display = "block";
+            quillContainer.style.display = "none";
+            quillToolbar.style.display = "none";
+            toggleButton.textContent = "Редактировать в визуальном редакторе";
+            isHtmlMode = true;
+        } else {
+            quill.root.innerHTML = rawContent;
+            quillHasContent = true;
+        }
+        syncContentField();
 
         toggleButton.addEventListener("click", function() {
             if (!isHtmlMode) {
                 // Переключаемся в HTML
-                htmlEditor.value = quill.root.innerHTML;
+                if (quillHasContent) {
+                    htmlEditor.value = quill.root.innerHTML;
+                }
                 htmlEditor.style.display = "block";
                 quillContainer.style.display = "none";
-                toggleButton.textContent = "Редактировать в Quill";
+                quillToolbar.style.display = "none";
+                toggleButton.textContent = "Редактировать в визуальном редакторе";
+                isHtmlMode = true;
             } else {
-                // Переключаемся обратно в Quill
+                // Переключаемся обратно в визуальный редактор
+                if (/<\s*(table|details|summary|iframe|video|svg|form)\b|faq-block/i.test(htmlEditor.value)
+                    && !confirm('Визуальный редактор может упростить верстку: таблицы и аккордеоны будут удалены. Продолжить?')) {
+                    return;
+                }
                 quill.root.innerHTML = htmlEditor.value;
+                quillHasContent = true;
                 htmlEditor.style.display = "none";
                 quillContainer.style.display = "block";
+                quillToolbar.style.display = "block";
                 toggleButton.textContent = "Редактировать HTML";
+                isHtmlMode = false;
             }
-            isHtmlMode = !isHtmlMode;
+            syncContentField();
+        });
+
+        htmlEditor.addEventListener("input", function() {
+            if (isHtmlMode) {
+                syncContentField();
+            }
         });
         // Перехват вставки изображений
         quill.getModule("toolbar").addHandler("image", function () {
@@ -159,7 +200,9 @@
         });
 
         quill.on("text-change", function () {
-            document.getElementById("content").value = quill.root.innerHTML;
+            if (!isHtmlMode) {
+                syncContentField();
+            }
         });
     });
 </script>

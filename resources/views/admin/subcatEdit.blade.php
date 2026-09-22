@@ -184,12 +184,11 @@
                 <form>
                     <div class="form-group">
                         <label for="seoEditor">Редактировать</label>
-                        <button id="toggle-editor" type="button" style="margin-bottom: 10px;">Редактировать
-                            HTML</button>
+                        <button id="toggle-editor" type="button" class="btn btn-outline-secondary btn-sm"
+                            style="margin-bottom: 10px;">Редактировать HTML</button>
+                        <textarea id="seo-source" style="display: none;">{!! $subcategory->seo !!}</textarea>
                         <div id="editor-container">
-                            <div id="seoEditor">
-                                {!! $subcategory->seo !!}
-                            </div>
+                            <div id="seoEditor"></div>
                         </div>
 
                     </div>
@@ -891,9 +890,29 @@
         document.getElementById("editor-container").appendChild(imageTools);
 
         let quillContainer = document.querySelector(".ql-container");
+        let quillToolbar = document.querySelector(".ql-toolbar");
         let isHtmlMode = false;
+        let quillHasContent = false;
         const imageAltInput = document.getElementById("seo-image-alt");
         const imageWidthInput = document.getElementById("seo-image-width");
+
+        const seoSource = document.getElementById('seo-source');
+        const rawContent = seoSource ? seoSource.value : '';
+        const hasComplexMarkup = /<\s*(table|details|summary|iframe|video|svg|form)\b|faq-block/i.test(rawContent);
+
+        if (hasComplexMarkup) {
+            // Таблицы и аккордеоны визуальный редактор не поддерживает:
+            // сразу открываем исходный HTML, чтобы верстка не потерялась.
+            htmlEditor.value = rawContent;
+            htmlEditor.style.display = "block";
+            quillContainer.style.display = "none";
+            quillToolbar.style.display = "none";
+            toggleButton.textContent = "Редактировать в визуальном редакторе";
+            isHtmlMode = true;
+        } else {
+            quill.root.innerHTML = rawContent;
+            quillHasContent = true;
+        }
 
         function selectAndUploadSeoImage() {
             const input = document.createElement('input');
@@ -1007,26 +1026,37 @@
         toggleButton.addEventListener("click", function() {
             if (!isHtmlMode) {
                 // Переключение в HTML
-                htmlEditor.value = quill.root.innerHTML;
+                if (quillHasContent) {
+                    htmlEditor.value = quill.root.innerHTML;
+                }
                 htmlEditor.style.display = "block";
                 quillContainer.style.display = "none";
+                quillToolbar.style.display = "none";
                 imageTools.classList.remove('is-visible');
-                toggleButton.textContent = "Редактировать в Quill";
-            } else {
-                // Переключение обратно в Quill
-                quill.root.innerHTML = htmlEditor.value;
-                htmlEditor.style.display = "none";
-                quillContainer.style.display = "block";
-                clearSeoImageSelection();
-                toggleButton.textContent = "Редактировать HTML";
+                toggleButton.textContent = "Редактировать в визуальном редакторе";
+                isHtmlMode = true;
+                return;
             }
-            isHtmlMode = !isHtmlMode;
+
+            // Переключение обратно в визуальный редактор
+            if (/<\s*(table|details|summary|iframe|video|svg|form)\b|faq-block/i.test(htmlEditor.value)
+                && !confirm('Визуальный редактор может упростить верстку: таблицы и аккордеоны будут удалены. Продолжить?')) {
+                return;
+            }
+            quill.root.innerHTML = htmlEditor.value;
+            quillHasContent = true;
+            htmlEditor.style.display = "none";
+            quillContainer.style.display = "block";
+            quillToolbar.style.display = "block";
+            clearSeoImageSelection();
+            toggleButton.textContent = "Редактировать HTML";
+            isHtmlMode = false;
         });
 
         document.getElementById('saveSeoButton').addEventListener('click', function() {
             const content = isHtmlMode ? htmlEditor.value : quill.root.innerHTML;
 
-            if (quill.getText().trim() === '') {
+            if (content.replace(/<[^>]*>/g, ' ').trim() === '') {
                 alert('Контент пустой, введите текст.');
                 return;
             }
