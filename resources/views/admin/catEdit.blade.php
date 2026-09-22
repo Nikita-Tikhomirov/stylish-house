@@ -340,8 +340,12 @@
                 <form>
                     <div class="form-group">
                         <label for="seoEditor">Редактировать</label>
-                        <div id="seoEditor">
-                            {!! $category->seo !!}
+                        <button id="toggle-editor" type="button" class="btn btn-outline-secondary btn-sm"
+                            style="margin-bottom: 10px;">Редактировать HTML</button>
+                        <div id="editor-container">
+                            <div id="seoEditor"></div>
+                            <textarea id="html-editor" class="form-control" rows="16"
+                                style="display: none; font-family: Consolas, Monaco, monospace; font-size: 13px;">{!! $category->seo !!}</textarea>
                         </div>
                     </div>
                     <button class="btn btn-primary" type="button" id="saveSeoButton">Сохранить</button>
@@ -961,6 +965,11 @@
             ['clean']
         ];
 
+        const htmlEditor = document.getElementById('html-editor');
+        const toggleButton = document.getElementById('toggle-editor');
+        const rawContent = htmlEditor.value;
+        const hasComplexMarkup = /<\s*(table|details|summary|iframe|video|svg|form)\b|faq-block/i.test(rawContent);
+
         var quill = new Quill('#seoEditor', {
             modules: {
                 toolbar: toolbarOptions
@@ -968,11 +977,60 @@
             theme: 'snow',
         });
 
-        document.getElementById('saveSeoButton').addEventListener('click', function() {
-            const content = quill.root.innerHTML;
+        const quillContainer = document.querySelector('#editor-container .ql-container');
+        const quillToolbar = document.querySelector('#editor-container .ql-toolbar');
+        let isHtmlMode = false;
+        let quillHasContent = false;
 
-            // Проверяем, пуст ли текст (без учета форматирования)
-            if (quill.getText().trim() === '') {
+        function showHtmlMode() {
+            if (quillHasContent) {
+                htmlEditor.value = quill.root.innerHTML;
+            }
+            htmlEditor.style.display = 'block';
+            quillContainer.style.display = 'none';
+            quillToolbar.style.display = 'none';
+            toggleButton.textContent = 'Редактировать в визуальном редакторе';
+            isHtmlMode = true;
+        }
+
+        function showVisualMode() {
+            quill.root.innerHTML = htmlEditor.value;
+            quillHasContent = true;
+            htmlEditor.style.display = 'none';
+            quillContainer.style.display = 'block';
+            quillToolbar.style.display = 'block';
+            toggleButton.textContent = 'Редактировать HTML';
+            isHtmlMode = false;
+        }
+
+        if (hasComplexMarkup) {
+            // Таблицы и аккордеоны визуальный редактор не поддерживает:
+            // сразу открываем исходный HTML, чтобы верстка не потерялась.
+            showHtmlMode();
+        } else {
+            quill.root.innerHTML = rawContent;
+            quillHasContent = true;
+        }
+
+        toggleButton.addEventListener('click', function() {
+            if (!isHtmlMode) {
+                showHtmlMode();
+                return;
+            }
+
+            if (/<\s*(table|details|summary|iframe|video|svg|form)\b|faq-block/i.test(htmlEditor.value)
+                && !confirm('Визуальный редактор может упростить верстку: таблицы и аккордеоны будут удалены. Продолжить?')) {
+                return;
+            }
+
+            showVisualMode();
+        });
+
+        document.getElementById('saveSeoButton').addEventListener('click', function() {
+            const content = isHtmlMode ? htmlEditor.value : quill.root.innerHTML;
+
+            // Проверяем, пуст ли контент (по активному режиму, без учета тегов)
+            if (content.replace(/<[^>]*>/g, ' ').trim() === '') {
                 alert('Контент пустой, введите текст.');
                 return;
             }

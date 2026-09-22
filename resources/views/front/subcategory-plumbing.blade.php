@@ -336,6 +336,48 @@
                 .customAccardeonWrap .faq-block .faq-item .faq-question::marker {
                     display: none;
                 }
+            /* Таблицы внутри ответов: оформление сайта + скролл на мобильных */
+                .customAccardeonWrap table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 14px 0 18px;
+                    font-size: 15px;
+                    background: #fff;
+                }
+
+                .customAccardeonWrap table th,
+                .customAccardeonWrap table td {
+                    border: 1px solid #e0e2e3;
+                    padding: 10px 14px;
+                    text-align: left;
+                    vertical-align: top;
+                    line-height: 1.4;
+                }
+
+                .customAccardeonWrap table th {
+                    background: #f4f7f9;
+                    font-weight: 600;
+                }
+
+                .customAccardeonWrap table tr:nth-child(even) td {
+                    background: #fafbfc;
+                }
+
+                @media only screen and (max-width: 767px) {
+                    .customAccardeonWrap table {
+                        display: block;
+                        width: 100%;
+                        overflow-x: auto;
+                        -webkit-overflow-scrolling: touch;
+                        margin: 12px 0 16px;
+                    }
+
+                    .customAccardeonWrap table th,
+                    .customAccardeonWrap table td {
+                        white-space: nowrap;
+                        min-width: 130px;
+                    }
+                }
             </style>
         @else
             <x-front.section.faqcat title="Вопросы и ответы" :faqs="$faqs"></x-front.section.faqcat>
