@@ -24,6 +24,78 @@
     @vite('resources/css/index.css')
     @vite('resources/js/shop.js')
 
+    {{-- Точки пагинации слайдеров: под слайдером, с переносом, без наложений на карточки --}}
+    <style>
+        .s-subcatSections__slider > .swiper-pagination,
+        .s-gallery__cards > .swiper-pagination {
+            position: static !important;
+            display: flex !important;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            width: 100% !important;
+            max-width: 100%;
+            margin-top: 14px;
+            bottom: auto !important;
+            left: auto !important;
+            right: auto !important;
+            transform: none !important;
+        }
+
+        .s-subcatSections__slider > .swiper-pagination .swiper-pagination-bullet,
+        .s-gallery__cards > .swiper-pagination .swiper-pagination-bullet {
+            margin: 0 !important;
+            flex: 0 0 auto;
+            width: 8px;
+            height: 8px;
+        }
+
+        /* В галерее может быть много работ: показываем не больше 12 точек + активную */
+        .s-gallery__cards > .swiper-pagination .swiper-pagination-bullet:nth-child(n+13) {
+            display: none;
+        }
+
+        .s-gallery__cards > .swiper-pagination .swiper-pagination-bullet-active {
+            display: block !important;
+        }
+
+        /* Мобильные: популярные товары — по 2 карточки в ряд */
+        @media only screen and (max-width: 575px) {
+            .popularsWithFilter__cards {
+                grid-template-columns: 1fr 1fr !important;
+                grid-gap: 10px !important;
+                width: 100% !important;
+                min-width: 0;
+            }
+
+            .popularsWithFilter__cards > * {
+                min-width: 0;
+            }
+
+            .popularsWithFilter__cards .bigProdCard__title {
+                font-size: 13px;
+                line-height: 1.25;
+            }
+
+            .popularsWithFilter__cards .bigProdCard__category {
+                font-size: 11px;
+            }
+
+            .popularsWithFilter__cards .bigProdCard__info {
+                padding: 10px;
+            }
+
+            .popularsWithFilter__cards .bigProdCard__meta {
+                font-size: 12px;
+            }
+
+            .popularsWithFilter__cards .discount {
+                font-size: 15px;
+            }
+        }
+    </style>
+
 
     <meta name="yandex-verification" content="a9f75680dfa64b76" />
 
