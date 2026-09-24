@@ -2,5 +2,5 @@
 @php($showSubcatSections = false)
 @php($showRolletCalculator = true)
 @php($showRolletProfilePrices = true)
-@php($showSeoSection = false)
+@php($showSeoSection = trim((string) ($subcategory->seo ?? '')) !== '')
 @include('front.subcategory-template-1')
